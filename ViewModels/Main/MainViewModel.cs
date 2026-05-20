@@ -1,7 +1,8 @@
 ﻿using OpenCvSharp;
 using OpenCvWpfTracking.Common;
-using OpenCvWpfTracking.Services.Video;
 using OpenCvWpfTracking.Converters;
+using OpenCvWpfTracking.Services.Video;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -33,7 +34,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 영상 주소 입력값
         /// </summary>
-        private string _sourceAddress = @"D:\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
+        private string _sourceAddress = @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
         /// <summary>
         /// 상태 표시용
@@ -136,6 +137,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <returns></returns>
         public async Task Connect()
         {
+            if (_videoService.IsConnected)
+            {
+                Console.WriteLine("[VIDEO] Already Connected.");
+
+                Console.WriteLine();
+                return;
+            }
+
             if (!_videoService.Open(SourceAddress))
             {
                 StatusText = "연결 실패";
