@@ -46,6 +46,7 @@
     <LangVersion>7.3</LangVersion>
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -58,6 +59,15 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FFmpeg.AutoGen, Version=8.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\FFmpeg.AutoGen.8.1.0\lib\netstandard2.0\FFmpeg.AutoGen.dll</HintPath>
+    </Reference>
+    <Reference Include="FFmpeg.AutoGen.Abstractions, Version=8.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\FFmpeg.AutoGen.Abstractions.8.1.0\lib\netstandard2.0\FFmpeg.AutoGen.Abstractions.dll</HintPath>
+    </Reference>
+    <Reference Include="FFmpeg.AutoGen.Bindings.DynamicallyLoaded, Version=8.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\FFmpeg.AutoGen.Bindings.DynamicallyLoaded.8.1.0\lib\netstandard2.0\FFmpeg.AutoGen.Bindings.DynamicallyLoaded.dll</HintPath>
+    </Reference>
     <Reference Include="OpenCvSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=6adad1e807fea099, processorArchitecture=MSIL">
       <HintPath>packages\OpenCvSharp4.4.7.0.20230115\lib\netstandard2.0\OpenCvSharp.dll</HintPath>
     </Reference>
@@ -106,6 +116,9 @@
     <Compile Include="Common\ParameterRelayCommand.cs" />
     <Compile Include="Common\RelayCommand.cs" />
     <Compile Include="Converters\MatToBitmapSourceConverter.cs" />
+    <Compile Include="Services\Communication\ControlCommandService.cs" />
+    <Compile Include="Services\Communication\TcpClientService.cs" />
+    <Compile Include="Services\Video\FFmpegDecoderService.cs" />
     <Compile Include="Services\Video\VideoCaptureService.cs" />
     <Compile Include="ViewModels\Main\MainViewModel.cs" />
     <Compile Include="Views\Main\MainWindow.xaml.cs">
@@ -141,7 +154,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Services\Communication\" />
     <Folder Include="Services\Coordinate\" />
     <Folder Include="Services\Logging\" />
     <Folder Include="Views\Menu\" />

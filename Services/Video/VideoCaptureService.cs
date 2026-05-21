@@ -1,5 +1,6 @@
 ﻿using OpenCvSharp;
 using System;
+using System.Threading;
 
 namespace OpenCvWpfTracking.Services.Video
 {
@@ -19,42 +20,67 @@ namespace OpenCvWpfTracking.Services.Video
             // 이전 객체가 남아있는 경우에만 정리
             if (_capture != null)
             {
-                Release(); // 이전 연결 끊기 함수
+                Release();
             }
 
             Console.WriteLine("[VIDEO] Connect Try...");
+            Console.WriteLine("[VIDEO] Source : " + source);
 
-            if (int.TryParse(source, out int cameraIndex))
+            try
             {
-                _capture = new VideoCapture(cameraIndex);
-            }
-            else
-            {
-                _capture = new VideoCapture(source, VideoCaptureAPIs.ANY);
-            }
+                if (int.TryParse(source, out int cameraIndex))
+                {
+                    _capture = new VideoCapture(cameraIndex); // 웹캠 번호 연결
+                }
+                else if (source.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
+                {
+                    _capture = new VideoCapture();
 
-            if (_capture != null && _capture.IsOpened())
-            {
-                IsConnected = true;
-            }
-            else
-            {
-                IsConnected = false;
-            }
+                    bool opened =
+                        _capture.Open(
+                            source,
+                            VideoCaptureAPIs.FFMPEG);
 
-            if (IsConnected)
-            {
-                Console.WriteLine("[VIDEO] Connect Success.");
-                Console.WriteLine();
-            }
-            else
-            {
+                    Thread.Sleep(1000);
+
+                    if (!opened || !_capture.IsOpened())
+                    {
+                        Console.WriteLine("[RTSP] Open Failed.");
+                    }
+
+                }
+                else
+                {
+                    // [MP4] / [AVI] 등 일반 영상 파일
+                    _capture = new VideoCapture(source, VideoCaptureAPIs.ANY);
+                }
+
+                IsConnected = _capture != null && _capture.IsOpened();
+
+                if (IsConnected)
+                {
+                    Console.WriteLine("[VIDEO] Connect Success.");
+                    Console.WriteLine();
+                    return true;
+                }
+
                 Console.WriteLine("[VIDEO] Connect Failed.");
                 Console.WriteLine();
 
-                Release(); // 이전 연결 끊기 함수
+                Release();
+
+                return false;
             }
-            return IsConnected;
+            catch (Exception ex)
+            {
+                Console.WriteLine("[VIDEO ERROR] Open Exception : " + ex.Message);
+                Console.WriteLine();
+
+                Release();
+
+                return false;
+            }
+
         }
 
         /// <summary>
@@ -102,7 +128,8 @@ namespace OpenCvWpfTracking.Services.Video
                     frame.Dispose();
                     return null;
                 }
-                return frame; // 정상 프레임 반환
+                // 정상 프레임 반환
+                return frame;
             }
             catch (Exception ex)
             {
@@ -137,18 +164,11 @@ namespace OpenCvWpfTracking.Services.Video
                 Console.WriteLine();
                 return;
             }
-
-            Console.WriteLine("[VIDEO] Disconnect Try...");
-
             _capture.Release();
             _capture.Dispose();
             _capture = null;
 
             IsConnected = false;
-
-            Console.WriteLine("[VIDEO] Disconnect Complete.");
-
-            Console.WriteLine("========================================");
         }
 
         /// <summary>

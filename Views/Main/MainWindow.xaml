@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenCvWpfTracking"    
         mc:Ignorable="d"
-        Title="TORUSS UI" 
+        Title="TORUSS [EO/IR] DEMO VIEWER" 
         Height="1080"
         Width="1920">
 
@@ -26,20 +26,19 @@
 
             <!-- 좌측 큰 영상 -->
             <Border Grid.Column="0"
-                    Margin="0,20,10,0"
+                    Margin="0,0,10,0"
                     Background="Black"
                     BorderBrush="#5A5A5A"
                     BorderThickness="2">
                 <Grid>
                     <!-- 영상 출력 -->
-                    <Image Source="{Binding CameraImage}"
+                    <Image Source="{Binding EOCameraImage}"
                            Stretch="Uniform"/>
-
-                    <!-- 안내 문자 (영상 없으면 보이게) -->
-                    <TextBlock Text="{Binding StatusText}"
-                               Margin="0,0,10,10"
-                               Foreground="#777"
-                               FontSize="20"
+                    <!-- 안내 문자 (오른쪽 하단에 보이게) -->
+                    <TextBlock Text="{Binding EoStatusText}"
+                               Margin="0,0,5,5"
+                               Foreground="#00E676"
+                               FontSize="18"
                                FontWeight="Bold"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Bottom"
@@ -60,12 +59,18 @@
                     BorderBrush="#5A5A5A"
                     BorderThickness="2">
                     <Grid>
-                        <TextBlock Text="RIGHT TOP VIDEO"
-                               Foreground="#777"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
+                        <!-- 영상 출력 -->
+                        <Image Source="{Binding IRCameraImage}"
+                           Stretch="Uniform"/>
+                        <!-- 안내 문자 (오른쪽 하단에 보이게) -->
+                        <TextBlock Text="{Binding IrStatusText}"
+                                   Margin="0,0,5,0"
+                                   Foreground="#FF7043"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Bottom"
+                                   IsHitTestVisible="False"/>
                     </Grid>
                 </Border>
 
@@ -75,12 +80,18 @@
                     BorderBrush="#5A5A5A"
                     BorderThickness="2">
                     <Grid>
-                        <TextBlock Text="RIGHT BOTTOM VIDEO"
-                               Foreground="#777"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
+                        <!-- 영상 출력 -->
+                        <Image Source="{Binding CameraImage}"
+                           Stretch="Uniform"/>
+                        <!-- 안내 문자 (오른쪽 하단에 보이게) -->
+                        <TextBlock Text="{Binding VdStatusText}"
+                                   Margin="0,0,5,0"
+                                   Foreground="#4FC3F7"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Bottom"
+                                   IsHitTestVisible="False"/>
                     </Grid>
                 </Border>
             </Grid>
@@ -118,7 +129,7 @@
                             Background="#466A87"
                             Foreground="White"
                             FontWeight="Bold"
-                            Command="{Binding AsyncConnectCommand}"/>
+                            Command="{Binding ConnectCommand}"/>
 
                     <!-- 장비 리스트 -->
                     <Border Grid.Row="3"
@@ -145,6 +156,7 @@
                                              Foreground="#6EC1FF"
                                              FontSize="15"
                                              Margin="0,5"/>
+
                                 <RadioButton Content="TORUSS-LR1000"
                                              Foreground="#6EC1FF"
                                              FontSize="15"
@@ -154,15 +166,9 @@
                         </Grid>
                     </Border>
 
-
-
-
-
-
-
-
                 </Grid>
             </Border>
+
         </Grid>
     </Grid>
 </Window>

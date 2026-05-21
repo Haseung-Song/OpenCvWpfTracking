@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using Microsoft.Win32.SafeHandles;
+using FFmpeg.AutoGen;
 
 namespace OpenCvWpfTracking
 {
@@ -83,6 +84,21 @@ namespace OpenCvWpfTracking
         private const uint OPEN_EXISTING = 3;
 
         /// <summary>
+        /// FFmpeg Native DLL 경로 설정
+        /// avcodec / avformat / avutil / swscale DLL을 찾도록 지정
+        /// </summary>
+        private void InitializeFFmpeg()
+        {
+            string ffmpegPath =
+                Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "FFmpeg");
+
+            ffmpeg.RootPath = ffmpegPath;
+            Console.WriteLine("[FFmpeg] RootPath : " + ffmpeg.RootPath);
+        }
+
+        /// <summary>
         /// [WPF] 프로그램 시작 시 최초 실행되는 함수
         /// 콘솔 창 생성 및 Console.WriteLine 출력 연결 수행
         /// </summary>
@@ -90,10 +106,15 @@ namespace OpenCvWpfTracking
         {
             base.OnStartup(e);
 
+            InitializeFFmpeg();
 #if DEBUG
             AllocConsole(); // 콘솔 창 생성
-            Console.Title = "OpenCV WPF Debug Console"; // 콘솔 창 제목 설정
-            Console.OutputEncoding = new UTF8Encoding(false); // [BOM] 없는 [UTF8] 사용: 한글 출력 깨짐 방지
+
+            // 콘솔 창 제목 설정
+            Console.Title = "OpenCV WPF Debug Console";
+
+            // [BOM] 없는 [UTF8] 사용: 한글 출력 깨짐 방지
+            Console.OutputEncoding = new UTF8Encoding(false);
 
             /// <summary>
             /// 실제 콘솔 출력 장치(CONOUT$) 열기
@@ -159,7 +180,6 @@ namespace OpenCvWpfTracking
             Console.WriteLine("========================================");
             Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console Start");
             Console.WriteLine("========================================");
-
 #endif
         }
 
