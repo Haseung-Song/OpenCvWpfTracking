@@ -397,6 +397,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             if (_isVideoConnecting)
             {
+                Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
                 Console.WriteLine("========================================");
 
@@ -416,28 +417,41 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
                 return;
             }
+            _isVideoConnecting = true; // 연결 시도 중 상태 설정
 
-            ResetCancellationToken();
+            VdStatusText = "[VD] Connecting...";
+            EoStatusText = "[EO] Connecting...";
+            IrStatusText = "[IR] Connecting...";
 
-            VideoConnectResult result =
-                await Task.Run(OpenVideoSources);
-
-            if (!result.VdResult &&
-                !result.EoResult &&
-                !result.IrResult)
+            try
             {
-                VdStatusText = "Connect Failed.";
-                EoStatusText = "Connect Failed.";
-                IrStatusText = "Connect Failed.";
+                ResetCancellationToken();
 
-                Console.WriteLine("[VIDEO] All Connect Failed.");
-                Console.WriteLine("========================================");
+                VideoConnectResult result =
+                    await Task.Run(OpenVideoSources);
 
-                return;
+                if (!result.VdResult &&
+                    !result.EoResult &&
+                    !result.IrResult)
+                {
+                    VdStatusText = "Connect Failed.";
+                    EoStatusText = "Connect Failed.";
+                    IrStatusText = "Connect Failed.";
+
+                    Console.WriteLine("[VIDEO] All Connect Failed.");
+                    Console.WriteLine("========================================");
+
+                    return;
+                }
+                WriteVideoConnectLog(result);
+                UpdateVideoStatusText(result);
+                StartVideoLoops(result);
             }
-            WriteVideoConnectLog(result);
-            UpdateVideoStatusText(result);
-            StartVideoLoops(result);
+            finally
+            {
+                _isVideoConnecting = false;
+            }
+
         }
 
         /// <summary>
@@ -453,6 +467,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[VIDEO] Disconnect Try...");
 
             _cts?.Cancel();
+
+            Thread.Sleep(100); // ReadFrame 종료 대기
 
             _rtspVideoService.Release();
             _eoRtspDecoder.Close();
@@ -628,33 +644,71 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Action<BitmapSource> setImageAction,
             CancellationToken cancellationToken)
         {
+            /// <summary>
+            /// Cancel 요청 전까지 반복
+            /// </summary>
             while (!cancellationToken.IsCancellationRequested)
             {
-                using (Mat frame = captureService.ReadFrame())
+                Mat frame = null;
+
+                try
                 {
+                    /// <summary>
+                    /// 영상 Frame 읽기
+                    /// </summary>
+                    frame = captureService.ReadFrame();
+
+                    /// <summary>
+                    /// 영상 종료 또는 수신 실패 시
+                    /// 다음 루프 대기
+                    /// </summary>
                     if (frame == null ||
                         frame.Empty())
                     {
+                        Thread.Sleep(10);
                         continue;
                     }
 
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
+                    /// <summary>
+                    /// OpenCV Mat →
+                    /// WPF Bitmap 변환
+                    /// </summary>
+                    BitmapSource bitmap = MatToBitmapSourceConverter.Convert(frame);
 
-                    BitmapSource bitmap =
-                        MatToBitmapSourceConverter.Convert(frame);
+                    /// <summary>
+                    /// 다른 Thread 접근 허용
+                    /// </summary>
+                    bitmap.Freeze();
 
-                    bitmap?.Freeze();
-
+                    /// <summary>
+                    /// UI Thread에서 영상 갱신
+                    /// </summary>
                     App.Current.Dispatcher.Invoke(() =>
                     {
                         setImageAction(bitmap);
                     });
 
                 }
+                catch (Exception ex)
+                {
+                    /// <summary>
+                    /// 영상 수신 중 예외 발생
+                    /// 루프 종료
+                    /// </summary>
+                    Console.WriteLine("[VIDEO ERROR] " + ex.Message);
+                    break;
+                }
+                finally
+                {
+                    /// <summary>
+                    /// Frame 메모리 해제
+                    /// OpenCV 비관리 객체 정리
+                    /// </summary>
+                    frame?.Dispose();
+                }
 
             }
-
+            Console.WriteLine("[VIDEO] CaptureLoop End.");
         }
 
         /// <summary>

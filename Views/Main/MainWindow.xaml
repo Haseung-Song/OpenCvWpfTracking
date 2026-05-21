@@ -47,7 +47,7 @@
             </Border>
 
             <!-- 우측 작은 영상 2개 -->
-            <Grid Grid.Column="1" Margin="0,20,10,0">
+            <Grid Grid.Column="1" Margin="0,0,10,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
