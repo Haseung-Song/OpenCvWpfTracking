@@ -6,7 +6,6 @@ using OpenCvWpfTracking.Services.Video;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -971,9 +970,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private struct VideoConnectResult
         {
             public bool VdResult;
-
             public bool EoResult;
-
             public bool IrResult;
         }
         #endregion

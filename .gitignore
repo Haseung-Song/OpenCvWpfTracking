@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# FFmpeg Native DLL (빌드 시 자동 복사, Git 제외)
+FFmpeg/
+
