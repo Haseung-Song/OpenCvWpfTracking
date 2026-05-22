@@ -405,17 +405,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            if (IsVideoConnected())
+            if (IsAllVideoConnected())
             {
-                if (!_isVideoConnecting)
-                {
-                    VdStatusText = "Already Connected...";
-                    EoStatusText = "Already Connected...";
-                    IrStatusText = "Already Connected...";
+                VdStatusText = "Already Connected...";
+                EoStatusText = "Already Connected...";
+                IrStatusText = "Already Connected...";
 
-                    Console.WriteLine("[VIDEO] Already Connected.");
-                    Console.WriteLine("========================================");
-                }
+                Console.WriteLine("[VIDEO] Already Connected.");
+                Console.WriteLine("========================================");
+
                 return;
             }
 
@@ -460,14 +458,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     });
 
                 /// <summary>
-                /// [VD] 연결 결과 상태 표시
-                /// </summary>
-                VdStatusText =
-                    vdResult.VdResult
-                    ? "[VD] Connected"
-                    : "[VD] Disconnected";
-
-                /// <summary>
                 /// [VD] 연결 결과 [Console] 출력
                 /// </summary>
                 Console.WriteLine("[VD] " +
@@ -475,7 +465,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     ? "Connect Success"
                     : "Connect Failure"));
 
-                Console.WriteLine();
+                /// [개별 연결 상태 표시]
+                VdStatusText =
+                    vdResult.VdResult
+                    ? "[VD] Connected"
+                    : "[VD] Connect Failed";
 
                 /// <summary>
                 /// [VD] 연결 성공 시
@@ -492,20 +486,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 VideoConnectResult result = await Task.Run(OpenVideoSources);
 
-                if (!result.EoResult &&
+                // [EO / IR] 개별 상태 [Console Log] 출력
+                WriteVideoConnectLog(result);
+
+                // [EO / IR] 개별 상태 [Status text] 출력
+                UpdateVideoStatusText(result);
+
+                /// 전부 다 실패한 경우
+                if (!result.VdResult &&
+                    !result.EoResult &&
                     !result.IrResult)
                 {
-                    VdStatusText = "Connect Failed.";
-                    EoStatusText = "Connect Failed.";
-                    IrStatusText = "Connect Failed.";
-
                     Console.WriteLine("[VIDEO] All Connect Failed.");
                     Console.WriteLine("========================================");
 
                     return;
                 }
-                WriteVideoConnectLog(result);
-                UpdateVideoStatusText(result);
                 StartVideoLoops(result);
             }
             finally
@@ -620,10 +616,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 현재 영상 연결 여부 확인
         /// </summary>
-        private bool IsVideoConnected()
+        private bool IsAllVideoConnected()
         {
-            return _rtspVideoService.IsConnected ||
-                   _eoRtspDecoder.IsOpened ||
+            return _rtspVideoService.IsConnected &&
+                   _eoRtspDecoder.IsOpened &&
                    _irRtspDecoder.IsOpened;
         }
 
@@ -680,11 +676,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// 영상 연결 결과를
-        /// 각 Viewer 상태 Text에 반영
+        /// 각 [Viewer] 상태 [Text]에 반영
         ///
-        /// 기존: StatusText 하나로 전체 출력
+        /// 기존: [StatusText] 하나로 전체 출력
         ///
-        /// 변경: EO / IR 개별 상태 출력
+        /// [EO / IR] 개별 상태 [Status text] 출력
         /// </summary>
         private void UpdateVideoStatusText(VideoConnectResult result)
         {
@@ -694,7 +690,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             EoStatusText =
                 result.EoResult
                 ? "[EO] Connected"
-                : "[EO] Disconnected";
+                : "[EO] Connect Failed";
 
             /// <summary>
             /// [IR] 영상 연결 상태 표시
@@ -702,7 +698,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             IrStatusText =
                 result.IrResult
                 ? "[IR] Connected"
-                : "[IR] Disconnected";
+                : "[IR] Connect Failed";
         }
 
         /// <summary>
