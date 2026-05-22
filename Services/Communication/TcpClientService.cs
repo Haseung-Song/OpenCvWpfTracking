@@ -70,7 +70,7 @@ namespace OpenCvWpfTracking.Services.Communication
         #region [Connect]
 
         /// <summary>
-        /// LA 프로그램에 TCP Client로 접속
+        /// LA 프로그램에 [TCP Client]로 접속
         /// 
         /// 연결 성공 시 NetworkStream을 생성하고,
         /// 백그라운드 ReceiveLoop를 시작한다.
@@ -206,8 +206,7 @@ namespace OpenCvWpfTracking.Services.Communication
                     }
 
                     // buffer 전체가 아니라 실제 수신 데이터만 복사
-                    byte[] receivedData =
-                        CopyReceivedData(buffer, readSize);
+                    byte[] receivedData = CopyReceivedData(buffer, readSize);
 
                     // 수신 로그는 Console 도배 방지를 위해 1초 간격으로만 출력
                     PrintReceiveLogIfNeeded(receivedData);
@@ -245,7 +244,7 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
-        /// 마지막 로그 출력 이후 1초 이상 지났을 경우에만 수신 로그 출력
+        /// 마지막 로그 출력 이후 5초 이상 지났을 경우에만 수신 로그 출력
         /// 
         /// TCP는 Packet 단위가 아니라 Stream 단위이므로,
         /// 12byte 응답 Packet 여러 개가 한 번에 붙어서 들어올 수 있다.
@@ -256,7 +255,7 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         private void PrintReceiveLogIfNeeded(byte[] receivedData)
         {
-            if ((DateTime.Now - _lastRecvLogTime).TotalSeconds < 1)
+            if ((DateTime.Now - _lastRecvLogTime).TotalSeconds < 5)
                 return;
 
             PrintReceivePackets(receivedData);
@@ -342,6 +341,7 @@ namespace OpenCvWpfTracking.Services.Communication
             _tcpClient = null;
 
             Console.WriteLine("[TCP] Disconnected.");
+            Console.WriteLine();
         }
         #endregion
     }

@@ -371,10 +371,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
             EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.150:554/rtsp_tunnel";
+                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
             // 현재 열화상 카메라 작동 (X)
             IrSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.150:554/rtsp_tunnel";
+                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
         }
 
         #endregion
@@ -817,9 +817,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
             }
-            Console.WriteLine("[VIDEO] CaptureLoop End");
 
-            Console.WriteLine();
         }
 
         /// <summary>
@@ -867,7 +865,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
             }
-            Console.WriteLine("[FFmpeg] CaptureLoop End.");
+
         }
 
         #endregion

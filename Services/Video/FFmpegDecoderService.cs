@@ -152,9 +152,9 @@ namespace OpenCvWpfTracking.Services.Video
         /// rtsp_transport=tcp:
         /// C++ FFmpeg 구조에서 TCP 기반으로 열었던 것과 동일하게 TCP 강제
         ///
-        /// timeout=7000000:
+        /// timeout=3000000:
         /// RTSP 연결 Timeout 설정
-        /// 단위는 microsecond, 7000000 = 7초
+        /// 단위는 microsecond, 3000000 = 3초
         /// </summary>
         private AVDictionary* CreateRtspOptions()
         {
