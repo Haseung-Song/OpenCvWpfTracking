@@ -119,6 +119,8 @@
     <Compile Include="Common\RelayCommand.cs" />
     <Compile Include="Converters\MatToBitmapSourceConverter.cs" />
     <Compile Include="Services\Communication\ControlCommandService.cs" />
+    <Compile Include="Services\Communication\LAPacketParser.cs" />
+    <Compile Include="Services\Communication\LaResponsePacket.cs" />
     <Compile Include="Services\Communication\TcpClientService.cs" />
     <Compile Include="Services\Video\FFmpegDecoderService.cs" />
     <Compile Include="Services\Video\VideoCaptureService.cs" />

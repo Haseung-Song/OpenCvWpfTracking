@@ -4,6 +4,7 @@ using OpenCvWpfTracking.Converters;
 using OpenCvWpfTracking.Services.Communication;
 using OpenCvWpfTracking.Services.Video;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -14,51 +15,51 @@ using System.Windows.Media.Imaging;
 namespace OpenCvWpfTracking.ViewModels.Main
 {
     /// <summary>
-    /// Main 화면 ViewModel
+    /// [Main] 화면 [ViewModel]
     /// 
-    /// 역할:
-    /// 1. MP4 / EO RTSP / IR RTSP 영상 출력 제어
-    /// 2. LA(Local Agent) TCP 통신 서비스 초기화
-    /// 3. TORUSS 제어 명령 서비스 관리
-    /// 4. XAML 바인딩용 Image / StatusText 갱신
+    /// 메인 클래스 역할:
+    /// 1. [VD] / [EO RTSP] / [IR RTSP] 영상 출력 제어
+    /// 2. LA(Local Agent) [TCP] 통신 서비스 초기화
+    /// 3. [TORUSS] 제어 명령 서비스 관리
+    /// 4. [XAML] 바인딩용, [Image] / [StatusText] 갱신
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged
     {
         #region [Fields]
 
         /// <summary>
-        /// 영상 모드 Index
+        /// 영상 모드 => [Index]
         /// 
         /// 0 : [VD] 영상
         /// 1 : [EO] 영상
         /// 2 : [IR] 영상
         /// 
-        /// 현재는 SourceAddress 확인용으로 사용하고,
-        /// 실제 Connect 시에는 MP4 / EO / IR을 각각 연결한다.
+        /// 현재는 [SourceAddress] 확인용으로 사용하고,
+        /// 실제 [Connect] 시에는 [VD] / [EO] / [IR]을 각각 연결한다.
         /// </summary>
         private int _videoModeIndex;
 
         /// <summary>
-        /// [VD] 파일 영상 출력용 Service
+        /// [VD] 파일 영상 출력용 [Service]
         /// 
-        /// OpenCvSharp VideoCapture 기반이며,
-        /// 현재 RTSP보다는 MP4 / WebCam 테스트 용도로 유지한다.
+        /// [OpenCvSharp] [VideoCapture] 기반이며,
+        /// [MP4] / [WebCam] 테스트 용도로 유지한다.
         /// </summary>
-        private readonly VideoCaptureService _rtspVideoService;
+        private readonly VideoCaptureService _vdVideoService;
 
         /// <summary>
         /// [EO] 주간 카메라 [RTSP] 영상 처리 객체
         /// 
-        /// OpenCvSharp VideoCapture RTSP 연결 실패로 인해
-        /// 실제 RTSP 출력은 FFmpegRtspDecoderService를 사용한다.
+        /// [OpenCvSharp] [VideoCapture] [RTS]P 연결 실패로 인해
+        /// 실제 [RTSP] 출력은 [FFmpegRtspDecoderService]를 사용한다.
         /// </summary>
         private readonly FFmpegDecoderService _eoRtspDecoder;
 
         /// <summary>
         /// [IR] 열상 카메라 [RTSP] 영상 처리 객체
         /// 
-        /// OpenCvSharp VideoCapture RTSP 연결 실패로 인해
-        /// 실제 RTSP 출력은 FFmpegRtspDecoderService를 사용한다.
+        /// [OpenCvSharp] [VideoCapture] [RTSP] 연결 실패로 인해
+        /// 실제 [RTSP] 출력은 [FFmpegRtspDecoderService]를 사용한다.
         /// </summary>
         private readonly FFmpegDecoderService _irRtspDecoder;
 
@@ -70,30 +71,51 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [TORUSS] 제어 명령 서비스
         /// 
-        ///[TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
+        /// [TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
         /// </summary>
         private readonly ControlCommandService _controlCommandService;
 
         /// <summary>
-        /// 영상 루프를 중지하기 위한 CancellationTokenSource
+        /// [LA] 수신 [Packet Parser]
         /// 
-        /// Connect 시 새로 생성하고,
-        /// Disconnect 시 Cancel / Dispose 처리한다.
+        /// [TcpClientService]에서 받은 byte[] 데이터를
+        /// [12byte] 단위의 [LA] 응답 [Packet]으로 분리 / 검증하는 역할
+        /// </summary>
+        private readonly LAPacketParser _laPacketParser;
+
+        /// <summary>
+        /// 마지막 [LA] 상태 로그 출력 시간
+        /// 
+        /// 상태 [Packet]은 [10Hz]로 계속 들어오므로,
+        /// [Console] 도배 방지 목적
+        /// </summary>
+        private DateTime _lastLaStatusLogTime = DateTime.MinValue;
+
+        /// <summary>
+        /// [LA] 상태 로그 출력 간격
+        /// </summary>
+        private const int LaLogIntervalSeconds = 5;
+
+        /// <summary>
+        /// 영상 루프를 중지하기 위한 [CancellationTokenSource]
+        /// 
+        /// [Connect] 시 새로 생성하고,
+        /// [Disconnect] 시 [Cancel / Dispose] 처리한다.
         /// </summary>
         private CancellationTokenSource _cts;
 
         /// <summary>
-        /// 왼쪽 상하단 [VD] 파일 영상 출력용 이미지
+        /// 오른쪽 하단 [VD] 파일 영상 출력용 이미지
         /// </summary>
-        private BitmapSource _cameraImage;
+        private BitmapSource _vdCameraImage;
 
         /// <summary>
-        /// 오른쪽 상단 [EO] 주간 영상 출력용 이미지
+        /// 왼쪽 상하단 [EO] 주간 영상 출력용 이미지
         /// </summary>
         private BitmapSource _eoCameraImage;
 
         /// <summary>
-        /// 오른쪽 하단 [IR] 열상 영상 출력용 이미지
+        /// 오른쪽 상단 [IR] 열상 영상 출력용 이미지
         /// </summary>
         private BitmapSource _irCameraImage;
 
@@ -115,11 +137,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 현재 영상 연결 진행 중 여부
         ///
-        /// true:
-        /// Connect 수행 중
+        /// 1. [true]: [Connect] 수행 중
         ///
-        /// false:
-        /// 연결 완료 또는 종료 상태
+        /// 2. [false]: 연결 완료 또는 종료 상태
         /// </summary>
         private bool _isVideoConnecting;
 
@@ -128,12 +148,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [ICommand]
 
         /// <summary>
-        /// 영상 Connect 버튼 Command
+        /// 영상 [Connect] 버튼 [Command]
         /// </summary>
         public ICommand ConnectCommand { get; }
 
         /// <summary>
-        /// 영상 Disconnect 버튼 Command
+        /// 영상 [Disconnect] 버튼 [Command]
         /// </summary>
         public ICommand DisconnectCommand { get; }
 
@@ -142,34 +162,50 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Constructor]
 
         /// <summary>
-        /// [MainViewModel] 생성자
-        /// 
-        /// Command / Video Service / LA TCP Service /
-        /// 기본 영상 주소 / StatusBuilder 초기화
+        /// [MainViewModel] 생성자 (초기화 역할)
         /// </summary>
         public MainViewModel()
         {
-            // Command 바인딩
+            /// <summary>
+            /// [Command] 바인딩
+            /// </summary>
             ConnectCommand = new RelayCommand(Connect);
             DisconnectCommand = new RelayCommand(Disconnect);
 
-            // 영상 서비스 생성
-            _rtspVideoService = new VideoCaptureService();
+            /// <summary>
+            /// 영상 서비스 생성
+            /// </summary>
+            _vdVideoService = new VideoCaptureService();
             _eoRtspDecoder = new FFmpegDecoderService();
             _irRtspDecoder = new FFmpegDecoderService();
 
-            // LA 통신 서비스 생성
+            /// <summary>
+            /// [LA] 통신 서비스 생성
+            /// </summary>
             _laTcpService = new TcpClientService();
 
-            // TORUSS 제어 명령 서비스 생성
+            /// <summary>
+            /// [TORUSS] 제어 명령 서비스 생성
+            /// </summary>
             _controlCommandService = new ControlCommandService(_laTcpService);
 
-            // LA 수신 Packet 확인용 이벤트 연결
+            /// <summary>
+            /// [LA] 수신 [Packet Parser] 생성
+            /// </summary>
+            _laPacketParser = new LAPacketParser();
+
+            /// <summary>
+            /// [LA] [TCP] 수신 이벤트 연결
+            /// 
+            /// [TcpClientService]의 [ReceiveLoop]에서 데이터 수신 시
+            /// [OnLaMessageReceived] 함수가 호출된다.
+            /// </summary>
             _laTcpService.MessageReceived += OnLaMessageReceived;
+            _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
 
-            _ = TestConnect();
-
-            // 기본 영상 주소 초기화
+            /// <summary>
+            /// 기본 영상 주소 초기화 (하단)
+            /// </summary>
             InitializeDefaultSourceAddress();
 
             Console.WriteLine("[LA] Service Initialize Complete");
@@ -196,17 +232,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public string IrSourceAddress { get; set; }
 
         /// <summary>
-        /// [CameraImage] 값 변경 시,
-        /// XAML의 Image Source가 갱신된다.
+        /// [VDCameraImage] 값 변경 시,
+        /// [XAML]의 [Image Source]가 갱신된다.
         /// </summary>
-        public BitmapSource CameraImage
+        public BitmapSource VDCameraImage
         {
-            get => _cameraImage;
+            get => _vdCameraImage;
             private set
             {
-                if (_cameraImage != value)
+                if (_vdCameraImage != value)
                 {
-                    _cameraImage = value;
+                    _vdCameraImage = value;
                     OnPropertyChanged();
                 }
 
@@ -216,7 +252,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [EOCameraImage] 값 변경 시,
-        /// XAML의 Image Source가 갱신된다.
+        /// [XAML]의 [Image Source]가 갱신된다.
         /// </summary>
         public BitmapSource EOCameraImage
         {
@@ -235,7 +271,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [IRCameraImage] 값 변경 시,
-        /// XAML의 Image Source가 갱신된다.
+        /// [XAML]의 [Image Source]가 갱신된다.
         /// </summary>
         public BitmapSource IRCameraImage
         {
@@ -253,10 +289,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// 현재 선택된 영상 모드 Index
+        /// 현재 선택된 영상 모드 [Index]
         /// 
-        /// 값 변경 시 SourceAddress도 변경되므로
-        /// SourceAddress 갱신 알림을 함께 수행한다.
+        /// 값 변경 시 [SourceAddress]도 변경되므로
+        /// [SourceAddress] 갱신 알림을 함께 수행한다.
         /// </summary>
         public int VideoModeIndex
         {
@@ -275,7 +311,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// 현재 VideoModeIndex 기준 영상 주소
+        /// 현재 [VideoModeIndex] 기준 영상 주소
         /// 
         /// 0 : [VD] [RTSP] 영상
         /// 1 : [EO] [RTSP] 영상
@@ -305,7 +341,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [VD] RTSP 영상 상태 출력 문자열
+        /// [VD] [RTSP] 영상 상태 출력 문자열
         /// 예)
         /// [VD] 연결 완료
         /// [VD] 연결 실패
@@ -322,7 +358,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [EO] RTSP 영상 상태 출력 문자열
+        /// [EO] [RTSP] 영상 상태 출력 문자열
         /// 예)
         /// [EO] 연결 완료
         /// [EO] 연결 실패
@@ -339,7 +375,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [IR] RTSP 영상 상태 출력 문자열
+        /// [IR] [RTSP] 영상 상태 출력 문자열
         /// 예)
         /// [IR] 연결 완료
         /// [IR] 연결 실패
@@ -362,8 +398,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 기본 영상 주소 초기화
         /// 
-        /// MP4는 OpenCvSharp VideoCaptureService로 출력하고,
-        /// EO / IR RTSP는 FFmpegRtspDecoderService로 출력한다.
+        /// [VD]는 [OpenCvSharp] [VideoCaptureService]로 출력하고,
+        /// [EO / IR] [RTSP]는 [FFmpegRtspDecoderService]로 출력한다.
         /// </summary>
         private void InitializeDefaultSourceAddress()
         {
@@ -372,6 +408,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             EoSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+
             // 현재 열화상 카메라 작동 (X)
             IrSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
@@ -384,11 +421,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 영상 연결 함수
         /// 
-        /// [MP4] / [EO RTSP] / [IR RTSP] 연결을 시도하고,
-        /// 연결 성공한 영상만 각각의 CaptureLoop로 출력한다.
+        /// [VD] / [EO RTSP] / [IR RTSP] 연결을 시도하고,
+        /// 연결 성공한 영상만 각각의 [CaptureLoop]로 출력한다.
         /// 
-        /// FFmpeg RTSP Open은 지연될 수 있으므로
-        /// 백그라운드 Task에서 연결을 시도한다.
+        /// [FFmpeg RTSP Open]은 지연될 수 있으므로
+        /// 백그라운드 [Task]에서 연결을 시도한다.
         /// </summary>
         public async void Connect()
         {
@@ -428,26 +465,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 ResetCancellationToken();
 
                 /// <summary>
-                /// [VD]도 EO / IR처럼 연결 시도 자체를 백그라운드에서 처리
+                /// [VD]도 [EO / IR]처럼 연결 시도 자체를 백그라운드에서 처리
                 /// 
-                /// 로컬 MP4는 연결이 너무 빠르므로,
-                /// Open 전 짧은 대기를 주어 Connecting 상태가 보이도록 한다.
+                /// 로컬 [VD]는 연결이 너무 빠르므로,
+                /// [Open] 전 짧은 대기를 주어, [연결중] 상태가 보이도록 한다.
                 /// </summary>
                 VideoConnectResult vdResult =
                     await Task.Run(() =>
                     {
                         /// <summary>
                         /// [VD] 연결 시도 전 대기
-                        /// UI에서 Connecting 상태 확인용
+                        /// [UI]에서 [연결중] 상태 확인용
                         /// </summary>
                         Thread.Sleep(1200);
 
                         /// <summary>
-                        /// [VD]는 로컬 MP4 영상이므로
+                        /// [VD]는 로컬[VD] 영상이므로
                         /// [EO/IR] [RTSP] 연결 대기와 분리하여 먼저 연결 및 출력 처리
                         /// </summary>
                         bool rvsResult =
-                            _rtspVideoService.Open(
+                            _vdVideoService.Open(
                                 VdSourceAddress);
 
                         return new VideoConnectResult
@@ -479,8 +516,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _ = Task.Run(() =>
                         CaptureLoop(
-                            _rtspVideoService,
-                            bitmap => CameraImage = bitmap,
+                            _vdVideoService,
+                            bitmap => VDCameraImage = bitmap,
                             _cts.Token));
                 }
 
@@ -514,9 +551,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 영상 연결 해제 함수
         /// 
-        /// 1. CaptureLoop 종료 요청
-        /// 2. MP4 VideoCapture 해제
-        /// 3. FFmpeg EO / IR RTSP Decoder 해제
+        /// 1. [CaptureLoop] 종료 요청
+        /// 2. [VD__VideoCapture] 해제
+        /// 3. [FFmpeg] [EO / IR] [RTSP] Decoder 해제
         /// 4. 상태 문자열 갱신
         /// </summary>
         public void Disconnect()
@@ -526,12 +563,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             // 1. 먼저 루프 종료 요청
             _cts?.Cancel();
 
-            // 2. [Decoder / Capture] 객체 종료
-            _rtspVideoService.Release();
+            // 2. [Service / Decoder] 객체 종료
+            _vdVideoService.Release();
+
             _eoRtspDecoder.Close();
             _irRtspDecoder.Close();
 
-            // 3. UI Thread에서 마지막으로 검은 화면 덮어쓰기
+            // 3. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
             App.Current.Dispatcher.Invoke(() =>
             {
                 ClearVideoView(); // [VD] / [EO] / [IR] Viewer 화면을 검은 화면으로 초기화
@@ -601,7 +639,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             App.Current.Dispatcher.Invoke(() =>
             {
-                CameraImage =
+                VDCameraImage =
                     blackBitmap;
 
                 EOCameraImage =
@@ -618,13 +656,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private bool IsAllVideoConnected()
         {
-            return _rtspVideoService.IsConnected &&
+            return _vdVideoService.IsConnected &&
                    _eoRtspDecoder.IsOpened &&
                    _irRtspDecoder.IsOpened;
         }
 
         /// <summary>
-        /// 기존 CancellationTokenSource 정리 후
+        /// 기존 [CancellationTokenSource] 정리 후
         /// 새 영상 루프 종료 토큰을 생성한다.
         /// </summary>
         private void ResetCancellationToken()
@@ -637,7 +675,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
 
         /// <summary>
-        /// EO/IR 영상 연결 시도
+        /// [EO / IR] 영상 연결 시도
         /// 
         /// 이 함수는 [Task.Run] 함수 내부에서 호출되어,
         /// [RTSP Open]으로 인한 [UI] 프리징을 방지한다.
@@ -659,7 +697,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// 영상 연결 결과 Console Log 출력
+        /// 영상 연결 결과 [Console Log] 출력
         /// </summary>
         private void WriteVideoConnectLog(VideoConnectResult result)
         {
@@ -734,12 +772,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Video Capture Loop]
 
         /// <summary>
-        /// OpenCvSharp VideoCapture 기반 프레임 수신 루프
+        /// [OpenCvSharp] [VideoCapture] 기반 프레임 수신 루프
         /// 
-        /// 현재는 MP4 / WebCam 테스트 출력용으로 사용한다.
+        /// 현재는 [VD] / [WebCam] 테스트 출력용으로 사용한다.
         /// </summary>
-        /// <param name="captureService">프레임을 읽어올 VideoCaptureService 객체</param>
-        /// <param name="setImageAction">화면에 출력할 Image 속성 설정 함수</param>
+        /// <param name="captureService">프레임을 읽어올 [VideoCaptureService] 객체</param>
+        /// <param name="setImageAction">화면에 출력할 [Image] 속성 설정 함수</param>
         /// <param name="cancellationToken">스트림 중지 신호 토큰</param>
         private void CaptureLoop(
             VideoCaptureService captureService,
@@ -747,7 +785,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             CancellationToken cancellationToken)
         {
             /// <summary>
-            /// Cancel 요청 전까지 반복
+            /// [Cancel] 요청 전까지 반복
             /// </summary>
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -756,7 +794,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 try
                 {
                     /// <summary>
-                    /// 영상 Frame 읽기
+                    /// 영상 [Frame] 읽기
                     /// </summary>
                     frame = captureService.ReadFrame();
 
@@ -772,13 +810,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     }
 
                     /// <summary>
-                    /// OpenCV Mat →
-                    /// WPF Bitmap 변환
+                    /// [OpenCV Mat] →
+                    /// [WPF Bitmap] 변환
                     /// </summary>
                     BitmapSource bitmap = MatToBitmapSourceConverter.Convert(frame);
 
                     /// <summary>
-                    /// 다른 Thread 접근 허용
+                    /// 다른 [Thread] 접근 허용
                     /// </summary>
                     bitmap.Freeze();
 
@@ -786,7 +824,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         break;
 
                     /// <summary>
-                    /// UI Thread에서 영상 갱신
+                    /// [UI Thread]에서 영상 갱신
                     /// </summary>
                     App.Current.Dispatcher.Invoke(() =>
                     {
@@ -810,8 +848,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 finally
                 {
                     /// <summary>
-                    /// Frame 메모리 해제
-                    /// OpenCV 비관리 객체 정리
+                    /// [Frame] 메모리 해제
+                    /// [OpenCV] 비관리 객체 정리
                     /// </summary>
                     frame?.Dispose();
                 }
@@ -821,10 +859,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// FFmpeg 기반 RTSP 프레임 수신 루프
+        /// [FFmpeg] 기반 [RTSP] 프레임 수신 루프
         /// 
-        /// FFmpegRtspDecoderService에서 Mat 프레임을 읽고,
-        /// WPF Image에 출력할 BitmapSource로 변환한다.
+        /// [FFmpegRtspDecoderService]에서 [Mat]프레임을 읽고,
+        /// [WPF Image]에 출력할 [BitmapSource]로 변환한다.
         /// </summary>
         private void FFmpegCaptureLoop(
             FFmpegDecoderService decoder,
@@ -873,13 +911,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Communication]
 
         /// <summary>
-        /// LA 연결 테스트
+        /// [LA] 연결 시작
         /// 
-        /// 현재 LA 프로그램의 사용자 제어 연결 Port는 5001로 확인됨.
+        /// 1. 옥상 카메라 제어 [Port]: 5001
+        /// 2. 연구 개발실 제어 [Port]: 5005
+        /// 
+        /// [TCP] 연결 성공 시,
+        /// [TcpClientService] 내부 [ReceiveLoop]에서
+        /// [LA] 응답 [Packet]을 지속적으로 수신한다.
+        /// 
+        /// 수신된 원본 [byte[] 데이터]는
+        /// [MessageReceived] 이벤트를 통해 [MainViewModel]로 전달되고,
+        /// [LaPacketParser]에서 [12 byte] Packet 단위로 분리/파싱된다.
         /// </summary>
-        public async Task TestConnect()
+        public async Task ConnectLaAsync()
         {
-            Console.WriteLine("[TEST] Connect Start");
+            Console.WriteLine("[LA] Connect Start");
 
             bool result =
                 await _laTcpService.ConnectAsync(
@@ -889,26 +936,226 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     5005);
 
             Console.WriteLine(
-                "[TEST RESULT] "
+                "[LA CONNECT RESULT] "
                 + result);
 
             Console.WriteLine();
         }
 
         /// <summary>
-        /// LA에서 수신된 Packet 처리 함수
+        /// [LA] [TCP] 수신 데이터 처리 함수
         /// 
-        /// 현재는 TcpClientService 내부에서 수신 HEX 로그를 출력하므로,
-        /// 추후 TORUSS 응답 Packet Parser 연결 시 이 함수에서 처리한다.
+        /// [TcpClientService]에서 byte[] 원본 데이터를 받으면,
+        /// [LaPacketParser]를 통해 12byte [Packet] 단위로 분리한다.
         /// </summary>
         private void OnLaMessageReceived(
             byte[] data,
             DateTime receiveTime)
         {
-            // TODO:
-            // 1. 12byte TORUSS 응답 Packet 분리
-            // 2. Function Number별 Parser 적용
-            // 3. Pan / Tilt / Zoom / 상태 정보 UI 바인딩
+            /// <summary>
+            /// 수신된 [byte[] 데이터]를 [LA] 응답 [Packet] 목록으로 변환.
+            /// </summary>
+            List<LaResponsePacket> packets = _laPacketParser.Parse(data);
+
+            /// <summary>
+            /// 분리된 [Packet]을 하나씩 처리
+            /// <summary></summary>
+            foreach (LaResponsePacket packet in packets)
+            {
+                HandleLaPacket(packet);
+            }
+
+        }
+
+        /// <summary>
+        /// [LA] 응답 [Packet] 처리 함수
+        /// 
+        /// [Function] 번호를 기준으로
+        /// [Status] / [Alive] / [Extended Status Packet]을 구분한다.
+        /// </summary>
+        private void HandleLaPacket(LaResponsePacket packet)
+        {
+            /// <summary>
+            /// [Header] / [Checksum] 검증 실패 시 처리하지 않음
+            /// </summary>
+            if (!packet.IsValid)
+            {
+                Console.WriteLine("[LA PACKET] Invalid Checksum");
+                return;
+            }
+
+            /// <summary>
+            /// [3초]마다 한 번만 출력
+            /// </summary>
+            if (!CanPrintLaLog())
+            {
+                return;
+            }
+
+            switch (packet.Function)
+            {
+                case 0x01:
+
+                    /// <summary>
+                    /// [Pan] / [Tilt] / [Zoom] / [Focus] 상태 정보
+                    /// </summary>
+
+                    Console.WriteLine();
+                    Console.WriteLine("[LA PACKET] [Pan] / [Tilt] / [Zoom] / [Focus] Status");
+
+                    ParseLaStatusPacket(packet.RawData);
+
+                    Console.WriteLine("========================================");
+                    Console.WriteLine();
+                    break;
+
+                case 0x07:
+
+                    /// <summary>
+                    /// [Alive] 또는 [ACK] 계열 Packet
+                    /// </summary>
+
+                    Console.WriteLine();
+                    Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
+                    Console.WriteLine("========================================");
+                    Console.WriteLine();
+                    break;
+
+                case 0xA1:
+
+                    /// <summary>
+                    /// 문서상 세부 매핑 추가 확인 필요
+                    /// 현재 수신 패턴상 정상 확장 상태 Packet으로 분류
+                    /// </summary>
+
+                    Console.WriteLine();
+                    Console.WriteLine("[LA PACKET] Extended Status Packet");
+
+                    ParseLaExtendedStatusPacket(packet.RawData);
+
+                    Console.WriteLine("========================================");
+                    Console.WriteLine();
+                    break;
+
+                default:
+
+                    /// <summary>
+                    /// 정의되지 않은 [Function] 번호
+                    /// </summary>
+
+                    Console.WriteLine();
+                    Console.Write($"[LA PACKET] Unknown Function 0x{packet.Function:X2} : ");
+
+                    foreach (byte b in packet.RawData)
+                    {
+                        Console.Write(
+                            $"{b:X2} ");
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine("========================================");
+                    Console.WriteLine();
+                    break;
+            }
+
+        }
+
+        /// <summary>
+        /// [LA] 상태 로그 출력 여부 확인
+        /// 
+        /// 현재 시간과 마지막 출력 시간을 비교하여
+        /// 일정 시간 이내면 => [Console] 출력 생략
+        /// </summary>
+        private bool CanPrintLaLog()
+        {
+            if ((DateTime.Now -
+                 _lastLaStatusLogTime)
+                .TotalSeconds
+                < LaLogIntervalSeconds)
+            {
+                return false;
+            }
+            _lastLaStatusLogTime = DateTime.Now;
+
+            return true;
+        }
+
+        /// <summary>
+        /// [LA] [Status Packet] 파싱
+        /// 
+        /// [Function] [0x01]:
+        /// [Pan] / [Tilt] / [Zoom] / [Focus] / [Power] 상태 정보
+        /// 
+        /// 주의: 응답 [Packet]의 [2byte] 이상 데이터 => [Little Endian] 방식
+        /// </summary>
+        private void ParseLaStatusPacket(byte[] packet)
+        {
+            // [Pan] 위치 [Raw]값
+            // [packet[2] ~ packet[3]]
+            // [Little Endian short]
+            short panRaw =
+                BitConverter.ToInt16(packet, 2);
+
+            // [Tilt] 위치 [Raw]값
+            // [packet[4] ~ packet[5]]
+            // [Little Endian short]
+            short tiltRaw =
+                BitConverter.ToInt16(packet, 4);
+
+            // [Zoom] 위치 [Raw] 값
+            // [packet[6] ~ packet[7]]
+            // [Little Endian short]
+            short zoomRaw =
+                BitConverter.ToInt16(packet, 6);
+
+            // [Focus] 위치 [Raw] 값
+            // [packet[8] ~ packet[9]]
+            // [Little Endian short]
+            short focusRaw =
+                BitConverter.ToInt16(packet, 8);
+
+            // 전원 상태 [bit] 정보
+            // [packet[10]]
+            byte powerStatus = packet[10];
+
+            // [Pan] / [Tilt]는 [각도 * 100]값으로 수신되므로
+            // 실제 각도는 [ / 100] 처리
+            double panDegree = panRaw / 100.0;
+
+            double tiltDegree = tiltRaw / 100.0;
+
+            Console.WriteLine(
+                $"[LA STATUS] [Pan]   : {panDegree:F2}");
+
+            Console.WriteLine(
+                $"[LA STATUS] [Tilt]  : {tiltDegree:F2}");
+
+            Console.WriteLine(
+                $"[LA STATUS] [Zoom] : {zoomRaw}");
+
+            Console.WriteLine(
+                $"[LA STATUS] [Focus] : {focusRaw}");
+
+            Console.WriteLine(
+                $"[LA STATUS] [Power] : 0x{powerStatus:X2}");
+        }
+
+        /// <summary>
+        /// [LA] [Extended] [Status] Packet 파싱
+        /// 
+        /// [Function] [0xA1]:
+        /// 현재 주기적으로 수신되는 확장 상태 [Packet].
+        /// 세부 필드 정의 확인 전까지 [Raw HEX] 출력용으로 사용.
+        /// </summary>
+        private void ParseLaExtendedStatusPacket(byte[] packet)
+        {
+            Console.Write("[LA EXT STATUS RAW] ");
+
+            foreach (byte b in packet)
+            {
+                Console.Write($"{b:X2} ");
+            }
+            Console.WriteLine();
         }
 
         #endregion
@@ -916,10 +1163,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Test Functions]
 
         /// <summary>
-        /// FFmpeg RTSP 연결 테스트
+        /// [FFmpeg] [RTSP] 연결 테스트
         /// 
         /// 카메라 연결 상태에서 실행 시
-        /// avformat_open_input Result : 0 이 출력되어야 정상이다.
+        /// [avformat_open_input Result] : 0 이 출력되어야 정상이다.
         /// </summary>
         public void TestFFmpegRtspConnect()
         {
@@ -962,8 +1209,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 영상 연결 결과 저장 구조체
         /// 
-        /// VD / EO / IR 연결 결과를 하나로 묶어서
-        /// 로그 출력, 상태 표시, CaptureLoop 시작 여부 판단에 사용한다.
+        /// [VD] / [EO] / [IR] 연결 결과를 하나로 묶어서
+        /// 로그 출력, 상태 표시, 그리고 [CaptureLoop] 시작 여부 판단에 사용한다.
         /// </summary>
         private struct VideoConnectResult
         {
