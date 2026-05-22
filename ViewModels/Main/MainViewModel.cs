@@ -890,7 +890,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             bool result =
                 await _laTcpService.ConnectAsync(
                     "127.0.0.1",
-                    5001);
+                    // 5001 (옥상 카메라 제어)
+                    // 5005 (연구 개발실 제어)
+                    5005);
 
             Console.WriteLine(
                 "[TEST RESULT] "
