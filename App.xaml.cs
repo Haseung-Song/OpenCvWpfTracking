@@ -104,6 +104,9 @@ namespace OpenCvWpfTracking
         /// </summary>
         protected override void OnStartup(StartupEventArgs e)
         {
+            Environment.SetEnvironmentVariable("OPENCV_FFMPEG_DEBUG", "0");
+            Environment.SetEnvironmentVariable("OPENCV_LOG_LEVEL", "ERROR");
+
             base.OnStartup(e);
 
             InitializeFFmpeg();

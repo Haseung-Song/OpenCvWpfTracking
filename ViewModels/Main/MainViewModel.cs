@@ -167,6 +167,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             // LA 수신 Packet 확인용 이벤트 연결
             _laTcpService.MessageReceived += OnLaMessageReceived;
 
+            _ = TestConnect();
+
             // 기본 영상 주소 초기화
             InitializeDefaultSourceAddress();
 
