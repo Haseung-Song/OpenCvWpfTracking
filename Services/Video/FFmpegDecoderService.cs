@@ -57,6 +57,14 @@ namespace OpenCvWpfTracking.Services.Video
         /// </summary>
         private int _videoStreamIndex = -1;
 
+        /// <summary>
+        /// FFmpeg 리소스 접근 동기화 객체
+        ///
+        /// ReadFrame()과 Close()가 동시에
+        /// FFmpeg 포인터를 접근하지 못하도록 제어한다.
+        /// </summary>
+        private readonly object _syncLock = new object();
+
         #endregion
 
         #region [Properties]
@@ -291,49 +299,62 @@ namespace OpenCvWpfTracking.Services.Video
         /// </summary>
         public Mat ReadFrame()
         {
-            if (!IsOpened ||
-                _formatContext == null ||
-                _codecContext == null ||
-                _packet == null ||
-                _frame == null)
+            // [ReadFrame()] 중에는 [Close()] 못 들어오게
+            lock (_syncLock)
             {
-                return null;
-            }
-
-            while (true)
-            {
-                int result =
-                    ffmpeg.av_read_frame(
-                        _formatContext,
-                        _packet);
-
-                if (result < 0)
-                    return null;
-
-                try
+                if (!IsOpened ||
+                    _formatContext == null ||
+                    _codecContext == null ||
+                    _packet == null)
                 {
-                    if (_packet->stream_index != _videoStreamIndex)
-                        continue;
+                    return null;
+                }
 
-                    if (!SendPacketToDecoder())
-                        return null;
-
-                    result =
-                        ffmpeg.avcodec_receive_frame(
-                            _codecContext,
-                            _frame);
-
-                    if (result == ffmpeg.AVERROR(ffmpeg.EAGAIN))
-                        continue;
+                while (true)
+                {
+                    int result =
+                        ffmpeg.av_read_frame(
+                            _formatContext,
+                            _packet);
 
                     if (result < 0)
                         return null;
 
-                    return ConvertFrameToMat(_frame);
-                }
-                finally
-                {
-                    ffmpeg.av_packet_unref(_packet);
+                    try
+                    {
+                        if (_packet->stream_index != _videoStreamIndex)
+                            continue;
+
+                        result =
+                            ffmpeg.avcodec_send_packet(
+                                _codecContext,
+                                _packet);
+
+                        if (result < 0)
+                            return null;
+
+                        result =
+                            ffmpeg.avcodec_receive_frame(
+                                _codecContext,
+                                _frame);
+
+                        if (result == ffmpeg.AVERROR(ffmpeg.EAGAIN))
+                            continue;
+
+                        if (result < 0)
+                            return null;
+
+                        return ConvertFrameToMat(_frame);
+                    }
+                    finally
+                    {
+                        if (_packet != null)
+                        {
+                            ffmpeg.av_packet_unref(_packet);
+                        }
+
+                    }
+
                 }
 
             }
@@ -418,15 +439,20 @@ namespace OpenCvWpfTracking.Services.Video
         /// </summary>
         public void Close()
         {
-            IsOpened = false;
+            // [Close()] 중에는 [ReadFrame()] 못 들어오게
+            lock (_syncLock)
+            {
+                IsOpened = false;
 
-            FreePacket();
-            FreeFrame();
-            FreeCodecContext();
-            FreeFormatContext();
-            FreeSwsContext();
+                FreePacket();
+                FreeFrame();
+                FreeCodecContext();
+                FreeFormatContext();
+                FreeSwsContext();
 
-            _videoStreamIndex = -1;
+                _videoStreamIndex = -1;
+            }
+
         }
 
         /// <summary>

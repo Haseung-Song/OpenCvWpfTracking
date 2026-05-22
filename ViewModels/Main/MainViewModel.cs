@@ -417,6 +417,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
                 return;
             }
+
             _isVideoConnecting = true; // 연결 시도 중 상태 설정
 
             VdStatusText = "[VD] Connecting...";
@@ -427,11 +428,70 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 ResetCancellationToken();
 
-                VideoConnectResult result =
-                    await Task.Run(OpenVideoSources);
+                /// <summary>
+                /// [VD]도 EO / IR처럼 연결 시도 자체를 백그라운드에서 처리
+                /// 
+                /// 로컬 MP4는 연결이 너무 빠르므로,
+                /// Open 전 짧은 대기를 주어 Connecting 상태가 보이도록 한다.
+                /// </summary>
+                VideoConnectResult vdResult =
+                    await Task.Run(() =>
+                    {
+                        /// <summary>
+                        /// [VD] 연결 시도 전 대기
+                        /// UI에서 Connecting 상태 확인용
+                        /// </summary>
+                        Thread.Sleep(1200);
 
-                if (!result.VdResult &&
-                    !result.EoResult &&
+                        /// <summary>
+                        /// [VD]는 로컬 MP4 영상이므로
+                        /// [EO/IR] [RTSP] 연결 대기와 분리하여 먼저 연결 및 출력 처리
+                        /// </summary>
+                        bool rvsResult =
+                            _rtspVideoService.Open(
+                                VdSourceAddress);
+
+                        return new VideoConnectResult
+                        {
+                            VdResult = rvsResult
+                        };
+
+                    });
+
+                /// <summary>
+                /// [VD] 연결 결과 상태 표시
+                /// </summary>
+                VdStatusText =
+                    vdResult.VdResult
+                    ? "[VD] Connected"
+                    : "[VD] Disconnected";
+
+                /// <summary>
+                /// [VD] 연결 결과 [Console] 출력
+                /// </summary>
+                Console.WriteLine("[VD] " +
+                    (vdResult.VdResult
+                    ? "Connect Success"
+                    : "Connect Failure"));
+
+                Console.WriteLine();
+
+                /// <summary>
+                /// [VD] 연결 성공 시
+                /// 별도 [Thread]에서 영상 출력 시작
+                /// <summary>
+                if (vdResult.VdResult)
+                {
+                    _ = Task.Run(() =>
+                        CaptureLoop(
+                            _rtspVideoService,
+                            bitmap => CameraImage = bitmap,
+                            _cts.Token));
+                }
+
+                VideoConnectResult result = await Task.Run(OpenVideoSources);
+
+                if (!result.EoResult &&
                     !result.IrResult)
                 {
                     VdStatusText = "Connect Failed.";
@@ -466,23 +526,94 @@ namespace OpenCvWpfTracking.ViewModels.Main
         {
             Console.WriteLine("[VIDEO] Disconnect Try...");
 
+            // 1. 먼저 루프 종료 요청
             _cts?.Cancel();
 
-            Thread.Sleep(100); // ReadFrame 종료 대기
-
+            // 2. [Decoder / Capture] 객체 종료
             _rtspVideoService.Release();
             _eoRtspDecoder.Close();
             _irRtspDecoder.Close();
 
-            _cts?.Dispose();
-            _cts = null;
+            // 3. UI Thread에서 마지막으로 검은 화면 덮어쓰기
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                ClearVideoView(); // [VD] / [EO] / [IR] Viewer 화면을 검은 화면으로 초기화
 
-            VdStatusText = "Disconnected";
-            EoStatusText = "Disconnected";
-            IrStatusText = "Disconnected";
-
+                VdStatusText = "Disconnected";
+                EoStatusText = "Disconnected";
+                IrStatusText = "Disconnected";
+            });
             Console.WriteLine("[VIDEO] Disconnect Complete.");
             Console.WriteLine("========================================");
+        }
+
+        /// <summary>
+        /// 지정한 크기의 검은색 [BitmapSource] 생성
+        ///
+        /// [Disconnect] 시 기존 마지막 프레임이 남지 않도록
+        /// [Viewer] 화면을 검은 화면으로 초기화할 때 사용
+        /// </summary>
+        private BitmapSource CreateBlackBitmap(
+            int width,
+            int height)
+        {
+            /// <summary>
+            /// [BGR24] 기준 1픽셀당 [3byte]
+            /// 전체 [byte] 배열을 0으로 유지하면 검은색 화면이 된다.
+            /// </summary>
+            int stride =
+                width * 3;
+
+            byte[] pixels =
+                new byte[height * stride];
+
+            BitmapSource bitmap =
+                BitmapSource.Create(
+                    width,
+                    height,
+                    96,
+                    96,
+                    System.Windows.Media.PixelFormats.Bgr24,
+                    null,
+                    pixels,
+                    stride);
+
+            bitmap.Freeze();
+
+            return bitmap;
+        }
+
+        /// <summary>
+        /// [VD] / [EO] / [IR] [Viewer] 화면 초기화
+        ///
+        /// [C++]에서 [Disconnect] 시 [View]를 검은 화면으로 [Clear] 하던 것과 동일한 목적
+        /// </summary>
+        private void ClearVideoView()
+        {
+            /// <summary>
+            /// 현재 [Viewer] 크기와 유사한 기본 검은 화면 생성
+            /// 실제 출력은 [Image Stretch="Uniform"] 설정에 따라 자동 맞춤
+            /// </summary>
+            BitmapSource blackBitmap =
+                CreateBlackBitmap(
+                    1280,
+                    720);
+
+            /// <summary>
+            /// [UI Thread]에서 [Image Source] 초기화
+            /// </summary>
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                CameraImage =
+                    blackBitmap;
+
+                EOCameraImage =
+                    blackBitmap;
+
+                IRCameraImage =
+                    blackBitmap;
+            });
+
         }
 
         /// <summary>
@@ -507,17 +638,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _cts = new CancellationTokenSource();
         }
 
+
         /// <summary>
-        /// VD / EO / IR 영상 연결 시도
+        /// EO/IR 영상 연결 시도
         /// 
-        /// 이 함수는 Task.Run 내부에서 호출되어
-        /// RTSP Open으로 인한 UI 정지를 방지한다.
+        /// 이 함수는 [Task.Run] 함수 내부에서 호출되어,
+        /// [RTSP Open]으로 인한 [UI] 프리징을 방지한다.
         /// </summary>
         private VideoConnectResult OpenVideoSources()
         {
-            bool vdResult =
-                _rtspVideoService.Open(VdSourceAddress);
-
             bool eoResult =
                 _eoRtspDecoder.Open(EoSourceAddress);
 
@@ -526,7 +655,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             return new VideoConnectResult
             {
-                VdResult = vdResult,
                 EoResult = eoResult,
                 IrResult = irResult
             };
@@ -538,10 +666,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void WriteVideoConnectLog(VideoConnectResult result)
         {
-            Console.WriteLine(
-                "[VD] "
-                + (result.VdResult ? "Connect Success" : "Connect Failure"));
-
             Console.WriteLine(
                 "[EO] "
                 + (result.EoResult ? "Connect Success" : "Connect Failure"));
@@ -557,22 +681,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 영상 연결 결과를
         /// 각 Viewer 상태 Text에 반영
         ///
-        /// 기존:
-        /// StatusText 하나로 전체 출력
+        /// 기존: StatusText 하나로 전체 출력
         ///
-        /// 변경:
-        /// VD / EO / IR 개별 상태 출력
+        /// 변경: EO / IR 개별 상태 출력
         /// </summary>
         private void UpdateVideoStatusText(VideoConnectResult result)
         {
-            /// <summary>
-            /// [VD] 영상 연결 상태 표시
-            /// </summary>
-            VdStatusText =
-                result.VdResult
-                ? "[VD] Connected"
-                : "[VD] Disconnected";
-
             /// <summary>
             /// [EO] 영상 연결 상태 표시
             /// </summary>
@@ -591,21 +705,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// 연결 성공한 영상만 [CaptureLoop] 실행
+        /// 연결 성공한 [EO/IR] 영상만 [FFmpegCaptureLoop] 실행
         /// </summary>
         private void StartVideoLoops(VideoConnectResult result)
         {
             if (_cts == null)
                 return;
-
-            if (result.VdResult)
-            {
-                _ = Task.Run(() =>
-                    CaptureLoop(
-                        _rtspVideoService,
-                        bitmap => CameraImage = bitmap,
-                        _cts.Token));
-            }
 
             if (result.EoResult)
             {
@@ -680,12 +785,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// </summary>
                     bitmap.Freeze();
 
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
                     /// <summary>
                     /// UI Thread에서 영상 갱신
                     /// </summary>
                     App.Current.Dispatcher.Invoke(() =>
                     {
-                        setImageAction(bitmap);
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            setImageAction(bitmap);
+                        }
+
                     });
 
                 }
@@ -708,7 +820,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
             }
-            Console.WriteLine("[VIDEO] CaptureLoop End.");
+            Console.WriteLine("[VIDEO] CaptureLoop End");
+
+            Console.WriteLine();
         }
 
         /// <summary>
@@ -720,15 +834,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private void FFmpegCaptureLoop(
             FFmpegDecoderService decoder,
             Action<BitmapSource> setImageAction,
-            CancellationToken token)
+            CancellationToken cancellationToken)
         {
-            while (!token.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 using (Mat frame = decoder.ReadFrame())
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
                     if (frame == null ||
                         frame.Empty())
                     {
+                        Thread.Sleep(10);
                         continue;
                     }
 
@@ -737,15 +855,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     bitmap?.Freeze();
 
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
                     App.Current.Dispatcher.Invoke(() =>
                     {
-                        setImageAction(bitmap);
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            setImageAction(bitmap);
+                        }
+
                     });
 
                 }
 
             }
-
+            Console.WriteLine("[FFmpeg] CaptureLoop End.");
         }
 
         #endregion
@@ -840,7 +965,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 영상 연결 결과 저장 구조체
         /// 
-        /// MP4 / EO / IR 연결 결과를 하나로 묶어서
+        /// VD / EO / IR 연결 결과를 하나로 묶어서
         /// 로그 출력, 상태 표시, CaptureLoop 시작 여부 판단에 사용한다.
         /// </summary>
         private struct VideoConnectResult
