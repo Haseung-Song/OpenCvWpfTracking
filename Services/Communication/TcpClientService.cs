@@ -244,7 +244,7 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
-        /// 마지막 로그 출력 이후 5초 이상 지났을 경우에만 수신 로그 출력
+        /// 마지막 로그 출력 이후 1초 이상 지났을 경우에, 수신 로그를 출력.
         /// 
         /// TCP는 Packet 단위가 아니라 Stream 단위이므로,
         /// 12byte 응답 Packet 여러 개가 한 번에 붙어서 들어올 수 있다.
@@ -255,7 +255,7 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         private void PrintReceiveLogIfNeeded(byte[] receivedData)
         {
-            if ((DateTime.Now - _lastRecvLogTime).TotalSeconds < 5)
+            if ((DateTime.Now - _lastRecvLogTime).TotalSeconds < 1)
                 return;
 
             PrintReceivePackets(receivedData);
@@ -271,7 +271,8 @@ namespace OpenCvWpfTracking.Services.Communication
         {
             const int responsePacketSize = 12;
 
-            for (int i = 0; i + responsePacketSize - 1 < receivedData.Length; i += responsePacketSize)
+            for (int i = 0; i + responsePacketSize - 1 < receivedData.Length;
+                            i += responsePacketSize)
             {
                 Console.Write("[TCP RECV PACKET] ");
 
@@ -279,7 +280,6 @@ namespace OpenCvWpfTracking.Services.Communication
                 {
                     Console.Write($"{receivedData[i + j]:X2} ");
                 }
-
                 Console.WriteLine();
             }
 

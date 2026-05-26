@@ -140,9 +140,14 @@
                             Padding="10">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="40" />
+                                <!-- 제목 -->
+                                <RowDefinition Height="Auto"/>
+
+                                <!-- 장비 리스트 -->
+                                <RowDefinition Height="*"/>
+
+                                <!-- PT 제어 -->
+                                <RowDefinition Height="120"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock Text="장비 연결"
@@ -161,6 +166,103 @@
                                              Foreground="#6EC1FF"
                                              FontSize="15"
                                              Margin="0,5"/>
+
+                                <!-- PAN / TILT 제어 -->
+                                <Border Grid.Row="2"
+                                        Margin="0,10,0,0"
+                                        Background="#5F666D"
+                                        BorderBrush="#95A5B0"
+                                        BorderThickness="1.5"
+                                        Padding="10">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- 제목 -->
+                                        <TextBlock Text="[PAN] / [TILT] CONTROL"
+                                                   Foreground="White"
+                                                   FontWeight="Bold"
+                                                   Margin="0,0,0,5"/>
+
+                                        <!-- [PT] 방향키 제어 버튼 영역 -->
+                                        <Grid Grid.Row="1"
+                                              Width="120"
+                                              Height="120"
+                                              HorizontalAlignment="Center">
+
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition/>
+                                                <RowDefinition/>
+                                                <RowDefinition/>
+                                            </Grid.RowDefinitions>
+
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- [TILT] 위쪽 [1.0]도 이동 -->
+                                            <Button Grid.Row="0"
+                                                    Grid.Column="1"
+                                                    Margin="5"
+                                                    FontSize="18"
+                                                    Content="▲"
+                                                    Command="{Binding TiltUpCommand}"/>
+
+                                            <!-- [PAN] 왼쪽 [1.0]도 이동 -->
+                                            <Button Grid.Row="1"
+                                                    Grid.Column="0"
+                                                    Margin="5"
+                                                    FontSize="18"
+                                                    Content="◀"
+                                                    Command="{Binding PanLeftCommand}"/>
+
+                                            <!-- 중앙 표시 -->
+                                            <Border Grid.Row="1"
+                                                    Grid.Column="1"
+                                                    Margin="3"
+                                                    Background="#3F454B"
+                                                    BorderBrush="#8B949E"
+                                                    BorderThickness="1">
+                                                <TextBlock Text="PT"
+                                                           Foreground="White"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- [PAN] 오른쪽 [1.0]도 이동 -->
+                                            <Button Grid.Row="1"
+                                                    Grid.Column="2"
+                                                    Margin="5"
+                                                    FontSize="18"
+                                                    Content="▶"
+                                                    Command="{Binding PanRightCommand}"/>
+
+                                            <!-- [TILT] 아래쪽 [1.0]도 이동 -->
+                                            <Button Grid.Row="2"
+                                                    Grid.Column="1"
+                                                    Margin="5"
+                                                    FontSize="18"
+                                                    Content="▼"
+                                                    Command="{Binding TiltDownCommand}"/>
+                                        </Grid>
+
+                                        <!-- 이동 단위 표시 -->
+                                        <TextBlock Grid.Row="2"
+                                                   Text="STEP : 1.0°"
+                                                   Foreground="#D0D7DE"
+                                                   FontSize="12"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,5,0,0"/>
+                                    </Grid>
+                                </Border>
+
                             </StackPanel>
 
                         </Grid>

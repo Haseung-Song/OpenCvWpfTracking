@@ -76,6 +76,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private readonly ControlCommandService _controlCommandService;
 
         /// <summary>
+        /// [PAN / TILT] 버튼 1회 클릭 시 이동할 각도 값
+        /// 
+        /// 기존 [LA] 프로그램의 [PT] 버튼 동작처럼
+        /// 한 번 클릭할 때마다 [1.0]도 단위로 이동하도록 설정한다.
+        /// </summary>
+        private const double PanTiltMoveStep = 1.0;
+
+        /// <summary>
+        /// 현재 [PAN] 각도 값(현재 위치 저장용)
+        /// 
+        /// [LA Status Packet] 수신 시 갱신되고,
+        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// </summary>
+        private double _currentPan;
+
+        /// <summary>
+        /// 현재 [TILT] 각도 값(현재 위치 저장용)
+        /// 
+        /// [LA Status Packet] 수신 시 갱신되고,
+        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// </summary>
+        private double _currentTilt;
+
+        /// <summary>
         /// [LA] 수신 [Packet Parser]
         /// 
         /// [TcpClientService]에서 받은 byte[] 데이터를
@@ -94,7 +118,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [LA] 상태 로그 출력 간격
         /// </summary>
-        private const int LaLogIntervalSeconds = 5;
+        private const int LaLogIntervalSeconds = 1;
 
         /// <summary>
         /// 영상 루프를 중지하기 위한 [CancellationTokenSource]
@@ -157,6 +181,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public ICommand DisconnectCommand { get; }
 
+        /// <summary>
+        /// [PAN] 왼쪽 위치 이동 테스트 [Command]
+        /// </summary>
+        public ICommand PanLeftCommand { get; }
+
+        /// <summary>
+        /// [PAN] 오른쪽 위치 이동 테스트 [Command]
+        /// </summary>
+        public ICommand PanRightCommand { get; }
+
+        /// <summary>
+        /// [TILT] 위쪽 위치 이동 테스트 [Command]
+        /// </summary>
+        public ICommand TiltUpCommand { get; }
+
+        /// <summary>
+        /// [TILT] 아래쪽 위치 이동 테스트 [Command]
+        /// </summary>
+        public ICommand TiltDownCommand { get; }
+
         #endregion
 
         #region [Constructor]
@@ -171,6 +215,69 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             ConnectCommand = new RelayCommand(Connect);
             DisconnectCommand = new RelayCommand(Disconnect);
+
+            /// <summary>
+            /// [PAN] 왼쪽 상대 이동 테스트
+            /// 
+            /// 현재 [PAN] 값에서 [1.0]도 감소한 값을 목표 각도로 송신한다.
+            /// </summary>
+            PanLeftCommand = new RelayCommand(() =>
+            {
+                double targetPan = _currentPan - PanTiltMoveStep;
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] PAN -{PanTiltMoveStep} => Target : {targetPan:F2}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.PanGoPosition(targetPan);
+            });
+
+            /// <summary>
+            /// [PAN] 오른쪽 상대 이동 테스트
+            /// 
+            /// 현재 [PAN] 값에서 [1.0]도 증가한 값을 목표 각도로 송신한다.
+            /// </summary>
+            PanRightCommand = new RelayCommand(() =>
+            {
+                double targetPan = _currentPan + PanTiltMoveStep;
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] PAN +{PanTiltMoveStep} => Target : {targetPan:F2}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.PanGoPosition(targetPan);
+            });
+
+            /// <summary>
+            /// [TILT] 위쪽 상대 이동 테스트
+            /// 
+            /// 현재 [TILT] 값에서 [1.0]도 증가한 값을 목표 각도로 송신한다.
+            /// </summary>
+            TiltUpCommand = new RelayCommand(() =>
+            {
+                double targetTilt = _currentTilt + PanTiltMoveStep;
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] TILT +{PanTiltMoveStep} => Target : {targetTilt:F2}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.TiltGoPosition(targetTilt);
+            });
+
+            /// <summary>
+            /// [TILT] 아래쪽 상대 이동 테스트
+            /// 
+            /// 현재 [TILT] 값에서 [1.0]도 감소한 값을 목표 각도로 송신한다.
+            /// </summary>
+            TiltDownCommand = new RelayCommand(() =>
+            {
+                double targetTilt = _currentTilt - PanTiltMoveStep;
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] TILT -{PanTiltMoveStep} => Target : {targetTilt:F2}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.TiltGoPosition(targetTilt);
+            });
 
             /// <summary>
             /// 영상 서비스 생성
@@ -939,7 +1046,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[LA CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine();
+            Console.WriteLine("========================================");
         }
 
         /// <summary>
@@ -984,78 +1091,61 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            /// <summary>
-            /// [3초]마다 한 번만 출력
-            /// </summary>
-            if (!CanPrintLaLog())
-            {
-                return;
-            }
+            bool canPrintLog = CanPrintLaLog();
+
+            Console.WriteLine("========================================");
 
             switch (packet.Function)
             {
                 case 0x01:
-
                     /// <summary>
                     /// [Pan] / [Tilt] / [Zoom] / [Focus] 상태 정보
                     /// </summary>
 
-                    Console.WriteLine();
                     Console.WriteLine("[LA PACKET] [Pan] / [Tilt] / [Zoom] / [Focus] Status");
 
-                    ParseLaStatusPacket(packet.RawData);
-
                     Console.WriteLine("========================================");
-                    Console.WriteLine();
+                    ParseLaStatusPacket(packet.RawData, canPrintLog);
                     break;
 
                 case 0x07:
-
                     /// <summary>
                     /// [Alive] 또는 [ACK] 계열 Packet
                     /// </summary>
 
-                    Console.WriteLine();
                     Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
-                    Console.WriteLine("========================================");
+
                     Console.WriteLine();
                     break;
 
                 case 0xA1:
-
                     /// <summary>
                     /// 문서상 세부 매핑 추가 확인 필요
                     /// 현재 수신 패턴상 정상 확장 상태 Packet으로 분류
                     /// </summary>
 
-                    Console.WriteLine();
                     Console.WriteLine("[LA PACKET] Extended Status Packet");
 
-                    ParseLaExtendedStatusPacket(packet.RawData);
-
-                    Console.WriteLine("========================================");
                     Console.WriteLine();
+                    ParseLaExtendedStatusPacket(packet.RawData);
                     break;
 
                 default:
-
                     /// <summary>
                     /// 정의되지 않은 [Function] 번호
                     /// </summary>
 
-                    Console.WriteLine();
                     Console.Write($"[LA PACKET] Unknown Function 0x{packet.Function:X2} : ");
 
+                    Console.WriteLine();
                     foreach (byte b in packet.RawData)
                     {
                         Console.Write(
                             $"{b:X2} ");
                     }
 
-                    Console.WriteLine();
-                    Console.WriteLine("========================================");
-                    Console.WriteLine();
                     break;
+
             }
 
         }
@@ -1088,7 +1178,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 
         /// 주의: 응답 [Packet]의 [2byte] 이상 데이터 => [Little Endian] 방식
         /// </summary>
-        private void ParseLaStatusPacket(byte[] packet)
+        private void ParseLaStatusPacket(byte[] packet, bool printLog)
         {
             // [Pan] 위치 [Raw]값
             // [packet[2] ~ packet[3]]
@@ -1119,10 +1209,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
             byte powerStatus = packet[10];
 
             // [Pan] / [Tilt]는 [각도 * 100]값으로 수신되므로
-            // 실제 각도는 [ / 100] 처리
+            // 실제 각도는 [각도 / 100] 처리
             double panDegree = panRaw / 100.0;
-
             double tiltDegree = tiltRaw / 100.0;
+
+            /// <summary>
+            /// 현재 [PAN / TILT] 값 저장
+            /// 
+            /// 로그 출력 여부와 상관없이
+            /// 수신 [Packet]이 들어올 때마다 현재값을 갱신한다.
+            /// 버튼 클릭 시 현재 위치 기준으로 ±[0.1]도 이동시키기 위해 사용한다.
+            /// </summary>
+            _currentPan = panDegree;
+            _currentTilt = tiltDegree;
+
+            if (!printLog)
+            {
+                return;
+            }
 
             Console.WriteLine(
                 $"[LA STATUS] [Pan]   : {panDegree:F2}");
@@ -1138,6 +1242,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine(
                 $"[LA STATUS] [Power] : 0x{powerStatus:X2}");
+
+            Console.WriteLine("========================================");
         }
 
         /// <summary>
