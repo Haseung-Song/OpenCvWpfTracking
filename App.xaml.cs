@@ -180,9 +180,9 @@ namespace OpenCvWpfTracking
             /// </summary>
             Console.SetError(consoleWriter);
 
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
             Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console Start");
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
 #endif
         }
 
@@ -192,9 +192,9 @@ namespace OpenCvWpfTracking
         /// </summary>
         protected override void OnExit(ExitEventArgs e)
         {
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
             Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console End");
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
 
 #if DEBUG
             FreeConsole(); // 콘솔 창 해제

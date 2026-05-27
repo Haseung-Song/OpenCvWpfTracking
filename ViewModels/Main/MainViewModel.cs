@@ -50,7 +50,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [EO] 주간 카메라 [RTSP] 영상 처리 객체
         /// 
-        /// [OpenCvSharp] [VideoCapture] [RTS]P 연결 실패로 인해
+        /// [OpenCvSharp] [VideoCapture] [RTSP] 연결 실패로 인해
         /// 실제 [RTSP] 출력은 [FFmpegRtspDecoderService]를 사용한다.
         /// </summary>
         private readonly FFmpegDecoderService _eoRtspDecoder;
@@ -227,7 +227,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN -{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -242,7 +242,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 double targetPan = _currentPan + PanTiltMoveStep;
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN +{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -258,7 +258,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT +{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -274,7 +274,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT -{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -316,7 +316,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             InitializeDefaultSourceAddress();
 
             Console.WriteLine("[LA] Service Initialize Complete");
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
         }
 
         #endregion
@@ -544,7 +544,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 return;
             }
@@ -556,7 +556,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 IrStatusText = "Already Connected...";
 
                 Console.WriteLine("[VIDEO] Already Connected.");
-                Console.WriteLine("========================================");
+                Console.WriteLine("=====================================================");
 
                 return;
             }
@@ -630,6 +630,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 VideoConnectResult result = await Task.Run(OpenVideoSources);
 
+                /// <summary>
+                /// [VD] 연결 결과를 통합하여
+                /// [VD / EO / IR] 전체 연결 상태 판단에 사용
+                /// </summary>
+                result.VdResult = vdResult.VdResult;
+
                 // [EO / IR] 개별 상태 [Console Log] 출력
                 WriteVideoConnectLog(result);
 
@@ -642,7 +648,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     !result.IrResult)
                 {
                     Console.WriteLine("[VIDEO] All Connect Failed.");
-                    Console.WriteLine("========================================");
+                    Console.WriteLine("=====================================================");
 
                     return;
                 }
@@ -667,6 +673,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
         {
             Console.WriteLine("[VIDEO] Disconnect Try...");
 
+            /// <summary>
+            /// 현재 연결 시도 중이면,
+            /// [Disconnect] 입력 무시
+            /// </summary>
+            if (_isVideoConnecting)
+            {
+                Console.WriteLine();
+                Console.WriteLine("[VIDEO] Connecting...");
+                Console.WriteLine("=====================================================");
+
+                return;
+            }
+
             // 1. 먼저 루프 종료 요청
             _cts?.Cancel();
 
@@ -686,7 +705,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 IrStatusText = "Disconnected";
             });
             Console.WriteLine("[VIDEO] Disconnect Complete.");
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
         }
 
         /// <summary>
@@ -816,7 +835,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[IR] "
                 + (result.IrResult ? "Connect Success" : "Connect Failure"));
 
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
         }
 
         /// <summary>
@@ -1046,7 +1065,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[LA CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
         }
 
         /// <summary>
@@ -1093,7 +1112,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             bool canPrintLog = CanPrintLaLog();
 
-            Console.WriteLine("========================================");
+            //Console.WriteLine("=====================================================");
 
             switch (packet.Function)
             {
@@ -1101,32 +1120,43 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// <summary>
                     /// [Pan] / [Tilt] / [Zoom] / [Focus] 상태 정보
                     /// </summary>
+                    if (!canPrintLog)
+                    {
+                        ParseLaStatusPacket(packet.RawData, false);
+                        return;
+                    }
 
+                    Console.WriteLine("=====================================================");
                     Console.WriteLine("[LA PACKET] [Pan] / [Tilt] / [Zoom] / [Focus] Status");
+                    Console.WriteLine("=====================================================");
 
-                    Console.WriteLine("========================================");
-                    ParseLaStatusPacket(packet.RawData, canPrintLog);
+                    ParseLaStatusPacket(packet.RawData, true);
                     break;
 
                 case 0x07:
                     /// <summary>
                     /// [Alive] 또는 [ACK] 계열 Packet
                     /// </summary>
+                    if (!canPrintLog)
+                        return;
 
+                    Console.WriteLine("=====================================================");
                     Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
-
                     Console.WriteLine();
                     break;
 
                 case 0xA1:
                     /// <summary>
                     /// 문서상 세부 매핑 추가 확인 필요
-                    /// 현재 수신 패턴상 정상 확장 상태 Packet으로 분류
+                    /// 현재 수신 패턴상 정상 확장 상태 [Packet]으로 분류
                     /// </summary>
+                    if (!canPrintLog)
+                        return;
 
+                    Console.WriteLine("=====================================================");
                     Console.WriteLine("[LA PACKET] Extended Status Packet");
-
                     Console.WriteLine();
+
                     ParseLaExtendedStatusPacket(packet.RawData);
                     break;
 
@@ -1134,16 +1164,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// <summary>
                     /// 정의되지 않은 [Function] 번호
                     /// </summary>
+                    if (!canPrintLog)
+                        return;
 
+                    Console.WriteLine("=====================================================");
                     Console.Write($"[LA PACKET] Unknown Function 0x{packet.Function:X2} : ");
-
                     Console.WriteLine();
+
                     foreach (byte b in packet.RawData)
                     {
-                        Console.Write(
-                            $"{b:X2} ");
+                        Console.Write($"{b:X2} ");
                     }
 
+                    Console.WriteLine();
                     break;
 
             }
@@ -1218,7 +1251,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// 
             /// 로그 출력 여부와 상관없이
             /// 수신 [Packet]이 들어올 때마다 현재값을 갱신한다.
-            /// 버튼 클릭 시 현재 위치 기준으로 ±[0.1]도 이동시키기 위해 사용한다.
+            /// 버튼 클릭 시 현재 위치 기준으로 ±[1.0]도 이동시키기 위해 사용한다.
             /// </summary>
             _currentPan = panDegree;
             _currentTilt = tiltDegree;
@@ -1243,7 +1276,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine(
                 $"[LA STATUS] [Power] : 0x{powerStatus:X2}");
 
-            Console.WriteLine("========================================");
+            Console.WriteLine("=====================================================");
         }
 
         /// <summary>
@@ -1284,11 +1317,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine(
                 "[EO FFmpeg RTSP] "
-                + (eoResult ? "Connect Success" : "Connect Failire"));
+                + (eoResult ? "Connect Success" : "Connect Failure"));
 
             Console.WriteLine(
                 "[IR FFmpeg RTSP] "
-                + (irResult ? "Connect Success" : "Connect Failire"));
+                + (irResult ? "Connect Success" : "Connect Failure"));
         }
 
         #endregion

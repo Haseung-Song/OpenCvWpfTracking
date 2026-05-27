@@ -81,7 +81,7 @@
                     BorderThickness="2">
                     <Grid>
                         <!-- 영상 출력 -->
-                        <Image Source="{Binding CameraImage}"
+                        <Image Source="{Binding VDCameraImage}"
                            Stretch="Uniform"/>
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding VdStatusText}"
