@@ -142,10 +142,8 @@
                             <Grid.RowDefinitions>
                                 <!-- 제목 -->
                                 <RowDefinition Height="Auto"/>
-
                                 <!-- 장비 리스트 -->
                                 <RowDefinition Height="*"/>
-
                                 <!-- PT 제어 -->
                                 <RowDefinition Height="120"/>
                             </Grid.RowDefinitions>

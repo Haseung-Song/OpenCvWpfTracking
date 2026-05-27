@@ -1177,6 +1177,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     }
 
                     Console.WriteLine();
+
                     break;
 
             }

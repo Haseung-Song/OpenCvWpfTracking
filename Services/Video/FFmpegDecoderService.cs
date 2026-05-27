@@ -99,11 +99,13 @@ namespace OpenCvWpfTracking.Services.Video
             Close();
 
             Console.WriteLine("[FFmpeg RTSP] Open Try...");
+
             Console.WriteLine("[FFmpeg RTSP] Source : " + rtspUrl);
 
             ffmpeg.avformat_network_init();
 
             AVFormatContext* formatContext = null;
+
             AVDictionary* options = CreateRtspOptions();
 
             int result =

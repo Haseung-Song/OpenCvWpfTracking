@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OpenCvWpfTracking.Services.Communication
+﻿namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
     /// TORUSS 감시장비 제어 명령 Packet 생성 / 송신 서비스
@@ -47,9 +45,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 data2,
                 0x00
             };
-
-            // CheckSum = Unit ID ~ Data2 합
-            packet[6] = CheckSum(packet, 1, 5);
+            packet[6] = CheckSum(packet, 1, 5); // CheckSum = Unit ID ~ Data2 합
 
             return _tcpClientService.Send(packet);
         }
