@@ -100,6 +100,51 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private double _currentTilt;
 
         /// <summary>
+        /// [PAN / TILT] 속도제어 현재 속도 [Level]
+        /// 
+        /// 문서 기준 [0 ~ 63] 범위를 사용한다.
+        /// 현재 기본값은 [30]으로 설정한다.
+        /// 
+        /// 이후 [Slider] 또는 [ComboBox] 등 [UI] 조작으로 값이 변경될 수 있으며,
+        /// 실제 연속 이동 제어 시 해당 값을 사용한다.
+        /// </summary>
+        private byte _panTiltSpeedLevel = 30;
+
+        /// <summary>
+        /// [ZOOM] 버튼 1회 클릭 시 이동할 값
+        /// 
+        /// 문서 기준 Zoom 값은 [열상 화각 × 100] 형태로 송신한다.
+        /// 따라서 [10] 단위 이동은 화각 기준 약 [0.1] 단위 조정으로 사용한다.
+        /// </summary>
+        private const short ZoomMoveStep = 10;
+
+        /// <summary>
+        /// [FOCUS] 버튼 1회 클릭 시 이동할 값
+        /// 
+        /// 문서 기준 Focus 위치값은
+        /// [0 = Focus Far] ~ [1000 = Focus Near] 범위를 사용한다.
+        /// </summary>
+        private const short FocusMoveStep = 5;
+
+        /// <summary>
+        /// 현재 [ZOOM] 위치 값(현재 위치 저장용)
+        /// 
+        /// [LA Status Packet] 수신 시 갱신되고,
+        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// </summary>
+        private short _currentZoom;
+
+        /// <summary>
+        /// 현재 [FOCUS] 위치 값(현재 위치 저장용)
+        /// 
+        /// [LA Status Packet] 수신 시 갱신되고,
+        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// </summary>
+        private short _currentFocus;
+
+
+
+        /// <summary>
         /// [LA] 수신 [Packet Parser]
         /// 
         /// [TcpClientService]에서 받은 byte[] 데이터를
@@ -201,6 +246,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public ICommand TiltDownCommand { get; }
 
+        /// <summary>
+        /// [ZOOM] 확대 테스트 [Command]
+        /// </summary>
+        public ICommand ZoomInCommand { get; }
+
+        /// <summary>
+        /// [ZOOM] 축소 테스트 [Command]
+        /// </summary>
+        public ICommand ZoomOutCommand { get; }
+
+        /// <summary>
+        /// [FOCUS] [Far] 테스트 [Command]
+        /// </summary>
+        public ICommand FocusFarCommand { get; }
+
+        /// <summary>
+        /// [FOCUS] [Near] 테스트 [Command]
+        /// </summary>
+        public ICommand FocusNearCommand { get; }
+
         #endregion
 
         #region [Constructor]
@@ -213,8 +278,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// [Command] 바인딩
             /// </summary>
+            #region [Connect / Disconnect Command Binding]
+
             ConnectCommand = new RelayCommand(Connect);
             DisconnectCommand = new RelayCommand(Disconnect);
+
+            #endregion
+
+            #region [Pan / Tilt Command Binding]
 
             /// <summary>
             /// [PAN] 왼쪽 상대 이동 테스트
@@ -278,6 +349,77 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
+
+            #endregion
+
+            #region [Zoom / Focus Command Binding]
+
+            /// <summary>
+            /// [ZOOM] 확대 상대 이동 테스트
+            /// 
+            /// 현재 [ZOOM] 값에서 [1] 증가한 값을 목표 위치로 송신한다.
+            /// </summary>
+            ZoomInCommand = new RelayCommand(() =>
+            {
+                short targetZoom = (short)(_currentZoom + ZoomMoveStep);
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
+                Console.WriteLine("=====================================================");
+
+                _controlCommandService.ZoomGoPosition(targetZoom);
+            });
+
+
+            /// <summary>
+            /// [ZOOM] 축소 상대 이동 테스트
+            /// 
+            /// 현재 [ZOOM] 값에서 [1] 감소한 값을 목표 위치로 송신한다.
+            /// </summary>
+            ZoomOutCommand = new RelayCommand(() =>
+            {
+                short targetZoom = (short)(_currentZoom - ZoomMoveStep);
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] ZOOM -{ZoomMoveStep} => Target : {targetZoom}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.ZoomGoPosition(targetZoom);
+            });
+
+            /// <summary>
+            /// [FOCUS] [Far] 상대 이동 테스트
+            /// 
+            /// 현재 [FOCUS] 값에서 [5] 증가한 값을 목표 위치로 송신한다.
+            /// </summary>
+            FocusFarCommand = new RelayCommand(() =>
+            {
+                short targetFocus = (short)(_currentFocus + FocusMoveStep);
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.FocusGoPosition(targetFocus);
+            });
+
+            /// <summary>
+            /// [FOCUS] [Near] 상대 이동 테스트
+            /// 
+            /// 현재 [FOCUS] 값에서 [5] 감소한 값을 목표 위치로 송신한다.
+            /// </summary>
+            FocusNearCommand = new RelayCommand(() =>
+            {
+                short targetFocus = (short)(_currentFocus - FocusMoveStep);
+
+                Console.WriteLine();
+                Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
+                Console.WriteLine("========================================");
+
+                _controlCommandService.FocusGoPosition(targetFocus);
+            });
+
+            #endregion
 
             /// <summary>
             /// 영상 서비스 생성
@@ -418,6 +560,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
+        /// [PAN / TILT] 속도제어 현재 속도 [Level]
+        /// 
+        /// [XAML] [UI]와 바인딩하여 현재 속도값을 표시하거나 변경할 때 사용한다.
+        /// 문서 기준 유효 범위는 [0 ~ 63]이다.
+        /// </summary>
+        public byte PanTiltSpeedLevel
+        {
+            get => _panTiltSpeedLevel;
+            set
+            {
+                if (_panTiltSpeedLevel != value)
+                {
+                    _panTiltSpeedLevel = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
         /// 현재 [VideoModeIndex] 기준 영상 주소
         /// 
         /// 0 : [VD] [RTSP] 영상
@@ -473,7 +636,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public string EoStatusText
         {
             get => _eoStatusText;
-            set
+            private set
             {
                 _eoStatusText = value;
                 OnPropertyChanged();
@@ -505,20 +668,183 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 기본 영상 주소 초기화
         /// 
-        /// [VD]는 [OpenCvSharp] [VideoCaptureService]로 출력하고,
-        /// [EO / IR] [RTSP]는 [FFmpegRtspDecoderService]로 출력한다.
+        /// 영상 입력 소스 구성:
+        /// 
+        /// [VD]
+        /// - OpenCvSharp 기반 [VideoCaptureService] 사용
+        /// - 로컬 [.mp4] 테스트 영상 또는 일반 영상 입력 출력
+        ///
+        /// [EO / IR]
+        /// - [FFmpeg.AutoGen] 기반 [FFmpegDecoderService] 사용
+        /// - [RTSP] [Stream] 직접 연결 및 Decode 수행
+        ///
+        /// 기본 등록 [RTSP] 주소(ID/PW 포함)
+        /// 
+        /// [EO]
+        /// 1. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
+        /// 2. 옥상 [GOP] 주간(EO) 카메라
+        ///
+        /// [IR]
+        /// 3. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
+        /// 4. 옥상 [GOP] 열상(IR) 카메라
+        /// 
+        /// ※ 동일 변수에 여러 주소를 설정할 경우
+        /// ※ 마지막 주소만 실제 적용되므로, 주의
+        /// 
+        /// ※ [EO / IR] 동시 연결 시
+        /// 잘못된 [RTSP] 주소 또는 미설정 주소가 포함되면
+        /// [FFmpeg Stream Open] 과정에서 예외가 발생할 수 있다.
+        ///
+        /// (Ex. System.AccessViolationException)
+        /// 따라서, 개별 연결 성공 여부 확인 후 사용해야만 한다.
         /// </summary>
         private void InitializeDefaultSourceAddress()
         {
+            // 0. [VD]: 테스트용 로컬 영상
             VdSourceAddress =
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
+            // 1. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
             EoSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
-            // 현재 열화상 카메라 작동 (X)
+            // 2. 옥상 [GOP] 주간(EO) 카메라
+            //EoSourceAddress =
+            //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
+
+            // 3. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
             IrSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+
+            // 4. 옥상 [GOP] 열상(IR) 카메라
+            //IrSourceAddress =
+            //    "rtsp://admin:Cg600ip100m@192.168.1.30:554/stream1";
+        }
+
+        #endregion
+
+        #region [Continuous Move Control Methods]
+
+        /// <summary>
+        /// [PAN] 좌측 연속 이동 시작
+        /// 
+        /// [PanTiltSpeedLevel] 값을 사용하여
+        /// 좌측 방향으로 연속 이동 명령을 송신한다.
+        /// </summary>
+        public void StartPanLeftMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"[CONTROL] PAN LEFT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartPanLeft(PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [PAN] 우측 연속 이동 시작
+        /// 
+        /// [PanTiltSpeedLevel] 값을 사용하여
+        /// 우측 방향으로 연속 이동 명령을 송신한다.
+        /// </summary>
+        public void StartPanRightMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"[CONTROL] PAN RIGHT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartPanRight(PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [TILT] 위쪽 연속 이동 시작
+        /// 
+        /// [PanTiltSpeedLevel] 값을 사용하여
+        /// 위쪽 방향으로 연속 이동 명령을 송신한다.
+        /// </summary>
+        public void StartTiltUpMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"[CONTROL] TILT UP START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartTiltUp(PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [TILT] 아래쪽 연속 이동 시작
+        /// 
+        /// [PanTiltSpeedLevel] 값을 사용하여
+        /// 아래 방향으로 연속 이동 명령을 송신한다.
+        /// </summary>
+        public void StartTiltDownMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"[CONTROL] TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [ZOOM] Tele 연속 이동 시작
+        /// </summary>
+        public void StartZoomInMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] ZOOM TELE START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartZoomTele();
+        }
+
+        /// <summary>
+        /// [ZOOM] Wide 연속 이동 시작
+        /// </summary>
+        public void StartZoomOutMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] ZOOM WIDE START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartZoomWide();
+        }
+
+        /// <summary>
+        /// [FOCUS] Near 연속 이동 시작
+        /// </summary>
+        public void StartFocusNearMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] FOCUS NEAR START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartFocusNear();
+        }
+
+        /// <summary>
+        /// [FOCUS] Far 연속 이동 시작
+        /// </summary>
+        public void StartFocusFarMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] FOCUS FAR START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartFocusFar();
+        }
+
+        /// <summary>
+        /// 연속 이동 정지
+        /// 
+        /// 버튼 [MouseUp] 또는 [MouseLeave] 시 호출된다.
+        /// </summary>
+        public void StopContinuousMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] MOVE STOP");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StopMove();
         }
 
         #endregion
@@ -1131,6 +1457,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine("=====================================================");
 
                     ParseLaStatusPacket(packet.RawData, true);
+                    Console.WriteLine("=====================================================");
                     break;
 
                 case 0x07:
@@ -1158,6 +1485,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine();
 
                     ParseLaExtendedStatusPacket(packet.RawData);
+                    Console.WriteLine("=====================================================");
                     break;
 
                 default:
@@ -1250,12 +1578,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// 현재 [PAN / TILT] 값 저장
             /// 
-            /// 로그 출력 여부와 상관없이
-            /// 수신 [Packet]이 들어올 때마다 현재값을 갱신한다.
-            /// 버튼 클릭 시 현재 위치 기준으로 ±[1.0]도 이동시키기 위해 사용한다.
+            /// 버튼 클릭 시
+            /// 현재 위치 기준 [상대 이동 계산]에 사용한다.
             /// </summary>
             _currentPan = panDegree;
             _currentTilt = tiltDegree;
+
+            /// <summary>
+            /// 현재 [ZOOM / FOCUS] 값 저장
+            /// 
+            /// 수신 [Packet]이 들어올 때마다 갱신이 되므로
+            /// 버튼 클릭 시
+            /// 현재 위치 기준 [상대 이동 계산]에 사용한다.
+            /// </summary>
+            _currentZoom = zoomRaw;
+            _currentFocus = focusRaw;
 
             if (!printLog)
             {
@@ -1276,8 +1613,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine(
                 $"[LA STATUS] [Power] : 0x{powerStatus:X2}");
-
-            Console.WriteLine("=====================================================");
         }
 
         /// <summary>
