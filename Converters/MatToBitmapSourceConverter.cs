@@ -9,8 +9,7 @@ namespace OpenCvWpfTracking.Converters
         /// <summary>
         /// [OpenCV] [Mat] → [WPF] [BitmapSource] 변환
         /// </summary>
-        public static BitmapSource Convert(
-            Mat frame)
+        public static BitmapSource Convert(Mat frame)
         {
             if (frame == null ||
                 frame.Empty())
@@ -18,10 +17,9 @@ namespace OpenCvWpfTracking.Converters
                 return null;
             }
 
-            PixelFormat pixelFormat =
-                PixelFormats.Bgr24;
+            PixelFormat pixelFormat = PixelFormats.Bgr24;
 
-            // 채널 수에 따른 PixelFormat 선택
+            // [채널 수]에 따른 [PixelFormat] 선택
             if (frame.Channels() == 1)
             {
                 pixelFormat =

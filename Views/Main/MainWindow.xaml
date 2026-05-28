@@ -388,7 +388,7 @@
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
 
-                                            <!-- [LRF] 1회 거리 측정 -->
+                                            <!-- [LRF] [1회] 거리 측정 -->
                                             <Button Grid.Row="1"
                                                     Content="MEASURE"
                                                     Width="180"
@@ -396,11 +396,11 @@
                                                     Margin="5"
                                                     FontWeight="Bold"
                                                     HorizontalAlignment="Center"
-                                                    Command="{Binding }"/>
+                                                    Command="{Binding LrfMeasureCommand}"/>
 
                                             <!-- 추후 거리값 표시 영역 -->
                                             <TextBlock Grid.Row="2"
-                                                       Text="DISTANCE : - m"
+                                                       Text="{Binding LrfDistanceText}"
                                                        Foreground="#D0D7DE"
                                                        FontSize="12"
                                                        FontWeight="Bold"

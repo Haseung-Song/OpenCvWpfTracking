@@ -27,6 +27,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
     {
         #region [Fields]
 
+        #region [Video State Fields]
+
         /// <summary>
         /// 영상 모드 => [Index]
         /// 
@@ -63,6 +65,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private readonly FFmpegDecoderService _irRtspDecoder;
 
+        #endregion
+
+        #region [LA Communication Fields]
+
         /// <summary>
         /// LA(Local Agent) [TCP] 통신 서비스 객체
         /// </summary>
@@ -74,6 +80,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
         /// </summary>
         private readonly ControlCommandService _controlCommandService;
+
+        #endregion
+
+        #region [Control State Fields]
 
         /// <summary>
         /// [PAN / TILT] 버튼 1회 클릭 시 이동할 각도 값
@@ -98,6 +108,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
         /// </summary>
         private double _currentTilt;
+
+        #endregion
+
+        #region [Control Properties]
 
         /// <summary>
         /// [PAN / TILT] 속도제어 현재 속도 [Level]
@@ -142,7 +156,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private short _currentFocus;
 
+        /// <summary>
+        /// [LRF] 최근 거리측정 값 표시 문자열
+        /// </summary>
+        private string _lrfDistanceText = "DISTANCE : - m";
 
+        #endregion
+
+        #region [LA Packet Fields]
 
         /// <summary>
         /// [LA] 수신 [Packet Parser]
@@ -165,6 +186,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private const int LaLogIntervalSeconds = 1;
 
+        #endregion
+
+        #region [Video Runtime Fields]
+
         /// <summary>
         /// 영상 루프를 중지하기 위한 [CancellationTokenSource]
         /// 
@@ -172,6 +197,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [Disconnect] 시 [Cancel / Dispose] 처리한다.
         /// </summary>
         private CancellationTokenSource _cts;
+
+        #endregion
+
+        #region [Image Binding Fields]
 
         /// <summary>
         /// 오른쪽 하단 [VD] 파일 영상 출력용 이미지
@@ -187,6 +216,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 오른쪽 상단 [IR] 열상 영상 출력용 이미지
         /// </summary>
         private BitmapSource _irCameraImage;
+
+        #endregion
+
+        #region [Status Binding Fields]
 
         /// <summary>
         /// [VD] 영상 상태 표시
@@ -214,7 +247,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #endregion
+
         #region [ICommand]
+
+        #region [Video Commands]
 
         /// <summary>
         /// 영상 [Connect] 버튼 [Command]
@@ -225,6 +262,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 영상 [Disconnect] 버튼 [Command]
         /// </summary>
         public ICommand DisconnectCommand { get; }
+
+        #endregion
+
+        #region [Pan / Tilt Commands]
 
         /// <summary>
         /// [PAN] 왼쪽 위치 이동 테스트 [Command]
@@ -245,6 +286,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [TILT] 아래쪽 위치 이동 테스트 [Command]
         /// </summary>
         public ICommand TiltDownCommand { get; }
+
+        #endregion
+
+        #region [Zoom / Focus Commands]
 
         /// <summary>
         /// [ZOOM] 확대 테스트 [Command]
@@ -268,6 +313,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [LRF Commands]
+
+        /// <summary>
+        /// [LRF] 거리측정 [1회] 요청 [Command]
+        /// </summary>
+        public ICommand LrfMeasureCommand { get; }
+
+        #endregion
+
+        #endregion
+
         #region [Constructor]
 
         /// <summary>
@@ -275,9 +331,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public MainViewModel()
         {
-            /// <summary>
-            /// [Command] 바인딩
-            /// </summary>
+            #region [Command Initialize]
+
             #region [Connect / Disconnect Command Binding]
 
             ConnectCommand = new RelayCommand(Connect);
@@ -421,6 +476,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             #endregion
 
+            #region [LRF Command Binding]
+
+            /// <summary>
+            /// [LRF] 거리측정 [1회] 요청
+            /// 
+            /// 버튼 클릭 시
+            /// 거리측정기 [1회 측정] [Packet]을 송신한다.
+            /// </summary>
+            LrfMeasureCommand = new RelayCommand(() =>
+            {
+                Console.WriteLine();
+                Console.WriteLine("=====================================================");
+                Console.WriteLine("[CONTROL] LRF MEASURE REQUEST");
+                Console.WriteLine("=====================================================");
+
+                _controlCommandService.ReadOnceLrfValue();
+            });
+
+            #endregion
+
+            #endregion
+
+            #region [Service Initialize]
+
             /// <summary>
             /// 영상 서비스 생성
             /// </summary>
@@ -452,6 +531,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _laTcpService.MessageReceived += OnLaMessageReceived;
             _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
 
+            #endregion
+
+            #region [Default Source Initialize]
+
             /// <summary>
             /// 기본 영상 주소 초기화 (하단)
             /// </summary>
@@ -459,11 +542,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine("[LA] Service Initialize Complete");
             Console.WriteLine("=====================================================");
+
+            #endregion
         }
 
         #endregion
 
         #region [Bindable Properties]
+
+        #region [Source Address Properties]
 
         /// <summary>
         /// [VD] 파일 영상 주소
@@ -479,6 +566,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [IR] 열상 [RTSP] 주소
         /// </summary>
         public string IrSourceAddress { get; set; }
+
+        #endregion
+
+        #region [Image Properties]
 
         /// <summary>
         /// [VDCameraImage] 값 변경 시,
@@ -537,6 +628,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #endregion
+
+        #region [Video Mode Properties]
+
         /// <summary>
         /// 현재 선택된 영상 모드 [Index]
         /// 
@@ -568,7 +663,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public byte PanTiltSpeedLevel
         {
             get => _panTiltSpeedLevel;
-            set
+            private set
             {
                 if (_panTiltSpeedLevel != value)
                 {
@@ -579,6 +674,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
         }
+
+        /// <summary>
+        /// [LRF] 최근 거리측정 값 표시 문자열
+        /// 
+        /// 거리측정 응답 수신 시 갱신되며,
+        /// [XAML] [TextBlock]과 바인딩하여 화면에 표시한다.
+        /// </summary>
+        public string LrfDistanceText
+        {
+            get => _lrfDistanceText;
+            private set
+            {
+                if (_lrfDistanceText != value)
+                {
+                    _lrfDistanceText = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        #endregion
+
+        #region [Current Source Property]
 
         /// <summary>
         /// 현재 [VideoModeIndex] 기준 영상 주소
@@ -609,6 +729,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
         }
+
+        #endregion
+
+        #region [Status Properties]
 
         /// <summary>
         /// [VD] [RTSP] 영상 상태 출력 문자열
@@ -660,6 +784,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
         }
+
+        #endregion
 
         #endregion
 
@@ -725,6 +851,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #region [Continuous Move Control Methods]
 
+        #region [Pan / Tilt Continuous Move]
+
         /// <summary>
         /// [PAN] 좌측 연속 이동 시작
         /// 
@@ -785,6 +913,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
         }
 
+        #endregion
+
+        #region [Zoom / Focus Continuous Move]
+
         /// <summary>
         /// [ZOOM] Tele 연속 이동 시작
         /// </summary>
@@ -833,6 +965,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService.StartFocusFar();
         }
 
+        #endregion
+
+        #region [Stop Continuous Move]
+
         /// <summary>
         /// 연속 이동 정지
         /// 
@@ -849,7 +985,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #endregion
+
         #region [Video Connect / Disconnect]
+
+        #region [Connect]
 
         /// <summary>
         /// 영상 연결 함수
@@ -987,6 +1127,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #endregion
+
+        #region [Disconnect]
+
         /// <summary>
         /// 영상 연결 해제 함수
         /// 
@@ -1033,6 +1177,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[VIDEO] Disconnect Complete.");
             Console.WriteLine("=====================================================");
         }
+
+        #endregion
+
+        #region [Video View Clear]
 
         /// <summary>
         /// 지정한 크기의 검은색 [BitmapSource] 생성
@@ -1103,6 +1251,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #endregion
+
+        #region [Video State Helpers]
+
         /// <summary>
         /// 현재 영상 연결 여부 확인
         /// </summary>
@@ -1126,6 +1278,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
 
+        #endregion
+
+        #region [Video Open Helpers]
+
         /// <summary>
         /// [EO / IR] 영상 연결 시도
         /// 
@@ -1147,6 +1303,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             };
 
         }
+
+        #endregion
+
+        #region [Video Result Helpers]
 
         /// <summary>
         /// 영상 연결 결과 [Console Log] 출력
@@ -1191,6 +1351,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 : "[IR] Connect Failed";
         }
 
+        #endregion
+
+        #region [Video Loop Start]
+
         /// <summary>
         /// 연결 성공한 [EO/IR] 영상만 [FFmpegCaptureLoop] 실행
         /// </summary>
@@ -1221,7 +1385,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #endregion
+
         #region [Video Capture Loop]
+
+        #region [OpenCV Capture Loop]
 
         /// <summary>
         /// [OpenCvSharp] [VideoCapture] 기반 프레임 수신 루프
@@ -1310,6 +1478,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #endregion
+
+        #region [FFmpeg Capture Loop]
+
         /// <summary>
         /// [FFmpeg] 기반 [RTSP] 프레임 수신 루프
         /// 
@@ -1360,7 +1532,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #endregion
+
         #region [LA Communication]
+
+        #region [LA Connect]
 
         /// <summary>
         /// [LA] 연결 시작
@@ -1394,6 +1570,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("=====================================================");
         }
 
+        #endregion
+
+        #region [LA Receive]
+
         /// <summary>
         /// [LA] [TCP] 수신 데이터 처리 함수
         /// 
@@ -1418,6 +1598,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
         }
+
+        #endregion
+
+        #region [LA Packet Handling]
 
         /// <summary>
         /// [LA] 응답 [Packet] 처리 함수
@@ -1488,29 +1672,45 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine("=====================================================");
                     break;
 
+                case 0x04:
+                    /// <summary>
+                    /// [LRF] 거리측정 응답 Packet
+                    /// </summary>
+
+                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("[LA PACKET] [LRF] Distance Packet");
+                    Console.WriteLine("=====================================================");
+
+                    ParseLrfDistancePacket(packet.RawData);
+                    Console.WriteLine("=====================================================");
+                    break;
+
                 default:
                     /// <summary>
                     /// 정의되지 않은 [Function] 번호
+                    /// 
+                    /// [LRF] / [GPS] / 기타 확장 [Packet] 확인용으로
+                    /// 로그 제한 없이 출력한다.
                     /// </summary>
-                    if (!canPrintLog)
-                        return;
 
                     Console.WriteLine("=====================================================");
-                    Console.Write($"[LA PACKET] Unknown Function 0x{packet.Function:X2} : ");
-                    Console.WriteLine();
+                    Console.WriteLine($"[LA PACKET] Unknown Function : 0x{packet.Function:X2}");
+                    Console.WriteLine("=====================================================");
 
                     foreach (byte b in packet.RawData)
                     {
                         Console.Write($"{b:X2} ");
                     }
-
                     Console.WriteLine();
-
+                    Console.WriteLine("=====================================================");
                     break;
-
             }
 
         }
+
+        #endregion
+
+        #region [LA Log Helpers]
 
         /// <summary>
         /// [LA] 상태 로그 출력 여부 확인
@@ -1531,6 +1731,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             return true;
         }
+
+        #endregion
+
+        #region [LA Packet Parsing]
 
         /// <summary>
         /// [LA] [Status Packet] 파싱
@@ -1632,6 +1836,32 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
             Console.WriteLine();
         }
+
+        /// <summary>
+        /// [LRF] 거리측정 응답 [Packet] 파싱
+        /// 
+        /// 거리값은 [8byte double] 형식이며,
+        /// [Little Endian] 방식으로 저장된다.
+        /// 
+        /// 현재는 장비 응답 [Function] 번호 확인 전 단계이며,
+        /// 실제 거리 응답 수신 시 [HandleLaPacket]의
+        /// [Function] 분기와 함께 최종 검증 예정이다.
+        /// </summary>
+        private void ParseLrfDistancePacket(byte[] packet)
+        {
+            if (packet == null ||
+                packet.Length < 10)
+            {
+                Console.WriteLine("[LRF] Invalid Distance Packet");
+                return;
+            }
+            double distance = BitConverter.ToDouble(packet, 2);
+
+            LrfDistanceText = $"DISTANCE : {distance:F1} m";
+            Console.WriteLine($"[LRF] Distance : {distance:F1} m");
+        }
+
+        #endregion
 
         #endregion
 

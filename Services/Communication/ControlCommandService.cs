@@ -21,9 +21,12 @@
 
         /// <summary>
         /// [Unit ID]
-        /// 문서 기준 기본 [0x01] 사용
+        /// 
+        /// [TORUSS] 문서 기준 기본 [0x01] 고정 사용.
+        /// [Packet] 생성 이후 변경되지 않으므로
+        /// [readonly]로 선언한다.
         /// </summary>
-        private byte _unitId = 0x01;
+        private readonly byte _unitId = 0x01;
 
         public ControlCommandService(TcpClientService tcpClientService)
         {
@@ -45,7 +48,7 @@
                 data2,
                 0x00
             };
-            packet[6] = CheckSum(packet, 1, 5); // [CheckSum] = [Unit ID ~ Data2] 총합
+            packet[6] = CheckSum(packet, 1, 5);
 
             return _tcpClientService.Send(packet);
         }
@@ -62,7 +65,6 @@
             {
                 sum += data[i];
             }
-
             return sum;
         }
 
@@ -88,7 +90,11 @@
             byte data1 = (byte)((value >> 8) & 0xFF);
             byte data2 = (byte)(value & 0xFF);
 
-            return SendCommand(0x00, 0x45, data1, data2);
+            return SendCommand(
+                0x00,
+                0x45,
+                data1,
+                data2);
         }
 
         /// <summary>
@@ -140,7 +146,11 @@
             byte data1 = (byte)((value >> 8) & 0xFF);
             byte data2 = (byte)(value & 0xFF);
 
-            return SendCommand(0x00, 0x47, data1, data2);
+            return SendCommand(
+                0x00,
+                0x47,
+                data1,
+                data2);
         }
 
         /// <summary>
@@ -202,7 +212,11 @@
             byte data1 = (byte)((zoom >> 8) & 0xFF);
             byte data2 = (byte)(zoom & 0xFF);
 
-            return SendCommand(0x00, 0x37, data1, data2);
+            return SendCommand(
+                0x00,
+                0x37,
+                data1,
+                data2);
         }
 
         /// <summary>
@@ -212,7 +226,11 @@
         /// </summary>
         public bool StartZoomTele()
         {
-            return SendCommand(0x00, 0x20, 0x00, 0x00);
+            return SendCommand(
+                0x00,
+                0x20,
+                0x00,
+                0x00);
         }
 
         /// <summary>
@@ -222,7 +240,11 @@
         /// </summary>
         public bool StartZoomWide()
         {
-            return SendCommand(0x00, 0x40, 0x00, 0x00);
+            return SendCommand(
+                0x00,
+                0x40,
+                0x00,
+                0x00);
         }
 
         /// <summary>
@@ -239,7 +261,11 @@
             byte data1 = (byte)((focus >> 8) & 0xFF);
             byte data2 = (byte)(focus & 0xFF);
 
-            return SendCommand(0x00, 0x39, data1, data2);
+            return SendCommand(
+                0x00,
+                0x39,
+                data1,
+                data2);
         }
 
         /// <summary>
@@ -249,7 +275,11 @@
         /// </summary>
         public bool StartFocusNear()
         {
-            return SendCommand(0x01, 0x00, 0x00, 0x00);
+            return SendCommand(
+                0x01,
+                0x00,
+                0x00,
+                0x00);
         }
 
         /// <summary>
@@ -259,15 +289,25 @@
         /// </summary>
         public bool StartFocusFar()
         {
-            return SendCommand(0x00, 0x80, 0x00, 0x00);
+            return SendCommand(
+                0x00,
+                0x80,
+                0x00,
+                0x00);
         }
 
         /// <summary>
-        /// 거리측정기 1회 측정 요청
+        /// 거리측정기 [1회] 측정 요청
+        /// 
+        /// [Command2 = 0x57]
         /// </summary>
         public bool ReadOnceLrfValue()
         {
-            return SendCommand(0x00, 0x57, 0x00, 0x00);
+            return SendCommand(
+                0x00,
+                0x57,
+                0x00,
+                0x00);
         }
 
     }

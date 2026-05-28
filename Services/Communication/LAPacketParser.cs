@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
-    /// LA(Local Agent) 수신 데이터를
+    /// [LA](Local Agent) 수신 데이터를
     /// [TORUSS] [12byte] 응답 [Packet] 단위로 분리 / 검증하는 [Parser] 클래스
     /// </summary>
     public class LAPacketParser
@@ -36,7 +36,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
             while (index + PacketSize <= receivedData.Length)
             {
-                // Header(0xFF)가 아니면 다음 byte로 이동
+                // [Header(0xFF)]가 아니면 다음 byte로 이동
                 if (receivedData[index] != 0xFF)
                 {
                     index++;
@@ -76,7 +76,7 @@ namespace OpenCvWpfTracking.Services.Communication
         /// 
         /// 문서 기준:
         /// [Checksum] = packet[1] ~ packet[10] byte 합산값
-        /// packet[11] = Checksum
+        /// [packet[11] = Checksum]
         /// </summary>
         private bool ValidateChecksum(byte[] packet)
         {
