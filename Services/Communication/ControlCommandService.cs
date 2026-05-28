@@ -245,7 +245,7 @@
         /// <summary>
         /// [FOCUS] [Near] 연속제어 시작
         /// 
-        /// [Command1 Bit0 = Focus Near]
+        /// [Command2 Bit0 = Focus Near]
         /// </summary>
         public bool StartFocusNear()
         {
@@ -255,7 +255,7 @@
         /// <summary>
         /// [FOCUS] [Far] 연속제어 시작
         /// 
-        /// [Command2 Bit7 = Focus Far]
+        /// [Command1 Bit7 = Focus Far]
         /// </summary>
         public bool StartFocusFar()
         {
