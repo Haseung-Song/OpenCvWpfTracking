@@ -144,7 +144,7 @@
                                 <!-- 장비 리스트 -->
                                 <RowDefinition Height="*"/>
                                 <!-- [PT] / [ZOOM] / [FOCUS] / [LRF] 제어 영역 -->
-                                <RowDefinition Height="100"/>
+                                <!--<RowDefinition Height="100"/>-->
                             </Grid.RowDefinitions>
 
                             <TextBlock Text="장비 연결"
@@ -152,21 +152,26 @@
                                        FontSize="16"
                                        FontWeight="Bold"
                                        Margin="0,0,0,10"/>
-
+                            <!-- 제어 패널 Scroll 영역 -->
                             <ScrollViewer Grid.Row="1"
                                           VerticalScrollBarVisibility="Auto"
                                           Margin="0,0,0,10"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <StackPanel Orientation="Vertical">
-                                    <RadioButton Content="연결 해제"
+                                <StackPanel Orientation="Vertical" 
+                                            Margin="0,0,0,10">
+                                    <!-- 테스트용 장비 선택 RadioButton 
+                                         현재는 단일 장비 연결 구조로 사용하므로
+                                         임시 비활성화 처리.
+                                         추후 다중 장비 선택 기능 추가 시 재사용 예정 -->
+                                    <!--<RadioButton Content="연결 해제"
                                                  Foreground="#6EC1FF"
                                                  FontSize="15"
                                                  Margin="0,5"/>
-
+                                    
                                     <RadioButton Content="TORUSS-LR1000"
                                                  Foreground="#6EC1FF"
                                                  FontSize="15"
-                                                 Margin="0,5"/>
+                                                 Margin="0,5"/>-->
 
                                     <!-- [PAN] / [TILT] 제어 -->
                                     <Border Grid.Row="2"
