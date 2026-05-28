@@ -9,6 +9,7 @@
         Height="1080"
         Width="1920">
 
+    <!-- 메인 화면 전체 레이아웃 -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="3*"/>
@@ -34,6 +35,7 @@
                     <!-- 영상 출력 -->
                     <Image Source="{Binding EOCameraImage}"
                            Stretch="Uniform"/>
+
                     <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                     <TextBlock Text="{Binding EoStatusText}"
                                Margin="0,0,10,5"
@@ -62,6 +64,7 @@
                         <!-- 영상 출력 -->
                         <Image Source="{Binding IRCameraImage}"
                            Stretch="Uniform"/>
+
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding IrStatusText}"
                                    Margin="0,0,10,5"
@@ -83,6 +86,7 @@
                         <!-- 영상 출력 -->
                         <Image Source="{Binding VDCameraImage}"
                            Stretch="Uniform"/>
+
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding VdStatusText}"
                                    Margin="0,0,10,5"
@@ -240,11 +244,17 @@
                                                         Background="#3F454B"
                                                         BorderBrush="#8B949E"
                                                         BorderThickness="1">
-                                                    <TextBlock Text="PT"
-                                                               Foreground="White"
-                                                               FontWeight="Bold"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"/>
+                                                    <Button Content="STOP"
+                                                            Width="70"
+                                                            Height="32"
+                                                            FontSize="10"
+                                                            Foreground="White"
+                                                            FontWeight="Bold"
+                                                            Background="#4B5964"
+                                                            BorderBrush="#708090"
+                                                            VerticalAlignment="Center"
+                                                            HorizontalAlignment="Center"
+                                                            Command="{Binding StopMoveCommand}"/>
                                                 </Border>
 
                                                 <!-- [PAN] [RIGHT] -->

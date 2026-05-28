@@ -322,6 +322,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [STOP Commands]
+
+        /// <summary>
+        /// [PT] 연속 이동 정지 [Command]
+        /// </summary>
+        public ICommand StopMoveCommand { get; }
+
+        #endregion
+
         #endregion
 
         #region [Constructor]
@@ -336,6 +345,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             #region [Connect / Disconnect Command Binding]
 
             ConnectCommand = new RelayCommand(Connect);
+
             DisconnectCommand = new RelayCommand(Disconnect);
 
             #endregion
@@ -493,6 +503,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 _controlCommandService.ReadOnceLrfValue();
             });
+
+            #region [STOP Command Binding]
+
+            /// <summary>
+            /// [PT] 연속 이동 정지
+            /// 
+            /// 현재 진행 중인
+            /// [PAN] / [TILT] / [Zoom] / [Focus]
+            /// 연속 이동을 정지한다.
+            /// </summary>
+            StopMoveCommand = new RelayCommand(() =>
+            {
+                Console.WriteLine();
+                Console.WriteLine("[CONTROL] STOP MOVE");
+                Console.WriteLine("=====================================================");
+
+                StopContinuousMove();
+            });
+
+            #endregion
 
             #endregion
 
