@@ -102,6 +102,8 @@ namespace OpenCvWpfTracking.Services.Video
 
             Console.WriteLine("[FFmpeg RTSP] Source : " + rtspUrl);
 
+            Console.WriteLine("=====================================================");
+
             ffmpeg.avformat_network_init();
 
             AVFormatContext* formatContext = null;
@@ -116,6 +118,8 @@ namespace OpenCvWpfTracking.Services.Video
                     &options);
 
             Console.WriteLine("[FFmpeg RTSP] avformat_open_input Result : " + result);
+
+            Console.WriteLine("=====================================================");
 
             ffmpeg.av_dict_free(&options);
 
@@ -402,7 +406,8 @@ namespace OpenCvWpfTracking.Services.Video
                     width,
                     height,
                     AVPixelFormat.AV_PIX_FMT_BGR24,
-                    2,      // SWS_BILINEAR
+                    // SWS_BILINEAR
+                    2,
                     null,
                     null,
                     null);

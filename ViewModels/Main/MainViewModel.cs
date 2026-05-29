@@ -860,7 +860,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             VdSourceAddress =
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
-            // 1. 4층 개발실 실장비 [BOSCH] PTZ(회전형) 카메라
+            // 1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             EoSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
@@ -872,14 +872,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //EoSourceAddress =
             //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
 
-            // 4. 4층 개발실 실장비 [BOSCH] PTZ(회전형) 카메라
+            // 4. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             IrSourceAddress =
                 "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 5. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
             // [ID], [PW], [PORT] 맞는지 Config 확인 필요
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.101:554/rtsp_tunnel";
+            //IrSourceAddress =
+            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 6. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
@@ -1582,7 +1582,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 
         /// 1. 옥상 카메라 제어 [Port]: 5001
         /// 2. 연구 개발실 제어 [Port]: 5005
-        /// 3. 일층 생산팀 제어 [Port]: 7000
+        /// 3. 일층 생산팀 제어 [Port]: 5001
         /// 
         /// [TCP] 연결 성공 시,
         /// [TcpClientService] 내부 [ReceiveLoop]에서
@@ -1601,7 +1601,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     "127.0.0.1",
                     // 5001 (옥상 카메라 제어)
                     // 5005 (연구 개발실 제어)
-                    // 7000 (일층 생산팀 제어)
+                    // 5001 (일층 생산팀 제어)
                     5005);
 
             Console.WriteLine(
