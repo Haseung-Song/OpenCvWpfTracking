@@ -25,6 +25,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged
     {
+        #region [Enum]
+
+        /// <summary>
+        /// 현재 진행 중인 연속 제어 종류
+        /// </summary>
+        private enum ContinuousMoveType
+        {
+            None,
+            PanTilt,
+            EoZoom,
+            EoFocus,
+            IrZoom,
+            IrFocus,
+            IrDigitalZoom
+        }
+
+        #endregion
+
         #region [Fields]
 
         #region [Video State Fields]
@@ -109,6 +127,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private double _currentTilt;
 
+        /// <summary>
+        /// 현재 어떤 연속 제어가 동작 중인지
+        /// </summary>
+        private ContinuousMoveType _currentMoveType = ContinuousMoveType.None;
+
         #endregion
 
         #region [Control Properties]
@@ -141,20 +164,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private const short FocusMoveStep = 5;
 
         /// <summary>
-        /// 현재 [ZOOM] 위치 값(현재 위치 저장용)
+        /// [LA Status Packet]에서 수신한 [EO] [Zoom] 현재 값
         /// 
-        /// [LA Status Packet] 수신 시 갱신되고,
-        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// 일반 상태 [Packet]의 [Zoom] 값은
+        /// [IR]이 아닌 [EO] 기준 값으로 확인되어
+        /// [EO Zoom] 상태값으로 관리한다.
         /// </summary>
-        private short _currentZoom;
+        private short _currentEoZoom;
 
         /// <summary>
-        /// 현재 [FOCUS] 위치 값(현재 위치 저장용)
+        /// [LA Status Packet]에서 수신한 [EO] [Focus] 현재 값
         /// 
-        /// [LA Status Packet] 수신 시 갱신되고,
-        /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
+        /// 일반 상태 [Packet]의 [Focus] 값은
+        /// [IR]이 아닌 [EO] 기준 값으로 확인되어
+        /// [EO Focus] 상태값으로 관리한다.
         /// </summary>
-        private short _currentFocus;
+        private short _currentEoFocus;
 
         /// <summary>
         /// [LRF] 최근 거리측정 값 표시 문자열
@@ -427,13 +452,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             ZoomInCommand = new RelayCommand(() =>
             {
-                short targetZoom = (short)(_currentZoom + ZoomMoveStep);
+                short targetZoom = (short)(_currentEoZoom + ZoomMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
                 Console.WriteLine("=====================================================");
 
-                _controlCommandService.ZoomGoPosition(targetZoom);
+                _controlCommandService.EoZoomGoPosition(targetZoom);
             });
 
 
@@ -444,13 +469,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             ZoomOutCommand = new RelayCommand(() =>
             {
-                short targetZoom = (short)(_currentZoom - ZoomMoveStep);
+                short targetZoom = (short)(_currentEoZoom - ZoomMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] ZOOM -{ZoomMoveStep} => Target : {targetZoom}");
                 Console.WriteLine("========================================");
 
-                _controlCommandService.ZoomGoPosition(targetZoom);
+                _controlCommandService.EoZoomGoPosition(targetZoom);
             });
 
             /// <summary>
@@ -460,13 +485,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             FocusFarCommand = new RelayCommand(() =>
             {
-                short targetFocus = (short)(_currentFocus + FocusMoveStep);
+                short targetFocus = (short)(_currentEoFocus + FocusMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
                 Console.WriteLine("========================================");
 
-                _controlCommandService.FocusGoPosition(targetFocus);
+                _controlCommandService.EoFocusGoPosition(targetFocus);
             });
 
             /// <summary>
@@ -476,13 +501,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             FocusNearCommand = new RelayCommand(() =>
             {
-                short targetFocus = (short)(_currentFocus - FocusMoveStep);
+                short targetFocus = (short)(_currentEoFocus - FocusMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
                 Console.WriteLine("========================================");
 
-                _controlCommandService.FocusGoPosition(targetFocus);
+                _controlCommandService.EoFocusGoPosition(targetFocus);
             });
 
             #endregion
@@ -862,25 +887,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
             // 1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 2. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+            EoSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 3. 옥상 [GOP] 주간(EO) 카메라
             //EoSourceAddress =
             //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
 
             // 4. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            IrSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            //IrSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 5. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
             // [ID], [PW], [PORT] 맞는지 Config 확인 필요
-            //IrSourceAddress =
-            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
+            IrSourceAddress =
+                "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 6. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
@@ -891,63 +916,71 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #region [Continuous Move Control Methods]
 
-        #region [Pan / Tilt Continuous Move]
+        #region [EO/IR] [Pan / Tilt Continuous Move]
 
         /// <summary>
-        /// [PAN] 좌측 연속 이동 시작
+        /// [EO/IR] 주간/열상 카메라 [PAN] 좌측 연속 이동 시작
         /// 
         /// [PanTiltSpeedLevel] 값을 사용하여
         /// 좌측 방향으로 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartPanLeftMove()
         {
+            _currentMoveType = ContinuousMoveType.PanTilt;
+
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] PAN LEFT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine($"[CONTROL] [EO/IR] PAN LEFT START / SPEED : {PanTiltSpeedLevel}");
             Console.WriteLine("========================================");
 
             _controlCommandService.StartPanLeft(PanTiltSpeedLevel);
         }
 
         /// <summary>
-        /// [PAN] 우측 연속 이동 시작
+        /// [EO/IR] 주간/열상 카메라 [PAN] 우측 연속 이동 시작
         /// 
         /// [PanTiltSpeedLevel] 값을 사용하여
         /// 우측 방향으로 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartPanRightMove()
         {
+            _currentMoveType = ContinuousMoveType.PanTilt;
+
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] PAN RIGHT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine($"[CONTROL] [EO/IR] PAN RIGHT START / SPEED : {PanTiltSpeedLevel}");
             Console.WriteLine("========================================");
 
             _controlCommandService.StartPanRight(PanTiltSpeedLevel);
         }
 
         /// <summary>
-        /// [TILT] 위쪽 연속 이동 시작
+        /// [EO/IR] 주간/열상 카메라 [TILT] 위쪽 연속 이동 시작
         /// 
         /// [PanTiltSpeedLevel] 값을 사용하여
         /// 위쪽 방향으로 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartTiltUpMove()
         {
+            _currentMoveType = ContinuousMoveType.PanTilt;
+
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] TILT UP START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine($"[CONTROL] [EO/IR] TILT UP START / SPEED : {PanTiltSpeedLevel}");
             Console.WriteLine("========================================");
 
             _controlCommandService.StartTiltUp(PanTiltSpeedLevel);
         }
 
         /// <summary>
-        /// [TILT] 아래쪽 연속 이동 시작
+        /// [EO/IR] 주간/열상 카메라 [TILT] 아래쪽 연속 이동 시작
         /// 
         /// [PanTiltSpeedLevel] 값을 사용하여
         /// 아래 방향으로 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartTiltDownMove()
         {
+            _currentMoveType = ContinuousMoveType.PanTilt;
+
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine($"[CONTROL] [EO/IR] TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
             Console.WriteLine("========================================");
 
             _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
@@ -955,59 +988,182 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
-        #region [Zoom / Focus Continuous Move]
+        #region [EO] [Zoom / Focus Continuous Move]
 
         /// <summary>
-        /// [ZOOM] Tele 연속 이동 시작
+        /// [EO] 주간 카메라 [ZOOM] [Tele] 연속 이동 시작
         /// </summary>
-        public void StartZoomInMove()
+        public void StartEoZoomInMove()
         {
+            _currentMoveType = ContinuousMoveType.EoZoom;
+
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] ZOOM TELE START");
+            Console.WriteLine("[CONTROL] EO ZOOM TELE START");
             Console.WriteLine("========================================");
 
-            _controlCommandService.StartZoomTele();
+            _controlCommandService.StartEoZoomTele();
         }
 
         /// <summary>
-        /// [ZOOM] Wide 연속 이동 시작
+        /// [EO] 주간 카메라 [ZOOM] [Wide] 연속 이동 시작
         /// </summary>
-        public void StartZoomOutMove()
+        public void StartEoZoomOutMove()
         {
+            _currentMoveType = ContinuousMoveType.EoZoom;
+
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] ZOOM WIDE START");
+            Console.WriteLine("[CONTROL] EO ZOOM WIDE START");
             Console.WriteLine("========================================");
 
-            _controlCommandService.StartZoomWide();
+            _controlCommandService.StartEoZoomWide();
         }
 
         /// <summary>
-        /// [FOCUS] Near 연속 이동 시작
+        /// [EO] 주간 카메라 [FOCUS] [Near] 연속 이동 시작
         /// </summary>
-        public void StartFocusNearMove()
+        public void StartEoFocusNearMove()
         {
+            _currentMoveType = ContinuousMoveType.EoFocus;
+
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] FOCUS NEAR START");
+            Console.WriteLine("[CONTROL] EO FOCUS NEAR START");
             Console.WriteLine("========================================");
 
-            _controlCommandService.StartFocusNear();
+            _controlCommandService.StartEoFocusNear();
         }
 
         /// <summary>
-        /// [FOCUS] Far 연속 이동 시작
+        /// [EO] 주간 카메라 [FOCUS] [Far] 연속 이동 시작
         /// </summary>
-        public void StartFocusFarMove()
+        public void StartEoFocusFarMove()
         {
+            _currentMoveType = ContinuousMoveType.EoFocus;
+
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] FOCUS FAR START");
+            Console.WriteLine("[CONTROL] EO FOCUS FAR START");
             Console.WriteLine("========================================");
 
-            _controlCommandService.StartFocusFar();
+            _controlCommandService.StartEoFocusFar();
         }
 
         #endregion
 
-        #region [Stop Continuous Move]
+        #region [IR] [Zoom / Focus Continuous Move]
+
+        /// <summary>
+        /// [IR] 열상 카메라 [ZOOM] [Tele] 연속 이동 시작
+        /// </summary>
+        public void StartIrZoomInMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrZoom;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR ZOOM IN START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrZoomTele();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [ZOOM] [Wide] 연속 이동 시작
+        /// </summary>
+        public void StartIrZoomOutMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrZoom;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR ZOOM OUT START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrZoomWide();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [FOCUS] [Near] 연속 이동 시작
+        /// </summary>
+        public void StartIrFocusNearMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrFocus;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR FOCUS NEAR START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrFocusNear();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [FOCUS] [Far] 연속 이동 시작
+        /// </summary>
+        public void StartIrFocusFarMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrFocus;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR FOCUS FAR START");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrFocusFar();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [FOCUS] 연속 이동 정지
+        /// </summary>
+        public void StopIrFocusMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR FOCUS STOP");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StopIrFocus();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [Digital Zoom] 확대 시작
+        /// </summary>
+        public void StartIrDigitalZoomInMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrDigitalZoom;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR DIGITAL ZOOM IN START");
+            Console.WriteLine($"[CONTROL] Current Common Zoom : {_currentEoZoom}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrDigitalZoomIn();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [Digital Zoom] 축소 시작
+        /// </summary>
+        public void StartIrDigitalZoomOutMove()
+        {
+            _currentMoveType = ContinuousMoveType.IrDigitalZoom;
+
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR DIGITAL ZOOM OUT START");
+            Console.WriteLine($"[CONTROL] Current Common Zoom : {_currentEoZoom}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrDigitalZoomOut();
+        }
+
+        /// <summary>
+        /// [IR] 열상 카메라 [Auto Focus] 요청
+        /// </summary>
+        public void StartIrAutoFocusMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR AUTO FOCUS REQUEST");
+            Console.WriteLine($"[CONTROL] Current Common Focus : {_currentEoFocus}");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StartIrAutoFocus();
+        }
+
+        #endregion
+
+        #region [Common Stop Continuous Move]
 
         /// <summary>
         /// 연속 이동 정지
@@ -1016,11 +1172,49 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StopContinuousMove()
         {
+            /// <summary>
+            /// 현재, 동작 중인 연속 제어가 없으면
+            /// 불필요한 정지 [Packet] 송신 방지
+            /// </summary>
+            if (_currentMoveType == ContinuousMoveType.None)
+                return;
+
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] MOVE STOP");
+            Console.WriteLine($"[CONTROL] MOVE STOP: {_currentMoveType}");
             Console.WriteLine("========================================");
 
-            _controlCommandService.StopMove();
+            /// <summary>
+            /// 마지막으로 실행된 연속 제어 종류에 따라
+            /// 해당 장비의 정지 [Packet]만 송신
+            /// </summary>
+            switch (_currentMoveType)
+            {
+                case ContinuousMoveType.PanTilt:
+
+                case ContinuousMoveType.EoZoom:
+
+                case ContinuousMoveType.EoFocus:
+                    // [Pelco-D] 기본 연속 제어 정지
+                    // [Pan] / [Tilt] / [EO Zoom] / [EO Focus] 정지에 사용
+                    _controlCommandService.StopMove();
+                    break;
+
+                case ContinuousMoveType.IrZoom:
+                    // [IR] [Optical Zoom] 정지
+                    _controlCommandService.StopIrZoom();
+                    break;
+
+                case ContinuousMoveType.IrFocus:
+                    // [IR] [Focus] 정지
+                    _controlCommandService.StopIrFocus();
+                    break;
+
+                case ContinuousMoveType.IrDigitalZoom:
+                    // [IR] [Digital Zoom] 정지
+                    _controlCommandService.StopIrDigitalZoom();
+                    break;
+            }
+            _currentMoveType = ContinuousMoveType.None;
         }
 
         #endregion
@@ -1114,6 +1308,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     (vdResult.VdResult
                     ? "Connect Success"
                     : "Connect Failure"));
+
+                Console.WriteLine();
 
                 /// [개별 연결 상태 표시]
                 VdStatusText =
@@ -1603,7 +1799,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     // 5001 (옥상 카메라 제어)
                     // 5005 (연구 개발실 제어)
                     // 5001 (일층 생산팀 제어)
-                    5005);
+                    5001);
 
             Console.WriteLine(
                 "[LA CONNECT RESULT] "
@@ -1829,14 +2025,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentTilt = tiltDegree;
 
             /// <summary>
-            /// 현재 [ZOOM / FOCUS] 값 저장
+            /// [LA Status Packet] 기준
+            /// [EO] [Zoom] / [EO] [Focus] 상태값 저장
             /// 
-            /// 수신 [Packet]이 들어올 때마다 갱신이 되므로
-            /// 버튼 클릭 시
-            /// 현재 위치 기준 [상대 이동 계산]에 사용한다.
+            /// 현재 일반 상태 [Packet]에서는
+            /// [IR] [Zoom] / [IR] [Focus] 값이 아닌
+            /// [EO] 기준 [Zoom] / [Focus] 값이 수신된다.
             /// </summary>
-            _currentZoom = zoomRaw;
-            _currentFocus = focusRaw;
+            _currentEoZoom = zoomRaw;
+            _currentEoFocus = focusRaw;
 
             if (!printLog)
             {
@@ -1850,10 +2047,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 $"[LA STATUS] [Tilt]  : {tiltDegree:F2}");
 
             Console.WriteLine(
-                $"[LA STATUS] [Zoom] : {zoomRaw}");
+                $"[LA STATUS] [EO Zoom] : {_currentEoZoom}");
 
             Console.WriteLine(
-                $"[LA STATUS] [Focus] : {focusRaw}");
+                $"[LA STATUS] [EO Focus] : {_currentEoFocus}");
 
             Console.WriteLine(
                 $"[LA STATUS] [Power] : 0x{powerStatus:X2}");

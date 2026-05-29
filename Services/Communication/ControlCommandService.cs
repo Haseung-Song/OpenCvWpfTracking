@@ -202,7 +202,7 @@
         /// PTZ(회전형) 카메라 [Zoom] 위치 제어 명령
         /// 범위: [0 ~ 1000]
         /// </summary>
-        public bool ZoomGoPosition(short zoom)
+        public bool EoZoomGoPosition(short zoom)
         {
             if (zoom > 1000)
                 zoom = 1000;
@@ -220,11 +220,11 @@
         }
 
         /// <summary>
-        /// [ZOOM] [Tele] 연속제어 시작
+        /// [EO] [ZOOM] [Tele] 연속제어 시작
         /// 
         /// [Command2 Bit5 = Zoom Tele]
         /// </summary>
-        public bool StartZoomTele()
+        public bool StartEoZoomTele()
         {
             return SendCommand(
                 0x00,
@@ -234,11 +234,11 @@
         }
 
         /// <summary>
-        /// [ZOOM] [Wide] 연속제어 시작
+        /// [EO] [ZOOM] [Wide] 연속제어 시작
         /// 
         /// [Command2 Bit6 = Zoom Wide]
         /// </summary>
-        public bool StartZoomWide()
+        public bool StartEoZoomWide()
         {
             return SendCommand(
                 0x00,
@@ -248,10 +248,10 @@
         }
 
         /// <summary>
-        /// PTZ(회전형) 카메라 [Focus] 위치 제어 명령
+        /// [EO] PTZ(회전형) 카메라 [Focus] 위치 제어 명령
         /// 범위: [0 ~ 1000]
         /// </summary>
-        public bool FocusGoPosition(short focus)
+        public bool EoFocusGoPosition(short focus)
         {
             if (focus > 1000)
                 focus = 1000;
@@ -269,11 +269,11 @@
         }
 
         /// <summary>
-        /// [FOCUS] [Near] 연속제어 시작
+        /// [EO] [FOCUS] [Near] 연속제어 시작
         /// 
         /// [Command2 Bit0 = Focus Near]
         /// </summary>
-        public bool StartFocusNear()
+        public bool StartEoFocusNear()
         {
             return SendCommand(
                 0x01,
@@ -283,16 +283,216 @@
         }
 
         /// <summary>
-        /// [FOCUS] [Far] 연속제어 시작
+        /// [EO] [FOCUS] [Far] 연속제어 시작
         /// 
         /// [Command1 Bit7 = Focus Far]
         /// </summary>
-        public bool StartFocusFar()
+        public bool StartEoFocusFar()
         {
             return SendCommand(
                 0x00,
                 0x80,
                 0x00,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Zoom] 위치 제어 명령
+        /// 
+        /// 위치 값은 [화각 * 100] 후
+        /// [Data1 / Data2]에 [Big Endian] 방식으로 설정
+        /// </summary>
+        public bool IrZoomGoPosition(short zoom)
+        {
+            byte data1 = (byte)((zoom >> 8) & 0xFF);
+            byte data2 = (byte)(zoom & 0xFF);
+
+            return SendCommand(
+                0x00,
+                0x29,
+                data1,
+                data2);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [ZOOM] [Tele] 연속제어 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x00] : Zoom In Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrZoomTele()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x00,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [ZOOM] [Wide] 연속제어 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x01] : Zoom Out Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrZoomWide()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x01,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [ZOOM] 연속제어 정지
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x0F] : Zoom Stop
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StopIrZoom()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x0F,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Focus] 위치 제어 명령
+        /// 
+        /// 범위: [0 ~ 1000]
+        /// </summary>
+        public bool IrFocusGoPosition(short focus)
+        {
+            if (focus > 1000)
+                focus = 1000;
+            else if (focus < 0)
+                focus = 0;
+
+            byte data1 = (byte)((focus >> 8) & 0xFF);
+            byte data2 = (byte)(focus & 0xFF);
+
+            return SendCommand(
+                0x00,
+                0x28,
+                data1,
+                data2);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [FOCUS] [Near] 연속제어 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x03] : Focus Near Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrFocusNear()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x03,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [FOCUS] [Far] 연속제어 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x04] : Focus Far Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrFocusFar()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x04,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [FOCUS] 연속제어 정지
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x05] : Focus Stop
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StopIrFocus()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x05,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Digital Zoom] 확대 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x07] : Digital Zoom In Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrDigitalZoomIn()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x07,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Digital Zoom] 축소 시작
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x08] : Digital Zoom Out Start
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrDigitalZoomOut()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x08,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Digital Zoom] 정지
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x06] : Digital Zoom Stop
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StopIrDigitalZoom()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x06,
+                0x00);
+        }
+
+        /// <summary>
+        /// [IR] 열영상 카메라 [Auto Focus] 요청
+        /// 
+        /// [Command2 = 0x31]
+        /// [Data1 = 0x02] : Auto Focus
+        /// [Data2 = 0x00]
+        /// </summary>
+        public bool StartIrAutoFocus()
+        {
+            return SendCommand(
+                0x00,
+                0x31,
+                0x02,
                 0x00);
         }
 

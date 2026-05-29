@@ -147,8 +147,6 @@
                                 <RowDefinition Height="Auto"/>
                                 <!-- 장비 리스트 -->
                                 <RowDefinition Height="*"/>
-                                <!-- [PT] / [ZOOM] / [FOCUS] / [LRF] 제어 영역 -->
-                                <!--<RowDefinition Height="100"/>-->
                             </Grid.RowDefinitions>
 
                             <TextBlock Text="장비 연결"
@@ -289,7 +287,96 @@
                                         </Grid>
                                     </Border>
 
-                                    <!-- [ZOOM] / [FOCUS] 제어 -->
+                                    <!-- [EO] [ZOOM] / [FOCUS] 제어 -->
+                                    <Border Grid.Row="2"
+                                            Margin="0,10,10,0"
+                                            Background="#5F666D"
+                                            BorderBrush="#95A5B0"
+                                            BorderThickness="1.5"
+                                            Padding="10">
+
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- 제목 -->
+                                            <TextBlock Text="EO ZOOM / FOCUS CONTROL"
+                                                       HorizontalAlignment="Center"
+                                                       Foreground="White"
+                                                       FontWeight="Bold"
+                                                       Margin="0,0,0,5"/>
+
+                                            <!-- [EO] [ZOOM] 제어 -->
+                                            <StackPanel Grid.Row="1"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        Margin="0,0,0,10">
+
+                                                <!-- [EO] [ZOOM] 확대 -->
+                                                <Button Content="ZOOM +"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="EoZoomIn_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                                <!-- [EO] [ZOOM] 축소 -->
+                                                <Button Content="ZOOM -"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="EoZoomOut_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                            </StackPanel>
+
+                                            <!-- [EO] [FOCUS] 제어 -->
+                                            <StackPanel Grid.Row="2"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        Margin="0,0,0,0">
+
+                                                <!-- [EO] [FOCUS] [Far] -->
+                                                <Button Content="FOCUS +"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="EoFocusFar_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                                <!-- [EO] [FOCUS] [Near] -->
+                                                <Button Content="FOCUS -"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="EoFocusNear_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                            </StackPanel>
+
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
                                     <Border Grid.Row="2"
                                             Margin="0,10,10,0"
                                             Background="#5F666D"
@@ -303,77 +390,124 @@
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
 
                                             <!-- 제목 -->
-                                            <TextBlock Text="ZOOM / FOCUS CONTROL"
+                                            <TextBlock Text="IR ZOOM / FOCUS CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,5"/>
 
-                                            <!-- [ZOOM] 제어 -->
+                                            <!-- [IR] [ZOOM] 제어 -->
                                             <StackPanel Grid.Row="1"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                <!-- [ZOOM] 확대 -->
+                                                <!-- [IR] [ZOOM] 확대 -->
                                                 <Button Content="ZOOM +"
                                                         Width="85"
                                                         Height="30"
                                                         Margin="5"
-                                                        FontSize="14"
+                                                        FontSize="12"
                                                         FontWeight="Bold"
-                                                        PreviewMouseDown="ZoomIn_MouseDown"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrZoomIn_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                                <!-- [ZOOM] 축소 -->
+                                                <!-- [IR] [ZOOM] 축소 -->
                                                 <Button Content="ZOOM -"
                                                         Width="85"
                                                         Height="30"
                                                         Margin="5"
-                                                        FontSize="14"
+                                                        FontSize="12"
                                                         FontWeight="Bold"
-                                                        PreviewMouseDown="ZoomOut_MouseDown"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrZoomOut_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
                                             </StackPanel>
 
-                                            <!-- [FOCUS] 제어 -->
+                                            <!-- [IR] [FOCUS] 제어 -->
                                             <StackPanel Grid.Row="2"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                <!-- [FOCUS] [Far] -->
+                                                <!-- [IR] [FOCUS] [Far] -->
                                                 <Button Content="FOCUS +"
                                                         Width="85"
                                                         Height="30"
                                                         Margin="5"
-                                                        FontSize="14"
+                                                        FontSize="12"
                                                         FontWeight="Bold"
-                                                        PreviewMouseDown="FocusFar_MouseDown"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrFocusFar_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                                <!-- [FOCUS] [Near] -->
+                                                <!-- [IR] [FOCUS] [Near] -->
                                                 <Button Content="FOCUS -"
                                                         Width="85"
                                                         Height="30"
                                                         Margin="5"
-                                                        FontSize="14"
+                                                        FontSize="12"
                                                         FontWeight="Bold"
-                                                        PreviewMouseDown="FocusNear_MouseDown"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrFocusNear_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
                                             </StackPanel>
 
-                                        </Grid>
+                                            <!-- [IR] [Digital Zoom] 제어 -->
+                                            <StackPanel Grid.Row="3"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        Margin="0,0,0,10">
 
+                                                <!-- [IR] [Digital Zoom] 확대 -->
+                                                <Button Content="D-ZOOM +"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrDigitalZoomIn_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                                <!-- [IR] [Digital Zoom] 축소 -->
+                                                <Button Content="D-ZOOM -"
+                                                        Width="85"
+                                                        Height="30"
+                                                        Margin="5"
+                                                        FontSize="12"
+                                                        FontWeight="Bold"
+                                                        Focusable="False"
+                                                        PreviewMouseDown="IrDigitalZoomOut_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseUp"/>
+
+                                            </StackPanel>
+
+                                            <!-- [IR] [Auto Focus] 제어 -->
+                                            <Button Grid.Row="4"
+                                                    Content="AUTO FOCUS"
+                                                    Width="180"
+                                                    Height="30"
+                                                    Margin="5"
+                                                    FontSize="13"
+                                                    FontWeight="Bold"
+                                                    HorizontalAlignment="Center"
+                                                    PreviewMouseDown="IrAutoFocus_MouseDown"/>
+
+                                        </Grid>
                                     </Border>
 
                                     <!-- [LRF] 제어 -->
@@ -404,6 +538,7 @@
                                                     Width="180"
                                                     Height="32"
                                                     Margin="5"
+                                                    FontSize="13"
                                                     FontWeight="Bold"
                                                     HorizontalAlignment="Center"
                                                     Command="{Binding LrfMeasureCommand}"/>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -231,7 +232,6 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 Console.WriteLine("[TCP ERROR] Receive Failed : " + ex.Message);
             }
-
             Disconnect(); // 수신 루프 종료 시 연결 정리
         }
 
@@ -283,16 +283,17 @@ namespace OpenCvWpfTracking.Services.Communication
         {
             const int responsePacketSize = 12;
 
-            for (int i = 0; i + responsePacketSize - 1 < receivedData.Length;
-                            i += responsePacketSize)
+            for (int i = 0;
+                 i + responsePacketSize - 1 < receivedData.Length;
+                 i += responsePacketSize)
             {
-                Console.Write("[TCP RECV PACKET] ");
+                string packet = "";
 
                 for (int j = 0; j < responsePacketSize; j++)
                 {
-                    Console.Write($"{receivedData[i + j]:X2} ");
+                    packet += $"{receivedData[i + j]:X2} ";
                 }
-                Console.WriteLine();
+                Console.WriteLine($"[TCP RECV PACKET] {packet}");
             }
 
         }

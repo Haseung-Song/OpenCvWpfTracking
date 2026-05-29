@@ -102,8 +102,6 @@ namespace OpenCvWpfTracking.Services.Video
 
             Console.WriteLine("[FFmpeg RTSP] Source : " + rtspUrl);
 
-            Console.WriteLine("=====================================================");
-
             ffmpeg.avformat_network_init();
 
             AVFormatContext* formatContext = null;
@@ -156,6 +154,7 @@ namespace OpenCvWpfTracking.Services.Video
         /// RTSP 연결 옵션 생성
         ///
         /// rtsp_transport=tcp:
+        /// 
         /// C++ FFmpeg 구조에서 TCP 기반으로 열었던 것과 동일하게 TCP 강제
         ///
         /// timeout=3000000:
@@ -223,8 +222,8 @@ namespace OpenCvWpfTracking.Services.Video
             if (_videoStreamIndex < 0)
             {
                 Console.WriteLine("[FFmpeg RTSP] Video Stream Not Found");
-                Close();
 
+                Close();
                 return false;
             }
             return true;
@@ -389,6 +388,7 @@ namespace OpenCvWpfTracking.Services.Video
         private Mat ConvertFrameToMat(AVFrame* sourceFrame)
         {
             int width = sourceFrame->width;
+
             int height = sourceFrame->height;
 
             Mat mat =

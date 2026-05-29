@@ -14,8 +14,7 @@ namespace OpenCvWpfTracking
         /// 
         /// [XAML] [Binding] 연결용
         /// </summary>
-        private readonly MainViewModel vm =
-            new MainViewModel();
+        private readonly MainViewModel vm = new MainViewModel();
 
         /// <summary>
         /// [Main] 화면 생성자
@@ -25,7 +24,6 @@ namespace OpenCvWpfTracking
         public MainWindow()
         {
             InitializeComponent();
-
             DataContext = vm;
         }
 
@@ -62,42 +60,95 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
-        /// [ZOOM] 확대 버튼 [MouseDown]
+        /// [EO] [ZOOM] 확대 버튼 [MouseDown]
         /// </summary>
-        private void ZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
+        private void EoZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            vm?.StartZoomInMove();
+            vm?.StartEoZoomInMove();
         }
 
         /// <summary>
-        /// [ZOOM] 축소 버튼 [MouseDown]
+        /// [EO] [ZOOM] 축소 버튼 [MouseDown]
         /// </summary>
-        private void ZoomOut_MouseDown(object sender, MouseButtonEventArgs e)
+        private void EoZoomOut_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            vm?.StartZoomOutMove();
+            vm?.StartEoZoomOutMove();
         }
 
         /// <summary>
-        /// [FOCUS] [Near] 버튼 [MouseDown]
+        /// [EO] [FOCUS] [Near] 버튼 [MouseDown]
         /// </summary>
-        private void FocusNear_MouseDown(object sender, MouseButtonEventArgs e)
+        private void EoFocusNear_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            vm?.StartFocusNearMove();
+            vm?.StartEoFocusNearMove();
         }
 
         /// <summary>
-        /// [FOCUS] [Far] 버튼 [MouseDown]
+        /// [EO] [FOCUS] [Far] 버튼 [MouseDown]
         /// </summary>
-        private void FocusFar_MouseDown(object sender, MouseButtonEventArgs e)
+        private void EoFocusFar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            vm?.StartFocusFarMove();
+            vm?.StartEoFocusFarMove();
         }
 
+        /// <summary>
+        /// [IR] [ZOOM] 확대 버튼 [MouseDown]
+        /// </summary>
+        private void IrZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrZoomInMove();
+        }
 
         /// <summary>
-        /// 연속 이동 정지
-        /// 
-        /// [MouseUp] / [MouseLeave] 공통 처리
+        /// [IR] [ZOOM] 축소 버튼 [MouseDown]
+        /// </summary>
+        private void IrZoomOut_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrZoomOutMove();
+        }
+
+        /// <summary>
+        /// [IR] [FOCUS] [Near] 버튼 [MouseDown]
+        /// </summary>
+        private void IrFocusNear_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrFocusNearMove();
+        }
+
+        /// <summary>
+        /// [IR] [FOCUS] [Far] 버튼 [MouseDown]
+        /// </summary>
+        private void IrFocusFar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrFocusFarMove();
+        }
+
+        /// <summary>
+        /// [IR] [Digital Zoom] 확대 버튼 [MouseDown]
+        /// </summary>
+        private void IrDigitalZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrDigitalZoomInMove();
+        }
+
+        /// <summary>
+        /// [IR] [Digital Zoom] 축소 버튼 [MouseDown]
+        /// </summary>
+        private void IrDigitalZoomOut_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrDigitalZoomOutMove();
+        }
+
+        /// <summary>
+        /// [IR] [Auto Focus] 버튼 [MouseDown]
+        /// </summary>
+        private void IrAutoFocus_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartIrAutoFocusMove();
+        }
+
+        /// <summary>
+        /// [EO/IR] [MouseUp] / [MouseLeave] 공통 처리: 연속 이동 정지
         /// </summary>
         private void MoveStop_MouseUp(object sender, MouseEventArgs e)
         {
