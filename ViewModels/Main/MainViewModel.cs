@@ -47,7 +47,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [OpenCvSharp] [VideoCapture] 기반이며,
         /// [MP4] / [WebCam] 테스트 용도로 유지한다.
         /// </summary>
-        private readonly VideoCaptureService _vdVideoService;
+        private readonly VideoCaptureService _vdDecoder;
 
         /// <summary>
         /// [EO] 주간 카메라 [RTSP] 영상 처리 객체
@@ -55,7 +55,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [OpenCvSharp] [VideoCapture] [RTSP] 연결 실패로 인해
         /// 실제 [RTSP] 출력은 [FFmpegRtspDecoderService]를 사용한다.
         /// </summary>
-        private readonly FFmpegDecoderService _eoRtspDecoder;
+        private readonly FFmpegDecoderService _eoDecoder;
 
         /// <summary>
         /// [IR] 열상 카메라 [RTSP] 영상 처리 객체
@@ -63,7 +63,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [OpenCvSharp] [VideoCapture] [RTSP] 연결 실패로 인해
         /// 실제 [RTSP] 출력은 [FFmpegRtspDecoderService]를 사용한다.
         /// </summary>
-        private readonly FFmpegDecoderService _irRtspDecoder;
+        private readonly FFmpegDecoderService _irDecoder;
 
         #endregion
 
@@ -376,6 +376,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             PanRightCommand = new RelayCommand(() =>
             {
                 double targetPan = _currentPan + PanTiltMoveStep;
+
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN +{PanTiltMoveStep} => Target : {targetPan:F2}");
                 Console.WriteLine("=====================================================");
@@ -533,9 +534,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// 영상 서비스 생성
             /// </summary>
-            _vdVideoService = new VideoCaptureService();
-            _eoRtspDecoder = new FFmpegDecoderService();
-            _irRtspDecoder = new FFmpegDecoderService();
+            _vdDecoder = new VideoCaptureService();
+            _eoDecoder = new FFmpegDecoderService();
+            _irDecoder = new FFmpegDecoderService();
 
             /// <summary>
             /// [LA] 통신 서비스 생성
@@ -1096,7 +1097,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         /// [EO/IR] [RTSP] 연결 대기와 분리하여 먼저 연결 및 출력 처리
                         /// </summary>
                         bool rvsResult =
-                            _vdVideoService.Open(
+                            _vdDecoder.Open(
                                 VdSourceAddress);
 
                         return new VideoConnectResult
@@ -1128,7 +1129,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _ = Task.Run(() =>
                         CaptureLoop(
-                            _vdVideoService,
+                            _vdDecoder,
                             bitmap => VDCameraImage = bitmap,
                             _cts.Token));
                 }
@@ -1199,10 +1200,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _cts?.Cancel();
 
             // 2. [Service / Decoder] 객체 종료
-            _vdVideoService.Release();
+            _vdDecoder.Release();
 
-            _eoRtspDecoder.Close();
-            _irRtspDecoder.Close();
+            _eoDecoder.Close();
+            _irDecoder.Close();
 
             // 3. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
             App.Current.Dispatcher.Invoke(() =>
@@ -1299,9 +1300,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private bool IsAllVideoConnected()
         {
-            return _vdVideoService.IsConnected &&
-                   _eoRtspDecoder.IsOpened &&
-                   _irRtspDecoder.IsOpened;
+            return _vdDecoder.IsConnected &&
+                   _eoDecoder.IsOpened &&
+                   _irDecoder.IsOpened;
         }
 
         /// <summary>
@@ -1330,10 +1331,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private VideoConnectResult OpenVideoSources()
         {
             bool eoResult =
-                _eoRtspDecoder.Open(EoSourceAddress);
+                _eoDecoder.Open(EoSourceAddress);
 
             bool irResult =
-                _irRtspDecoder.Open(IrSourceAddress);
+                _irDecoder.Open(IrSourceAddress);
 
             return new VideoConnectResult
             {
@@ -1406,7 +1407,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 _ = Task.Run(() =>
                     FFmpegCaptureLoop(
-                        _eoRtspDecoder,
+                        _eoDecoder,
                         bitmap => EOCameraImage = bitmap,
                         _cts.Token));
             }
@@ -1415,7 +1416,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 _ = Task.Run(() =>
                     FFmpegCaptureLoop(
-                        _irRtspDecoder,
+                        _irDecoder,
                         bitmap => IRCameraImage = bitmap,
                         _cts.Token));
             }
@@ -1662,8 +1663,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
             bool canPrintLog = CanPrintLaLog();
-
-            //Console.WriteLine("=====================================================");
 
             switch (packet.Function)
             {
@@ -1917,10 +1916,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public void TestFFmpegRtspConnect()
         {
             bool eoResult =
-                _eoRtspDecoder.Open(EoSourceAddress);
+                _eoDecoder.Open(EoSourceAddress);
 
             bool irResult =
-                _irRtspDecoder.Open(IrSourceAddress);
+                _irDecoder.Open(IrSourceAddress);
 
             Console.WriteLine(
                 "[EO FFmpeg RTSP] "
