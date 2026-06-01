@@ -44,14 +44,12 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [TCP]는 [Packet] 단위로 들어오지 않으므로,
         /// 수신된 [byte[]]를 여기에 계속 누적한다.
         /// </summary>
-        private readonly List<byte> _receiveBuffer
-            = new List<byte>();
+        private readonly List<byte> _receiveBuffer = new List<byte>();
 
         /// <summary>
         /// 누적 [Buffer]에서 완성 [Packet]을 분리하기 위한 [Parser]
         /// </summary>
-        private readonly AiDetectorPacketParser _packetParser
-            = new AiDetectorPacketParser();
+        private readonly AiDetectorPacketParser _packetParser = new AiDetectorPacketParser();
 
         #endregion
 
@@ -83,7 +81,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// <summary>
         /// [AI] [Detector Agent]에 [TCP] 연결
         ///
-        /// 예:
+        /// [Ex]   :
         /// [IP]   : [192.168.20.160]
         /// [PORT] : [5055]
         /// </summary>
@@ -173,9 +171,12 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
                     foreach (byte[] packet in packets)
                     {
-                        PrintHex("[AI TCP RECV]", packet);
+                        // [AI Detector] 수신 Packet은 매우 빠르게 들어오므로
+                        // Raw HEX Log는 Console 도배 방지를 위해 기본 출력하지 않는다.
+                        // 필요 시 디버깅할 때만 주석 해제한다.
 
-                        // [ViewModel] 쪽으로 완성 [Packet] 전달
+                        // PrintHex("[AI TCP RECV]", packet);
+
                         PacketReceived?.Invoke(packet, DateTime.Now);
                     }
 
@@ -219,7 +220,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             try
             {
                 _cts?.Cancel();
-
                 _networkStream?.Close();
                 _tcpClient?.Close();
             }

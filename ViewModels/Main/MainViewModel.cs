@@ -21,13 +21,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
     /// 
     /// 메인 클래스 역할:
     /// 1. [VD] / [EO RTSP] / [IR RTSP] 영상 출력 제어
+    /// 
     /// 2. LA(Local Agent) [TCP] 통신 서비스 초기화
+    /// 
     /// 3. [TORUSS] 제어 명령 서비스 관리
+    /// 
     /// 4. [XAML] 바인딩용, [Image] / [StatusText] 갱신
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged
     {
-        #region [Enum]
+        #region [Enum Type]
 
         /// <summary>
         /// 현재 진행 중인 연속 제어 종류
@@ -235,6 +238,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [AI Detector Packet Fields]
+
+        /// <summary>
+        /// 마지막 [AI Detector] 탐지 로그 출력 시간
+        /// 
+        /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
+        /// [Console] 도배 방지 목적
+        /// </summary>
+        private DateTime _lastAiDetectorLogTime = DateTime.MinValue;
+
+        /// <summary>
+        /// [AI Detector] 탐지 로그 출력 간격
+        /// </summary>
+        private const int AiDetectorLogIntervalSeconds = 1;
+
+        #endregion
+
         #region [Video Runtime Fields]
 
         /// <summary>
@@ -286,9 +306,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 현재 영상 연결 진행 중 여부
         ///
-        /// 1. [true]: [Connect] 수행 중
-        ///
-        /// 2. [false]: 연결 완료 또는 종료 상태
+        /// 1. true : [Connect] 수행 중
+        /// 2. false: 연결 완료 또는 종료 상태
         /// </summary>
         private bool _isVideoConnecting;
 
@@ -492,7 +511,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 _controlCommandService.EoZoomGoPosition(targetZoom);
             });
-
 
             /// <summary>
             /// [ZOOM] 축소 상대 이동 테스트
@@ -1275,22 +1293,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 case ContinuousMoveType.EoZoom:
 
                 case ContinuousMoveType.EoFocus:
+
                     // [Pelco-D] 기본 연속 제어 정지
                     // [Pan] / [Tilt] / [EO Zoom] / [EO Focus] 정지에 사용
                     _controlCommandService.StopMove();
                     break;
 
                 case ContinuousMoveType.IrZoom:
+
                     // [IR] [Optical Zoom] 정지
                     _controlCommandService.StopIrZoom();
                     break;
 
                 case ContinuousMoveType.IrFocus:
+
                     // [IR] [Focus] 정지
                     _controlCommandService.StopIrFocus();
                     break;
 
                 case ContinuousMoveType.IrDigitalZoom:
+
                     // [IR] [Digital Zoom] 정지
                     _controlCommandService.StopIrDigitalZoom();
                     break;
@@ -2220,7 +2242,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[AI DETECTOR CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("===========================================================================");
         }
 
         #endregion
@@ -2237,7 +2259,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             byte[] packet,
             DateTime receiveTime)
         {
-            AiDetectionResult result;
+            AiDetectionResult result; // [AI Detector] 탐지 결과 [1 Frame] 정보
 
             /// <summary>
             /// [CMD 55] 탐지데이터 [Packet]이 아니거나
@@ -2249,6 +2271,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 return;
             }
+            // [AI Detector] 탐지 결과 처리 함수
             HandleAiDetectionResult(result, receiveTime);
         }
 
@@ -2269,9 +2292,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiDetectionResult result,
             DateTime receiveTime)
         {
-            Console.WriteLine("=====================================================");
+            bool canPrintLog = CanPrintAiDetectorLog();
+
+            /// <summary>
+            /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
+            /// 일정 시간 이내라면 [Console] 출력만 생략한다.
+            /// 
+            /// 실제 수신 / 파싱은 계속 수행된다.
+            /// </summary>
+            if (!canPrintLog)
+            {
+                return;
+            }
+
+            Console.WriteLine("===========================================================================");
             Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("===========================================================================");
 
             Console.WriteLine($"[AI DETECT] [Receive Time] : {receiveTime:HH:mm:ss.fff}");
             Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
@@ -2288,7 +2324,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[Confidence] {box.Confidence:F2}, " +
                     $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
             }
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("===========================================================================");
+        }
+
+        #endregion
+
+        #region [AI Detector Log Helpers]
+
+        /// <summary>
+        /// [AI Detector] 탐지 로그 출력 여부 확인
+        /// 
+        /// 현재 시간과 마지막 출력 시간을 비교하여
+        /// 일정 시간 이내면 => [Console] 출력 생략
+        /// </summary>
+        private bool CanPrintAiDetectorLog()
+        {
+            if ((DateTime.Now -
+                 _lastAiDetectorLogTime)
+                .TotalSeconds
+                < AiDetectorLogIntervalSeconds)
+            {
+                return false;
+            }
+            _lastAiDetectorLogTime = DateTime.Now;
+
+            return true;
         }
 
         #endregion
