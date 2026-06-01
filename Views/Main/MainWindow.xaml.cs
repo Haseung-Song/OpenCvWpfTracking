@@ -10,9 +10,7 @@ namespace OpenCvWpfTracking
     public partial class MainWindow : Window
     {
         /// <summary>
-        /// [Main] 화면 [ViewModel]
-        /// 
-        /// [XAML] [Binding] 연결용
+        /// [Main] 화면 -> [ViewModel]: [XAML]의 [Binding] 연결!
         /// </summary>
         private readonly MainViewModel vm = new MainViewModel();
 
@@ -96,6 +94,7 @@ namespace OpenCvWpfTracking
         /// </summary>
         private void IrZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            e.Handled = true;
             vm?.StartIrZoomInMove();
         }
 
@@ -104,6 +103,7 @@ namespace OpenCvWpfTracking
         /// </summary>
         private void IrZoomOut_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            e.Handled = true;
             vm?.StartIrZoomOutMove();
         }
 

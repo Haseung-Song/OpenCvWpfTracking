@@ -15,7 +15,7 @@
     public class ControlCommandService
     {
         /// <summary>
-        /// LA(Local Agent) [TCP] 통신 서비스
+        /// [LA](Local Agent) [TCP] 통신 서비스
         /// </summary>
         private readonly TcpClientService _tcpClientService;
 
@@ -350,7 +350,7 @@
         /// [IR] 열영상 카메라 [ZOOM] 연속제어 정지
         /// 
         /// [Command2 = 0x31]
-        /// [Data1 = 0x0F] : Zoom Stop
+        /// [Data1 = 0xFF] : Zoom Stop
         /// [Data2 = 0x00]
         /// </summary>
         public bool StopIrZoom()
@@ -358,7 +358,7 @@
             return SendCommand(
                 0x00,
                 0x31,
-                0x0F,
+                0xFF,
                 0x00);
         }
 

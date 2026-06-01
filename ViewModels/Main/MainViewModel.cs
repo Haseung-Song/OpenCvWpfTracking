@@ -369,8 +369,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             #region [Connect / Disconnect Command Binding]
 
+            /// <summary>
+            /// [Connect] 버튼 클릭 시 호출
+            /// 
+            /// 영상 스트림 및 [LA] [TCP] 통신 연결을 시작한다.
+            /// </summary>
             ConnectCommand = new RelayCommand(Connect);
 
+            /// <summary>
+            /// [Disconnect] 버튼 클릭 시 호출
+            /// 
+            /// 영상 스트림 및 [LA] [TCP] 통신 연결을 종료한다.
+            /// </summary>
             DisconnectCommand = new RelayCommand(Disconnect);
 
             #endregion
@@ -1079,6 +1089,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
+        /// [IR] [ZOOM] 연속 이동 정지
+        /// 
+        /// IR Zoom 버튼 [MouseUp] 시에만 호출한다.
+        /// </summary>
+        public void StopIrZoomMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] IR ZOOM STOP");
+            Console.WriteLine("========================================");
+
+            _controlCommandService.StopIrZoom();
+
+            _currentMoveType = ContinuousMoveType.None;
+        }
+
+        /// <summary>
         /// [IR] 열상 카메라 [FOCUS] [Near] 연속 이동 시작
         /// </summary>
         public void StartIrFocusNearMove()
@@ -1432,8 +1458,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [BGR24] 기준 1픽셀당 [3byte]
             /// 전체 [byte] 배열을 0으로 유지하면 검은색 화면이 된다.
             /// </summary>
-            int stride =
-                width * 3;
+            int stride = width * 3;
 
             byte[] pixels =
                 new byte[height * stride];
