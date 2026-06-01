@@ -637,7 +637,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _aiDetectorClientService.PacketReceived += OnAiDetectorPacketReceived;
 
-            // [AI Detector Agent] 프로그램 실행 후 테스트할 때만 주석 해제
+            // [AI Detector Agent] 실행 후, 테스트 시에만 주석 해제
             _ = ConnectAiDetectorAsync();
 
             #endregion
