@@ -863,32 +863,36 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 영상 입력 소스 구성:
         /// 
         /// [VD]
-        /// - OpenCvSharp 기반 [VideoCaptureService] 사용
-        /// - 로컬 [.mp4] 테스트 영상 또는 일반 영상 입력 출력
+        /// - [OpenCvSharp] 기반 [VideoCaptureService] 사용
+        /// - 로컬 [.mp4] 테스트 영상 출력용
         ///
         /// [EO / IR]
         /// - [FFmpeg.AutoGen] 기반 [FFmpegDecoderService] 사용
-        /// - [RTSP] [Stream] 직접 연결 및 Decode 수행
+        /// - [RTSP] Stream 직접 연결 및 Decode 수행
         ///
-        /// 기본 등록 [RTSP] 주소(ID/PW 포함)
-        /// 
-        /// [EO]
-        /// 1. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
-        /// 2. 옥상 [GOP] 주간(EO) 카메라
+        /// 기본 등록 [RTSP] 주소:
         ///
-        /// [IR]
-        /// 3. 4층 실장비 [BOSCH] PTZ(회전형) 카메라
-        /// 4. 옥상 [GOP] 열상(IR) 카메라
-        /// 
+        /// [1] 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
+        /// - EO / IR Viewer 공통 영상 출력 테스트용
+        ///
+        /// [2] 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
+        /// - PTZ 제어 및 영상 출력 테스트용
+        ///
+        /// [3] 1층 생산팀 실장비 [ADS] 카메라
+        /// - EO: 주간카메라
+        /// - IR: 열상카메라
+        ///
+        /// [4] 옥상 [GOP] 카메라
+        /// - EO: 주간카메라
+        /// - IR: 열상카메라
+        ///
         /// ※ 동일 변수에 여러 주소를 설정할 경우
-        /// ※ 마지막 주소만 실제 적용되므로, 주의
+        /// 마지막으로 대입된 주소만 실제 적용된다.
         /// 
         /// ※ [EO / IR] 동시 연결 시
         /// 잘못된 [RTSP] 주소 또는 미설정 주소가 포함되면
-        /// [FFmpeg Stream Open] 과정에서 예외가 발생할 수 있다.
-        ///
-        /// (Ex. System.AccessViolationException)
-        /// 따라서, 개별 연결 성공 여부 확인 후 사용해야만 한다.
+        /// [FFmpeg] => [Stream Open] 과정에서 예외가 발생할 수 있으므로
+        /// 개별 연결 성공 여부 확인 후 적용한다.
         /// </summary>
         private void InitializeDefaultSourceAddress()
         {
