@@ -1681,6 +1681,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     /// <summary>
                     /// 영상 종료 또는 수신 실패 시
+                    /// 
                     /// 다음 루프 대기
                     /// </summary>
                     if (frame == null ||
@@ -1721,6 +1722,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     /// <summary>
                     /// 영상 수신 중 예외 발생
+                    /// 
                     /// 루프 종료
                     /// </summary>
                     Console.WriteLine("[VIDEO ERROR] " + ex.Message);
@@ -1730,6 +1732,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     /// <summary>
                     /// [Frame] 메모리 해제
+                    /// 
                     /// [OpenCV] 비관리 객체 정리
                     /// </summary>
                     frame?.Dispose();
@@ -1902,6 +1905,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine("=====================================================");
 
                     ParseLaStatusPacket(packet.RawData, true);
+
                     Console.WriteLine("=====================================================");
                     break;
 
@@ -1914,6 +1918,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     Console.WriteLine("=====================================================");
                     Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
+
                     Console.WriteLine();
                     break;
 
@@ -1930,6 +1935,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine();
 
                     ParseLaExtendedStatusPacket(packet.RawData);
+
                     Console.WriteLine("=====================================================");
                     break;
 
@@ -1943,6 +1949,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     Console.WriteLine("=====================================================");
 
                     ParseLrfDistancePacket(packet.RawData);
+
                     Console.WriteLine("=====================================================");
                     break;
 
@@ -1955,7 +1962,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// </summary>
 
                     Console.WriteLine("=====================================================");
-                    Console.WriteLine($"[LA PACKET] Unknown Function : 0x{packet.Function:X2}");
+                    Console.WriteLine($"[LA PACKET] Unknown Function: 0x{packet.Function:X2}");
                     Console.WriteLine("=====================================================");
 
                     foreach (byte b in packet.RawData)
@@ -1963,6 +1970,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         Console.Write($"{b:X2} ");
                     }
                     Console.WriteLine();
+
                     Console.WriteLine("=====================================================");
                     break;
             }
