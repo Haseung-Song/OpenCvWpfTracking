@@ -901,16 +901,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
             // 1-1. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             //EoSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+            EoSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 4-1. 옥상 [GOP] 주간(EO) 카메라
             //EoSourceAddress =
