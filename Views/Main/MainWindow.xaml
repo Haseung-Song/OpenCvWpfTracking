@@ -5,9 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenCvWpfTracking"    
         mc:Ignorable="d"
-        Title="TORUSS [EO/IR] DEMO VIEWER" 
-        Height="1080"
-        Width="1920">
+        Title="TORUSS [EO/IR] DEMO VIEWER"
+        Width="1920"
+        Height="1080">
 
     <!-- 메인 화면 전체 레이아웃 -->
     <Grid Margin="10">
@@ -18,25 +18,78 @@
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
-        <Grid Grid.Row="0" Margin="0,0,0,5">
+        <Grid Grid.Row="0"
+              Margin="0,0,0,5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2.3*" />
                 <ColumnDefinition Width="1.1*" />
                 <ColumnDefinition Width="260" />
             </Grid.ColumnDefinitions>
 
-            <!-- 좌측 큰 영상 -->
+            <!-- [좌측] 큰 영상 -->
             <Border Grid.Column="0"
                     Margin="0,0,15,0"
                     Background="Black"
                     BorderBrush="#5A5A5A"
                     BorderThickness="2">
-                <Grid>
-                    <!-- 영상 출력 -->
+                <Grid ClipToBounds="True">
+
+                    <!-- [EO] 영상 -->
                     <Image Source="{Binding EOCameraImage}"
                            Stretch="Uniform"/>
 
-                    <!-- 안내 문자 (오른쪽 하단에 보이게) -->
+                    <!-- [AI] [Bounding Box] [Overlay] -->
+                    <Viewbox Stretch="Uniform"
+                             IsHitTestVisible="False">
+
+                        <ItemsControl ItemsSource="{Binding EoDetectionBoxes}"
+                                      Width="1920" 
+                                      Height="1080">
+
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas Width="1920"
+                                            Height="1080"
+                                            ClipToBounds="True" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                    <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- [AI] [Bounding Box] 표시 영역 -->
+                                    <Grid>
+                                        <!-- [AI] 탐지 객체 [Bounding Box] -->
+                                        <Rectangle Width="{Binding Width}"
+                                                   Height="{Binding Height}"
+                                                   Stroke="#FFFF0000"
+                                                   StrokeThickness="4" />
+
+                                        <!-- [AI] 탐지 객체 이름 / 정확도 표시 -->
+                                        <Border Background="#FFFF0000"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       Foreground="White"
+                                                       FontSize="14"
+                                                       FontWeight="Bold"
+                                                       Padding="5,1" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+
+                        </ItemsControl>
+
+                    </Viewbox>
+
+                    <!-- 안내 문자 (왼쪽 상하단에 보이게) -->
                     <TextBlock Text="{Binding EoStatusText}"
                                Margin="0,0,10,5"
                                Foreground="#00E676"
@@ -48,24 +101,26 @@
                 </Grid>
             </Border>
 
-            <!-- 우측 작은 영상 2개 -->
-            <Grid Grid.Column="1" Margin="0,0,5,0">
+            <!-- [우측] 작은 영상 2개 -->
+            <Grid Grid.Column="1"
+                  Margin="0,0,5,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
-                    Margin="0,0,10,0"
-                    Background="Black"
-                    BorderBrush="#5A5A5A"
-                    BorderThickness="2">
-                    <Grid>
-                        <!-- 영상 출력 -->
-                        <Image Source="{Binding IRCameraImage}"
-                           Stretch="Uniform"/>
+                        Margin="0,0,10,0"
+                        Background="Black"
+                        BorderBrush="#5A5A5A"
+                        BorderThickness="2">
+                    <Grid ClipToBounds="True">
 
-                        <!-- 안내 문자 (오른쪽 하단에 보이게) -->
+                        <!-- [IR] 영상 -->
+                        <Image Source="{Binding IRCameraImage}"
+                               Stretch="Uniform" />
+
+                        <!-- 안내 문자 (오른쪽 상단에 보이게) -->
                         <TextBlock Text="{Binding IrStatusText}"
                                    Margin="0,0,10,5"
                                    Foreground="#FF7043"
@@ -73,19 +128,19 @@
                                    FontWeight="Bold"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Bottom"
-                                   IsHitTestVisible="False"/>
+                                   IsHitTestVisible="False" />
                     </Grid>
                 </Border>
 
                 <Border Grid.Row="1"
-                    Margin="0,0,10,0"
-                    Background="Black"
-                    BorderBrush="#5A5A5A"
-                    BorderThickness="2">
+                        Margin="0,0,10,0"
+                        Background="Black"
+                        BorderBrush="#5A5A5A"
+                        BorderThickness="2">
                     <Grid>
-                        <!-- 영상 출력 -->
+                        <!-- [VD] 영상 -->
                         <Image Source="{Binding VDCameraImage}"
-                           Stretch="Uniform"/>
+                               Stretch="Uniform"/>
 
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding VdStatusText}"

@@ -24,6 +24,7 @@ namespace OpenCvWpfTracking.Services.Video
             }
 
             Console.WriteLine("[VIDEO] Connect Try...");
+
             Console.WriteLine("[VIDEO] Source : " + source);
 
             try
@@ -161,7 +162,6 @@ namespace OpenCvWpfTracking.Services.Video
 
                 Console.WriteLine("[VIDEO] Already Disconnected.");
 
-                Console.WriteLine();
                 return;
             }
             _capture.Release();

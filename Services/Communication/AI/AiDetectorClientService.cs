@@ -44,12 +44,24 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [TCP]는 [Packet] 단위로 들어오지 않으므로,
         /// 수신된 [byte[]]를 여기에 계속 누적한다.
         /// </summary>
-        private readonly List<byte> _receiveBuffer = new List<byte>();
+        private readonly List<byte> _receiveBuffer
+            = new List<byte>();
 
         /// <summary>
         /// 누적 [Buffer]에서 완성 [Packet]을 분리하기 위한 [Parser]
         /// </summary>
-        private readonly AiDetectorPacketParser _packetParser = new AiDetectorPacketParser();
+        private readonly AiDetectorPacketParser _packetParser
+            = new AiDetectorPacketParser();
+
+        /// <summary>
+        /// [AI Detector] 자동 재연결 루프 실행 여부
+        /// </summary>
+        private bool _isReconnectRunning;
+
+        /// <summary>
+        /// [AI Detector] 자동 재연결 중복 실행 방지 여부
+        /// </summary>
+        private bool _isReconnectLoopStarted;
 
         #endregion
 
@@ -87,6 +99,8 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// </summary>
         public async Task<bool> ConnectAsync(string ip, int port)
         {
+            TcpClient tcpClient = null;
+
             try
             {
                 if (IsConnected)
@@ -99,10 +113,11 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 Console.WriteLine("[AI TCP] Connect Try...");
                 Console.WriteLine($"[AI TCP] Target : {ip}:{port}");
 
-                _tcpClient = new TcpClient();
+                tcpClient = new TcpClient();
 
-                await _tcpClient.ConnectAsync(ip, port);
+                await tcpClient.ConnectAsync(ip, port);
 
+                _tcpClient = tcpClient;
                 _networkStream = _tcpClient.GetStream();
 
                 _cts = new CancellationTokenSource();
@@ -119,11 +134,80 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             {
                 Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
                 Console.WriteLine("=====================================================");
-                Disconnect();
 
+                try
+                {
+                    tcpClient?.Close();
+                }
+                catch
+                {
+
+                }
                 return false;
             }
 
+        }
+
+        #endregion
+
+        #region [Auto Reconnect]
+
+        /// <summary>
+        /// [AI Detector Agent] 자동 재연결 시작
+        /// 
+        /// [AI Detector Agent] 프로그램이 늦게 켜지거나,
+        /// 중간에 종료되었다가 다시 실행되는 경우를 대비하여
+        /// 일정 주기마다 [TCP] 연결을 재시도한다.
+        /// </summary>
+        public async Task StartAutoReconnectAsync(
+            string ip,
+            int port,
+            int retryIntervalMs = 3000)
+        {
+            if (_isReconnectLoopStarted)
+            {
+                Console.WriteLine("[AI TCP] Auto Reconnect Already Running.");
+                return;
+            }
+
+            _isReconnectLoopStarted = true;
+            _isReconnectRunning = true;
+
+            Console.WriteLine("=====================================================");
+            Console.WriteLine("[AI TCP] Auto Reconnect Start.");
+
+            while (_isReconnectRunning)
+            {
+                if (!IsConnected)
+                {
+                    bool connected = await ConnectAsync(ip, port);
+
+                    if (connected)
+                    {
+                        Console.WriteLine("[AI TCP] Auto Reconnect Success.");
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"[AI TCP] Reconnect Retry After {retryIntervalMs} ms");
+                    }
+                    Console.WriteLine();
+                }
+                await Task.Delay(retryIntervalMs);
+            }
+            _isReconnectLoopStarted = false;
+
+            Console.WriteLine("[AI TCP] Auto Reconnect Stop.");
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] 자동 재연결 중지
+        /// </summary>
+        public void StopAutoReconnect()
+        {
+            _isReconnectRunning = false;
+
+            Disconnect();
         }
 
         #endregion
@@ -171,8 +255,8 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
                     foreach (byte[] packet in packets)
                     {
-                        // [AI Detector] 수신 Packet은 매우 빠르게 들어오므로
-                        // Raw HEX Log는 Console 도배 방지를 위해 기본 출력하지 않는다.
+                        // [AI Detector] 수신 [Packet]은 매우 빠르게 들어오므로
+                        // [Raw HEX Log]는 [Console] 도배 방지를 위해 기본 출력하지 않는다.
                         // 필요 시 디버깅할 때만 주석 해제한다.
 
                         // PrintHex("[AI TCP RECV]", packet);
@@ -185,12 +269,13 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch (ObjectDisposedException)
             {
-                // [Disconnect] 중 [Stream]이 닫히면서 발생 가능
-                // 정상 종료 흐름으로 처리
+                // [Disconnect] 중 [Stream]이 닫히면서 발생 가능하므로,
+                // 정상 종료 흐름으로 처리.
                 Console.WriteLine("[AI TCP] Receive Loop Closed.");
             }
             catch (Exception ex)
             {
+                Console.WriteLine("=====================================================");
                 Console.WriteLine("[AI TCP ERROR] Receive Failed : " + ex.Message);
             }
             Disconnect();
@@ -220,8 +305,15 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             try
             {
                 _cts?.Cancel();
-                _networkStream?.Close();
-                _tcpClient?.Close();
+
+                NetworkStream stream = _networkStream;
+                TcpClient client = _tcpClient;
+
+                _networkStream = null;
+                _tcpClient = null;
+
+                stream?.Close();
+                client?.Close();
             }
             catch
             {
@@ -229,15 +321,13 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             finally
             {
-                _networkStream = null;
-                _tcpClient = null;
-
                 _cts?.Dispose();
                 _cts = null;
 
                 _receiveBuffer.Clear();
 
                 Console.WriteLine("[AI TCP] Disconnected.");
+                Console.WriteLine();
             }
 
         }

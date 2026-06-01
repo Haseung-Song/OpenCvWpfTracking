@@ -24,30 +24,35 @@ namespace OpenCvWpfTracking.Services.Video
 
         /// <summary>
         /// [RTSP] / 영상 파일 입력 [Format Context]
+        /// 
         /// [avformat_open_input()] 성공 시 생성되는 입력 컨텍스트
         /// </summary>
         private AVFormatContext* _formatContext;
 
         /// <summary>
         /// 영상 [Decode]용 [Codec Context]
+        /// 
         /// [H.264] / [H.265] 등 실제 영상 [Codec] [Decode] 담당
         /// </summary>
         private AVCodecContext* _codecContext;
 
         /// <summary>
         /// [FFmpeg] [Packet]
+        /// 
         /// [RTSP] [Stream]에서 읽어온 압축 데이터 저장용
         /// </summary>
         private AVPacket* _packet;
 
         /// <summary>
         /// [FFmpeg] [Frame]
+        /// 
         /// [Packet] [Decode] 후 실제 영상 [Frame] 저장용
         /// </summary>
         private AVFrame* _frame;
 
         /// <summary>
         /// [Pixel Format] 변환 [Context]
+        /// 
         /// [AVFrame]을 [WPF] 출력에 사용 가능한 [BGR24] [Mat]으로 변환할 때 사용
         /// </summary>
         private SwsContext* _swsContext;
@@ -64,6 +69,11 @@ namespace OpenCvWpfTracking.Services.Video
         /// [FFmpeg] 포인터를 접근하지 못하도록 제어한다.
         /// </summary>
         private readonly object _syncLock = new object();
+
+        /// <summary>
+        /// [EO/IR] 영상 해상도 [로그 1회] 출력 여부
+        /// </summary>
+        private bool _isFrameSizePrinted;
 
         #endregion
 
@@ -144,7 +154,6 @@ namespace OpenCvWpfTracking.Services.Video
             IsOpened = true;
 
             Console.WriteLine("[FFmpeg RTSP] Open Success.");
-
             Console.WriteLine();
 
             return true;
@@ -182,6 +191,7 @@ namespace OpenCvWpfTracking.Services.Video
 
         /// <summary>
         /// 입력 [Stream] 정보 조회
+        /// 
         /// [RTSP] 연결 이후 영상 / 음성 [Stream] 정보 확인 단계
         /// </summary>
         private bool LoadStreamInfo()
@@ -282,7 +292,6 @@ namespace OpenCvWpfTracking.Services.Video
         private void AllocateDecodeBuffer()
         {
             _packet = ffmpeg.av_packet_alloc();
-
             _frame = ffmpeg.av_frame_alloc();
         }
 
@@ -382,7 +391,7 @@ namespace OpenCvWpfTracking.Services.Video
         /// <summary>
         /// [FFmpeg] [AVFrame]을 [OpenCV] [Mat]([BGR24])으로 변환
         ///
-        /// 기존 [WPF] 출력 구조는 [MatToBitmapSourceConverter]를 사용하므로,
+        /// 기존 [WPF] 출력 구조는 => [MatToBitmapSourceConverter]를 사용하므로,
         /// 여기서는 [WPF]가 바로 처리하기 쉬운 [BGR24] [Mat] 형태로 맞춘다.
         /// </summary>
         private Mat ConvertFrameToMat(AVFrame* sourceFrame)
@@ -390,6 +399,17 @@ namespace OpenCvWpfTracking.Services.Video
             int width = sourceFrame->width;
 
             int height = sourceFrame->height;
+
+            if (!_isFrameSizePrinted)
+            {
+                Console.WriteLine(
+                    $"[FFmpeg FRAME SIZE] {width} x {height}");
+
+                Console.WriteLine(
+                    "=====================================================");
+
+                _isFrameSizePrinted = true;
+            }
 
             Mat mat =
                 new Mat(
