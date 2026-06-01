@@ -2,7 +2,9 @@
 using OpenCvWpfTracking.Common;
 using OpenCvWpfTracking.Converters;
 using OpenCvWpfTracking.Services.Communication;
+using OpenCvWpfTracking.Services.Communication.AI;
 using OpenCvWpfTracking.Services.Video;
+using OpenCvWpfTracking.Models.AI;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -98,6 +100,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
         /// </summary>
         private readonly ControlCommandService _controlCommandService;
+
+        #endregion
+
+        #region [AI Detector Communication Fields]
+
+        /// <summary>
+        /// [AI] [Detector Agent] [TCP] 통신 서비스
+        /// 
+        /// [AI] [Detector Agent]와 [TCP] 연결 후,
+        /// 수신된 [AI Packet]을 [MainViewModel]로 전달한다.
+        /// </summary>
+        private readonly AiDetectorClientService _aiDetectorClientService;
+
+        /// <summary>
+        /// [AI] [Detector] [Packet Parser]
+        /// 
+        /// [AI] [Detector Agent]에서 => 수신한 [Packet]을
+        /// [CMD] / [SIZE] / [Payload] / [Checksum] 기준으로 해석한다.
+        /// </summary>
+        private readonly AiDetectorPacketParser _aiDetectorPacketParser;
 
         #endregion
 
@@ -596,6 +618,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _laTcpService.MessageReceived += OnLaMessageReceived;
             _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
+
+            /// <summary>
+            /// [AI Detector] 통신 서비스 생성
+            /// </summary>
+            _aiDetectorClientService = new AiDetectorClientService();
+
+            /// <summary>
+            /// [AI Detector] [Packet Parser] 생성
+            /// </summary>
+            _aiDetectorPacketParser = new AiDetectorPacketParser();
+
+            /// <summary>
+            /// [AI Detector] 수신 이벤트 연결
+            /// 
+            /// [AiDetectorClientService]에서 완성 [Packet] 수신 시
+            /// [OnAiDetectorPacketReceived] 함수가 호출된다.
+            /// </summary>
+            _aiDetectorClientService.PacketReceived += OnAiDetectorPacketReceived;
+
+            // [AI Detector Agent] 프로그램 실행 후 테스트할 때만 주석 해제
+            _ = ConnectAiDetectorAsync();
 
             #endregion
 
@@ -2141,6 +2184,111 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             LrfDistanceText = $"DISTANCE : {distance:F1} m";
             Console.WriteLine($"[LRF] Distance : {distance:F1} m");
+        }
+
+        #endregion
+
+        #endregion
+
+        #region [AI Detector Communication]
+
+        #region [AI Detector Connect]
+
+        /// <summary>
+        /// [AI Detector Agent] 연결 시작
+        /// 
+        /// 기본 [TCP] Port : [5055]
+        /// 
+        /// [TCP] 연결 성공 시,
+        /// [AiDetectorClientService] 내부 [ReceiveLoop]에서
+        /// [AI Detector Agent] 응답 [Packet]을 지속적으로 수신한다.
+        /// 
+        /// 수신된 완성 [Packet]은
+        /// [PacketReceived] 이벤트를 통해 [MainViewModel]로 전달되고,
+        /// [AiDetectorPacketParser]에서 [CMD 55] 탐지데이터를 파싱한다.
+        /// </summary>
+        private async Task ConnectAiDetectorAsync()
+        {
+            Console.WriteLine("[AI DETECTOR] Connect Start");
+
+            bool result =
+                await _aiDetectorClientService.ConnectAsync(
+                    "192.168.20.160",
+                    5055);
+
+            Console.WriteLine(
+                "[AI DETECTOR CONNECT RESULT] "
+                + result);
+
+            Console.WriteLine("=====================================================");
+        }
+
+        #endregion
+
+        #region [AI Detector Receive]
+
+        /// <summary>
+        /// [AI Detector Agent] [TCP] 수신 [Packet] 처리 함수
+        /// 
+        /// [AiDetectorClientService]에서 완성된 [byte[] Packet]을 받으면,
+        /// [AiDetectorPacketParser]를 통해 [CMD 55] 탐지데이터인지 확인하고 파싱한다.
+        /// </summary>
+        private void OnAiDetectorPacketReceived(
+            byte[] packet,
+            DateTime receiveTime)
+        {
+            AiDetectionResult result;
+
+            /// <summary>
+            /// [CMD 55] 탐지데이터 [Packet]이 아니거나
+            /// [Checksum] / [Payload] 구조가 맞지 않으면 처리하지 않는다.
+            /// </summary>
+            if (!_aiDetectorPacketParser.TryParseDetectionPacket(
+                packet,
+                out result))
+            {
+                return;
+            }
+            HandleAiDetectionResult(result, receiveTime);
+        }
+
+        #endregion
+
+        #region [AI Detector Packet Handling]
+
+        /// <summary>
+        /// [AI Detector] 탐지 결과 처리 함수
+        /// 
+        /// 현재 단계에서는 화면에 [Bounding Box]를 그리기 전
+        /// 수신 / 파싱 정상 여부를 [Console Log]로 확인하는 목적이다.
+        /// 
+        /// 추후 이 함수에서
+        /// [RtspIndex] 기준으로 [EO] / [IR] 영상 위에 [Bounding Box]를 표시하도록 확장한다.
+        /// </summary>
+        private void HandleAiDetectionResult(
+            AiDetectionResult result,
+            DateTime receiveTime)
+        {
+            Console.WriteLine("=====================================================");
+            Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
+            Console.WriteLine("=====================================================");
+
+            Console.WriteLine($"[AI DETECT] [Receive Time] : {receiveTime:HH:mm:ss.fff}");
+            Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
+            Console.WriteLine($"[AI DETECT] [Inference ms] : {result.InferenceMs}");
+            Console.WriteLine($"[AI DETECT] [RTSP Index]   : {result.RtspIndex}");
+            Console.WriteLine($"[AI DETECT] [Count]        : {result.DetectionCount}");
+
+            foreach (AiDetectionBox box in result.Boxes)
+            {
+                Console.WriteLine(
+                    $"[AI BOX] " +
+                    $"[ID] {box.ObjectId}, " +
+                    $"[Class] {box.ClassIndex}, " +
+                    $"[Confidence] {box.Confidence:F2}, " +
+                    $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
+            }
+            Console.WriteLine("=====================================================");
         }
 
         #endregion

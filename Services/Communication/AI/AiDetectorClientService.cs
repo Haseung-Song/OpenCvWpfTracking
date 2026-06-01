@@ -1,12 +1,259 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OpenCvWpfTracking.Services.Communication.AI
 {
-    internal class AiDetectorClientService
+    /// <summary>
+    /// [AI] [Detector Agent]와 [TCP] 통신을 담당하는 [Client Service]
+    ///
+    /// 역할:
+    /// 1. [AI] [Detector Agent]에 [TCP] [Client]로 연결
+    /// 2. [Agent]에서 송신하는 [byte[]] 데이터 수신
+    /// 3. 수신 데이터를 [Buffer]에 누적
+    /// 4. 완성된 [AI] [Packet]만 분리하여 [ViewModel]로 전달
+    ///
+    /// 주의:
+    /// - 이 클래스는 [Packet] 내용을 해석하지 않는다.
+    /// - [Packet] 해석은 [AiDetectorPacketParser]가 담당한다.
+    /// </summary>
+    public class AiDetectorClientService
     {
+        #region [Fields]
+
+        /// <summary>
+        /// 실제 [TCP] [Client] 객체
+        /// </summary>
+        private TcpClient _tcpClient;
+
+        /// <summary>
+        /// [TCP] 송수신 [Stream]
+        /// </summary>
+        private NetworkStream _networkStream;
+
+        /// <summary>
+        /// [ReceiveLoop] 종료 제어용 [Token]
+        /// </summary>
+        private CancellationTokenSource _cts;
+
+        /// <summary>
+        /// [TCP] 수신 데이터 누적 [Buffer]
+        ///
+        /// [TCP]는 [Packet] 단위로 들어오지 않으므로,
+        /// 수신된 [byte[]]를 여기에 계속 누적한다.
+        /// </summary>
+        private readonly List<byte> _receiveBuffer
+            = new List<byte>();
+
+        /// <summary>
+        /// 누적 [Buffer]에서 완성 [Packet]을 분리하기 위한 [Parser]
+        /// </summary>
+        private readonly AiDetectorPacketParser _packetParser
+            = new AiDetectorPacketParser();
+
+        #endregion
+
+        #region [Events]
+
+        /// <summary>
+        /// 완성된 [AI] [Packet]이 수신되었을 때 발생하는 [Event]
+        ///
+        /// [MainViewModel]에서 이 [Event]를 구독해서
+        /// [CMD 55] 탐지데이터를 파싱하면 된다.
+        /// </summary>
+        public event Action<byte[], DateTime> PacketReceived;
+
+        #endregion
+
+        #region [Properties]
+
+        /// <summary>
+        /// 현재 [TCP] 연결 상태
+        /// </summary>
+        public bool IsConnected =>
+            _tcpClient != null &&
+            _tcpClient.Connected;
+
+        #endregion
+
+        #region [Connect]
+
+        /// <summary>
+        /// [AI] [Detector Agent]에 [TCP] 연결
+        ///
+        /// 예:
+        /// [IP]   : [192.168.20.160]
+        /// [PORT] : [5055]
+        /// </summary>
+        public async Task<bool> ConnectAsync(string ip, int port)
+        {
+            try
+            {
+                if (IsConnected)
+                {
+                    Console.WriteLine("[AI TCP] Already Connected.");
+                    return true;
+                }
+
+                Console.WriteLine("=====================================================");
+                Console.WriteLine("[AI TCP] Connect Try...");
+                Console.WriteLine($"[AI TCP] Target : {ip}:{port}");
+
+                _tcpClient = new TcpClient();
+
+                await _tcpClient.ConnectAsync(ip, port);
+
+                _networkStream = _tcpClient.GetStream();
+
+                _cts = new CancellationTokenSource();
+
+                // 수신 [Loop]는 [UI] 멈춤 방지를 위해 [Background Task]로 실행
+                _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
+
+                Console.WriteLine("[AI TCP] Connect Success.");
+                Console.WriteLine("=====================================================");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
+                Console.WriteLine("=====================================================");
+                Disconnect();
+
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region [Receive]
+
+        /// <summary>
+        /// [AI] [Detector Agent]로부터 데이터를 계속 수신하는 [Loop]
+        ///
+        /// 수신 흐름:
+        /// 1. [NetworkStream.ReadAsync()]로 [byte[]] 수신
+        /// 2. [_receiveBuffer]에 누적
+        /// 3. [Parser]로 완성 [Packet] 분리
+        /// 4. [PacketReceived] [Event] 발생
+        /// </summary>
+        private async Task ReceiveLoopAsync(CancellationToken token)
+        {
+            byte[] buffer = new byte[4096];
+
+            try
+            {
+                while (!token.IsCancellationRequested &&
+                       IsConnected &&
+                       _networkStream != null)
+                {
+                    int readSize =
+                        await _networkStream.ReadAsync(
+                            buffer,
+                            0,
+                            buffer.Length);
+
+                    // [readSize]가 0이면 상대방이 연결 종료한 것
+                    if (readSize <= 0)
+                    {
+                        Console.WriteLine("[AI TCP] Server Disconnected.");
+                        break;
+                    }
+
+                    // 실제 수신된 [byte]만 누적 [Buffer]에 추가
+                    AppendReceiveBuffer(buffer, readSize);
+
+                    // 누적 [Buffer]에서 완성 [Packet] 분리
+                    List<byte[]> packets =
+                        _packetParser.ExtractPackets(_receiveBuffer);
+
+                    foreach (byte[] packet in packets)
+                    {
+                        PrintHex("[AI TCP RECV]", packet);
+
+                        // [ViewModel] 쪽으로 완성 [Packet] 전달
+                        PacketReceived?.Invoke(packet, DateTime.Now);
+                    }
+
+                }
+
+            }
+            catch (ObjectDisposedException)
+            {
+                // [Disconnect] 중 [Stream]이 닫히면서 발생 가능
+                // 정상 종료 흐름으로 처리
+                Console.WriteLine("[AI TCP] Receive Loop Closed.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[AI TCP ERROR] Receive Failed : " + ex.Message);
+            }
+            Disconnect();
+        }
+
+        /// <summary>
+        /// 수신된 [byte[]] 중 실제 [readSize]만큼만 누적 [Buffer]에 추가
+        /// </summary>
+        private void AppendReceiveBuffer(byte[] buffer, int readSize)
+        {
+            for (int i = 0; i < readSize; i++)
+            {
+                _receiveBuffer.Add(buffer[i]);
+            }
+
+        }
+
+        #endregion
+
+        #region [Disconnect]
+
+        /// <summary>
+        /// [AI] [Detector] [TCP] 연결 종료 및 리소스 정리
+        /// </summary>
+        public void Disconnect()
+        {
+            try
+            {
+                _cts?.Cancel();
+
+                _networkStream?.Close();
+                _tcpClient?.Close();
+            }
+            catch
+            {
+                // 종료 과정에서 발생하는 예외는 무시
+            }
+            finally
+            {
+                _networkStream = null;
+                _tcpClient = null;
+
+                _cts?.Dispose();
+                _cts = null;
+
+                _receiveBuffer.Clear();
+
+                Console.WriteLine("[AI TCP] Disconnected.");
+            }
+
+        }
+
+        #endregion
+
+        #region [Log]
+
+        /// <summary>
+        /// 수신 [Packet] [HEX] 로그 출력
+        /// </summary>
+        private void PrintHex(string title, byte[] data)
+        {
+            Console.WriteLine(title + " " + BitConverter.ToString(data));
+        }
+        #endregion
     }
+
 }

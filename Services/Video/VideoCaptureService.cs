@@ -5,9 +5,9 @@ using System.Threading;
 namespace OpenCvWpfTracking.Services.Video
 {
     /// <summary>
-    /// OpenCV는 C++로 돌아가므로,
+    /// [OpenCV]는 [C++]로 돌아가므로,
     /// 비관리 자원이므로,
-    /// Dispose()를 해주는게 중요.
+    /// [Dispose()]를 해주는게 중요.
     /// </summary>
     public class VideoCaptureService : IDisposable
     {
@@ -84,13 +84,13 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// 영상에서 한 장(프레임)을 가져오는 함수
+        /// 영상에서 한 장([Frame])을 가져오는 함수
         /// 
-        /// OpenCV는 내부적으로 C++ 포인터를 사용하므로,
-        /// Disconnect / Release() 중 Read()가 호출되면
-        /// OpenCVException(p == NULL) 예외가 발생할 수 있다.
+        /// [OpenCV]는 내부적으로 [C++] 포인터를 사용하므로,
+        /// [Disconnect] / [Release()] 중 [Read()]가 호출되면
+        /// [OpenCVException]([p == NULL]) 예외가 발생할 수 있다.
         /// 
-        /// 따라서 예외 발생 시 안전하게 null 반환 처리.
+        /// 따라서 예외 발생 시 안전하게 [null] 반환 처리.
         /// </summary>
         public Mat ReadFrame()
         {
@@ -99,7 +99,7 @@ namespace OpenCvWpfTracking.Services.Video
             if (!IsConnected || _capture == null)
                 return null;
 
-            // 현재 프레임 저장용 Mat 객체 생성
+            // 현재 [Frame] 저장용 [Mat] 객체 생성
             Mat frame = new Mat();
 
             try
@@ -115,9 +115,9 @@ namespace OpenCvWpfTracking.Services.Video
                 }
 
                 /// <summary>
-                /// 실제 영상 프레임 읽기
+                /// 실제 영상 [Frame] 읽기
                 /// 
-                /// [Read] 실패 또는 빈 프레임인 경우:
+                /// [Read] 실패 또는 빈 [Frame]인 경우:
                 /// - [RTSP] 끊김
                 /// - 카메라 종료
                 /// - 영상 끝
@@ -128,7 +128,7 @@ namespace OpenCvWpfTracking.Services.Video
                     frame.Dispose();
                     return null;
                 }
-                // 정상 프레임 반환
+                // 정상 [Frame] 반환
                 return frame;
             }
             catch (Exception ex)

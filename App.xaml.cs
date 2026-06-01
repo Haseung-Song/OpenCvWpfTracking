@@ -9,13 +9,14 @@ using FFmpeg.AutoGen;
 namespace OpenCvWpfTracking
 {
     /// <summary>
-    /// App.xaml에 대한 상호 작용 논리
+    /// [App.xaml]에 대한 상호 작용 논리
     /// </summary>
     public partial class App : Application
     {
         /// <summary>
         /// [Windows] 콘솔 창 생성 함수
         /// [C++] [AllocConsole()] 과 동일
+        /// 
         /// [WPF]는 기본적으로 콘솔 프로그램이 아니므로,
         /// 별도로 콘솔 창을 생성해야 한다.
         /// </summary>
@@ -24,6 +25,7 @@ namespace OpenCvWpfTracking
 
         /// <summary>
         /// 생성한 콘솔 창 해제 함수
+        /// 
         /// 프로그램 종료 시 사용
         /// </summary>
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -31,10 +33,10 @@ namespace OpenCvWpfTracking
 
         /// <summary>
         /// [Windows API]
-        /// 콘솔 출력 장치(CONOUT$)를 여는 함수
+        /// 콘솔 출력 장치([CONOUT$])를 여는 함수
         /// 
         /// [WPF]는 [Console.WriteLine()] 출력 대상이 없기 때문에,
-        /// CreateFile()을 사용해서 실제 콘솔 출력 핸들을 가져온다.
+        /// [CreateFile()]을 사용해서 실제 콘솔 출력 핸들을 가져온다.
         /// </summary>
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern SafeFileHandle CreateFile(
@@ -48,10 +50,11 @@ namespace OpenCvWpfTracking
 
         /// <summary>
         /// [Windows API]
+        /// 
         /// 표준 출력 핸들을 새 콘솔 핸들로 변경하는 함수
         /// 
         /// 이 작업을 하지 않으면,
-        /// Console.WriteLine()이 [Visual Studio] 출력창으로 갈 수 있다.
+        /// [Console.WriteLine()]이 [Visual Studio] 출력창으로 갈 수 있다.
         /// </summary>
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool SetStdHandle(
@@ -59,12 +62,12 @@ namespace OpenCvWpfTracking
             SafeFileHandle handle);
 
         /// <summary>
-        /// 표준 출력(stdout) 핸들 번호
+        /// 표준 출력([stdout]) 핸들 번호
         /// </summary>
         private const int STD_OUTPUT_HANDLE = -11;
 
         /// <summary>
-        /// 표준 에러(stderr) 핸들 번호
+        /// 표준 에러([stderr]) 핸들 번호
         /// </summary>
         private const int STD_ERROR_HANDLE = -12;
 
@@ -84,8 +87,9 @@ namespace OpenCvWpfTracking
         private const uint OPEN_EXISTING = 3;
 
         /// <summary>
-        /// FFmpeg Native DLL 경로 설정
-        /// avcodec / avformat / avutil / swscale DLL을 찾도록 지정
+        /// [FFmpeg] [Native DLL] 경로 설정
+        /// 
+        /// [avcodec] / [avformat] / [avutil] / [swscale] [DLL]을 찾도록 지정
         /// </summary>
         private void InitializeFFmpeg()
         {
@@ -100,7 +104,8 @@ namespace OpenCvWpfTracking
 
         /// <summary>
         /// [WPF] 프로그램 시작 시 최초 실행되는 함수
-        /// 콘솔 창 생성 및 Console.WriteLine 출력 연결 수행
+        /// 
+        /// 콘솔 창 생성 및 [Console.WriteLine()] 출력 연결 수행
         /// </summary>
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -120,10 +125,11 @@ namespace OpenCvWpfTracking
             Console.OutputEncoding = new UTF8Encoding(false);
 
             /// <summary>
-            /// 실제 콘솔 출력 장치(CONOUT$) 열기
+            /// 실제 콘솔 출력 장치([CONOUT$]) 열기
             /// 
             /// 이 핸들을 통해,
-            /// Console.WriteLine() 출력 대상을 [Visual Studio] 출력창 → 실제 콘솔창
+            /// 
+            /// [Console.WriteLine()] 출력 대상을 [Visual Studio] 출력창 → 실제 콘솔창
             /// 으로 변경한다.
             /// </summary>
             SafeFileHandle consoleHandle = CreateFile(
@@ -136,7 +142,7 @@ namespace OpenCvWpfTracking
                 IntPtr.Zero);
 
             /// <summary>
-            /// 표준 출력(stdout) 핸들을
+            /// 표준 출력([stdout]) 핸들을
             /// 새 콘솔 핸들로 변경
             /// </summary>
             SetStdHandle(
@@ -144,7 +150,7 @@ namespace OpenCvWpfTracking
                 consoleHandle);
 
             /// <summary>
-            /// 표준 에러(stderr) 핸들도
+            /// 표준 에러([stderr]) 핸들도
             /// 같은 콘솔로 연결
             /// </summary>
             SetStdHandle(
@@ -161,7 +167,7 @@ namespace OpenCvWpfTracking
             /// <summary>
             /// [UTF8] 기반 [StreamWriter] 생성
             /// 
-            /// AutoFlush = true : Console.WriteLine() 호출 즉시 출력
+            /// [AutoFlush] = true : [Console.WriteLine()] 호출 즉시 출력
             /// </summary>
             var consoleWriter = new StreamWriter(
                 consoleStream,
@@ -171,12 +177,12 @@ namespace OpenCvWpfTracking
             };
 
             /// <summary>
-            /// Console.WriteLine() 출력 연결
+            /// [Console.WriteLine()] 출력 연결
             /// </summary>
             Console.SetOut(consoleWriter);
 
             /// <summary>
-            /// Console.Error 출력 연결
+            /// [Console.Error] 출력 연결
             /// </summary>
             Console.SetError(consoleWriter);
 
@@ -188,6 +194,7 @@ namespace OpenCvWpfTracking
 
         /// <summary>
         /// 프로그램 종료 시, 호출이 되는 함수
+        /// 
         /// 콘솔 종료 및 리소스 정리 수행 함수
         /// </summary>
         protected override void OnExit(ExitEventArgs e)

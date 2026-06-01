@@ -1,8 +1,11 @@
 ﻿namespace OpenCvWpfTracking.Models.AI
 {
+    /// <summary>
+    /// [AI Detector] 객체 1개 [Bounding Box] 정보
+    /// </summary>
     public class AiDetectionBox
     {
-        public int ObjectId { get; set; }
+        public long ObjectId { get; set; }
 
         public int ClassIndex { get; set; }
 

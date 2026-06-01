@@ -5,63 +5,63 @@ using System;
 namespace OpenCvWpfTracking.Services.Video
 {
     /// <summary>
-    /// FFmpeg.AutoGen 기반 RTSP Decoder Service
+    /// [FFmpeg.AutoGen] 기반 [RTSP] [Decoder Service]
     ///
     /// 역할:
-    /// 1. OpenCvSharp VideoCapture로 열리지 않는 RTSP Stream 직접 연결
-    /// 2. FFmpeg API 기반 Packet 수신 / Decode 수행
-    /// 3. Decode된 AVFrame을 OpenCV Mat(BGR24)으로 변환
-    /// 4. ViewModel의 FFmpegCaptureLoop에서 WPF Image 출력용 Frame 제공
+    /// 1. [OpenCvSharp] [VideoCapture]로 열리지 않는 [RTSP] [Stream] 직접 연결
+    /// 2. [FFmpeg] [API] 기반 [Packet] 수신 / [Decode] 수행
+    /// 3. [Decode]된 [AVFrame]을 [OpenCV] [Mat]([BGR24])으로 변환
+    /// 4. [ViewModel]의 [FFmpegCaptureLoop]에서 [WPF] [Image] 출력용 [Frame] 제공
     ///
     /// 주의:
-    /// - unsafe 코드 허용 필요
-    /// - FFmpeg Native DLL 경로 설정 필요
-    /// - 반환되는 Mat은 호출부에서 Dispose 필요
+    /// - [unsafe] 코드 허용 필요
+    /// - [FFmpeg] [Native DLL] 경로 설정 필요
+    /// - 반환되는 [Mat]은 호출부에서 [Dispose] 필요
     /// </summary>
     public unsafe class FFmpegDecoderService : IDisposable
     {
         #region [Fields]
 
         /// <summary>
-        /// RTSP / 영상 파일 입력 Format Context
-        /// avformat_open_input() 성공 시 생성되는 입력 컨텍스트
+        /// [RTSP] / 영상 파일 입력 [Format Context]
+        /// [avformat_open_input()] 성공 시 생성되는 입력 컨텍스트
         /// </summary>
         private AVFormatContext* _formatContext;
 
         /// <summary>
-        /// 영상 Decode용 Codec Context
-        /// H.264 / H.265 등 실제 영상 Codec Decode 담당
+        /// 영상 [Decode]용 [Codec Context]
+        /// [H.264] / [H.265] 등 실제 영상 [Codec] [Decode] 담당
         /// </summary>
         private AVCodecContext* _codecContext;
 
         /// <summary>
-        /// FFmpeg Packet
-        /// RTSP Stream에서 읽어온 압축 데이터 저장용
+        /// [FFmpeg] [Packet]
+        /// [RTSP] [Stream]에서 읽어온 압축 데이터 저장용
         /// </summary>
         private AVPacket* _packet;
 
         /// <summary>
-        /// FFmpeg Frame
-        /// Packet Decode 후 실제 영상 Frame 저장용
+        /// [FFmpeg] [Frame]
+        /// [Packet] [Decode] 후 실제 영상 [Frame] 저장용
         /// </summary>
         private AVFrame* _frame;
 
         /// <summary>
-        /// Pixel Format 변환 Context
-        /// AVFrame을 WPF 출력에 사용 가능한 BGR24 Mat으로 변환할 때 사용
+        /// [Pixel Format] 변환 [Context]
+        /// [AVFrame]을 [WPF] 출력에 사용 가능한 [BGR24] [Mat]으로 변환할 때 사용
         /// </summary>
         private SwsContext* _swsContext;
 
         /// <summary>
-        /// 현재 입력 Stream 중 Video Stream Index
+        /// 현재 입력 [Stream] 중 [Video Stream Index]
         /// </summary>
         private int _videoStreamIndex = -1;
 
         /// <summary>
-        /// FFmpeg 리소스 접근 동기화 객체
+        /// [FFmpeg] 리소스 접근 동기화 객체
         ///
-        /// ReadFrame()과 Close()가 동시에
-        /// FFmpeg 포인터를 접근하지 못하도록 제어한다.
+        /// [ReadFrame()]과 [Close()]가 동시에
+        /// [FFmpeg] 포인터를 접근하지 못하도록 제어한다.
         /// </summary>
         private readonly object _syncLock = new object();
 
@@ -70,7 +70,7 @@ namespace OpenCvWpfTracking.Services.Video
         #region [Properties]
 
         /// <summary>
-        /// RTSP 연결 및 Decoder 초기화 완료 여부
+        /// [RTSP] 연결 및 [Decoder] 초기화 완료 여부
         /// </summary>
         public bool IsOpened { get; private set; }
 
@@ -79,21 +79,21 @@ namespace OpenCvWpfTracking.Services.Video
         #region [Open]
 
         /// <summary>
-        /// RTSP 연결 및 FFmpeg Decoder 초기화
+        /// [RTSP] 연결 및 [FFmpeg] [Decoder] 초기화
         ///
         /// 처리 순서:
         /// 
         /// 1. 기존 연결 정리
-        /// 2. RTSP TCP / Timeout 옵션 생성
-        /// 3. avformat_open_input()으로 RTSP 연결
-        /// 4. Stream 정보 조회
-        /// 5. Video Stream 탐색
-        /// 6. Codec Context 생성 및 Decoder Open
-        /// 7. Packet / Frame 버퍼 생성
+        /// 2. [RTSP] [TCP] / [Timeout] 옵션 생성
+        /// 3. [avformat_open_input()]으로 [RTSP] 연결
+        /// 4. [Stream] 정보 조회
+        /// 5. [Video Stream] 탐색
+        /// 6. [Codec Context] 생성 및 [Decoder] [Open]
+        /// 7. [Packet] / [Frame] 버퍼 생성
         /// 
         /// </summary>
-        /// <param name="rtspUrl">RTSP 주소</param>
-        /// <returns>연결 및 Decoder 초기화 성공 여부</returns>
+        /// <param name="rtspUrl">[RTSP] 주소</param>
+        /// <returns>연결 및 [Decoder] 초기화 성공 여부</returns>
         public bool Open(string rtspUrl)
         {
             Close();
@@ -151,15 +151,15 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// RTSP 연결 옵션 생성
+        /// [RTSP] 연결 옵션 생성
         ///
-        /// rtsp_transport=tcp:
+        /// [rtsp_transport=tcp]:
         /// 
-        /// C++ FFmpeg 구조에서 TCP 기반으로 열었던 것과 동일하게 TCP 강제
+        /// [C++] [FFmpeg] 구조에서 [TCP] 기반으로 열었던 것과 동일하게 [TCP] 강제
         ///
-        /// timeout=3000000:
-        /// RTSP 연결 Timeout 설정
-        /// 단위는 microsecond, 3000000 = 3초
+        /// [timeout=3000000]:
+        /// [RTSP] 연결 [Timeout] 설정
+        /// 단위는 [microsecond], 3000000 = 3초
         /// </summary>
         private AVDictionary* CreateRtspOptions()
         {
@@ -181,8 +181,8 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// 입력 Stream 정보 조회
-        /// RTSP 연결 이후 영상 / 음성 Stream 정보 확인 단계
+        /// 입력 [Stream] 정보 조회
+        /// [RTSP] 연결 이후 영상 / 음성 [Stream] 정보 확인 단계
         /// </summary>
         private bool LoadStreamInfo()
         {
@@ -194,15 +194,15 @@ namespace OpenCvWpfTracking.Services.Video
             if (result < 0)
             {
                 Console.WriteLine("[FFmpeg RTSP] avformat_find_stream_info Failed");
-                Close();
 
+                Close();
                 return false;
             }
             return true;
         }
 
         /// <summary>
-        /// 입력 Stream 목록에서 첫 번째 Video Stream 탐색
+        /// 입력 [Stream] 목록에서 첫 번째 [Video Stream] 탐색
         /// </summary>
         private bool FindVideoStream()
         {
@@ -230,7 +230,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Video Stream의 Codec 정보를 기반으로 Decoder Open
+        /// [Video Stream]의 [Codec] 정보를 기반으로 [Decoder] [Open]
         /// </summary>
         private bool OpenCodec()
         {
@@ -277,7 +277,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Decode에 사용할 Packet / Frame 버퍼 생성
+        /// [Decode]에 사용할 [Packet] / [Frame] 버퍼 생성
         /// </summary>
         private void AllocateDecodeBuffer()
         {
@@ -291,16 +291,16 @@ namespace OpenCvWpfTracking.Services.Video
         #region [Read Frame]
 
         /// <summary>
-        /// RTSP에서 다음 영상 Frame을 읽어 OpenCV Mat으로 반환
+        /// [RTSP]에서 다음 영상 [Frame]을 읽어 [OpenCV] [Mat]으로 반환
         ///
         /// 처리 순서:
-        /// 1. av_read_frame()으로 Packet 수신
-        /// 2. Video Stream Packet만 Decode 대상으로 사용
-        /// 3. avcodec_send_packet()
-        /// 4. avcodec_receive_frame()
-        /// 5. AVFrame을 BGR24 Mat으로 변환
+        /// 1. [av_read_frame()]으로 [Packet] 수신
+        /// 2. [Video Stream] [Packet]만 [Decode] 대상으로 사용
+        /// 3. [avcodec_send_packet()]
+        /// 4. [avcodec_receive_frame()]
+        /// 5. [AVFrame]을 [BGR24] [Mat]으로 변환
         ///
-        /// 반환 Mat은 호출부에서 using / Dispose 처리 필요
+        /// 반환 [Mat]은 호출부에서 [using] / [Dispose] 처리 필요
         /// </summary>
         public Mat ReadFrame()
         {
@@ -367,7 +367,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Packet을 Decoder로 전달
+        /// [Packet]을 [Decoder]로 전달
         /// </summary>
         private bool SendPacketToDecoder()
         {
@@ -380,10 +380,10 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// FFmpeg AVFrame을 OpenCV Mat(BGR24)으로 변환
+        /// [FFmpeg] [AVFrame]을 [OpenCV] [Mat]([BGR24])으로 변환
         ///
-        /// 기존 WPF 출력 구조는 MatToBitmapSourceConverter를 사용하므로,
-        /// 여기서는 WPF가 바로 처리하기 쉬운 BGR24 Mat 형태로 맞춘다.
+        /// 기존 [WPF] 출력 구조는 [MatToBitmapSourceConverter]를 사용하므로,
+        /// 여기서는 [WPF]가 바로 처리하기 쉬운 [BGR24] [Mat] 형태로 맞춘다.
         /// </summary>
         private Mat ConvertFrameToMat(AVFrame* sourceFrame)
         {
@@ -406,7 +406,7 @@ namespace OpenCvWpfTracking.Services.Video
                     width,
                     height,
                     AVPixelFormat.AV_PIX_FMT_BGR24,
-                    // SWS_BILINEAR
+                    // [SWS_BILINEAR]
                     2,
                     null,
                     null,
@@ -435,14 +435,14 @@ namespace OpenCvWpfTracking.Services.Video
         #region [Close / Dispose]
 
         /// <summary>
-        /// RTSP 연결 해제 및 FFmpeg 리소스 정리
+        /// [RTSP] 연결 해제 및 [FFmpeg] 리소스 정리
         ///
         /// 해제 순서:
-        /// 1. Packet
-        /// 2. Frame
-        /// 3. Codec Context
-        /// 4. Format Context
-        /// 5. Sws Context
+        /// 1. [Packet]
+        /// 2. [Frame]
+        /// 3. [Codec Context]
+        /// 4. [Format Context]
+        /// 5. [Sws Context]
         /// </summary>
         public void Close()
         {
@@ -463,7 +463,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Packet 리소스 해제
+        /// [Packet] 리소스 해제
         /// </summary>
         private void FreePacket()
         {
@@ -477,7 +477,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Frame 리소스 해제
+        /// [Frame] 리소스 해제
         /// </summary>
         private void FreeFrame()
         {
@@ -491,7 +491,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Codec Context 리소스 해제
+        /// [Codec Context] 리소스 해제
         /// </summary>
         private void FreeCodecContext()
         {
@@ -505,7 +505,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Format Context 리소스 해제
+        /// [Format Context] 리소스 해제
         /// </summary>
         private void FreeFormatContext()
         {
@@ -519,7 +519,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// Pixel Format 변환 Context 해제
+        /// [Pixel Format] 변환 [Context] 해제
         /// </summary>
         private void FreeSwsContext()
         {
@@ -532,7 +532,7 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// 외부 using / Dispose 호출 시 내부 FFmpeg 리소스 정리
+        /// 외부 [using] / [Dispose] 호출 시 내부 [FFmpeg] 리소스 정리
         /// </summary>
         public void Dispose()
         {
