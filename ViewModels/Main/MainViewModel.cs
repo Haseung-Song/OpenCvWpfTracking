@@ -896,28 +896,36 @@ namespace OpenCvWpfTracking.ViewModels.Main
             VdSourceAddress =
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
-            // 1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
+            // 1-1. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
+            EoSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
+
+            // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             //EoSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
-            // 2. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+            // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
-            // 3. 옥상 [GOP] 주간(EO) 카메라
+            // 4-1. 옥상 [GOP] 주간(EO) 카메라
             //EoSourceAddress =
             //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
 
-            // 4. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
+            // 1-2. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
+            IrSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
+
+            // 2-2. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             //IrSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
-            // 5. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
-            // [ID], [PW], [PORT] 맞는지 Config 확인 필요
-            IrSourceAddress =
-                "rtsp://admin:admin@192.168.0.101:554/hdmi";
+            // 3-2. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
+            // [ID], [PW] 및 [PORT] 맞는지 Config 확인 완료
+            //IrSourceAddress =
+            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
-            // 6. 옥상 [GOP] 열상(IR) 카메라
+            // 4-2. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
             //    "rtsp://admin:Cg600ip100m@192.168.1.30:554/stream1";
         }
