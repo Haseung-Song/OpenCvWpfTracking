@@ -90,7 +90,7 @@ namespace OpenCvWpfTracking.Services.Communication
                     return true;
                 }
 
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
                 Console.WriteLine("[TCP] Connect Try...");
                 Console.WriteLine($"[TCP] Target : {ip}:{port}");
 
@@ -110,13 +110,13 @@ namespace OpenCvWpfTracking.Services.Communication
                 _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
 
                 Console.WriteLine("[TCP] Connect Success.");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[TCP ERROR] Connect Failed : " + ex.Message);
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 Disconnect();
                 return false;

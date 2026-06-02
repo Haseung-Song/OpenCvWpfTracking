@@ -10,7 +10,7 @@ namespace OpenCvWpfTracking.Services.Video
     /// 역할:
     /// 1. [OpenCvSharp] [VideoCapture]로 열리지 않는 [RTSP] [Stream] 직접 연결
     /// 2. [FFmpeg] [API] 기반 [Packet] 수신 / [Decode] 수행
-    /// 3. [Decode]된 [AVFrame]을 [OpenCV] [Mat]([BGR24])으로 변환
+    /// 3. [Decode]된 [AVFrame] => [OpenCV] [Mat](BGR24)으로 변환
     /// 4. [ViewModel]의 [FFmpegCaptureLoop]에서 [WPF] [Image] 출력용 [Frame] 제공
     ///
     /// 주의:
@@ -71,9 +71,11 @@ namespace OpenCvWpfTracking.Services.Video
         private readonly object _syncLock = new object();
 
         /// <summary>
-        /// [EO/IR] 영상 해상도 [로그 1회] 출력 여부
+        /// 로그 출력용 영상 구분 이름
+        /// 
+        /// Ex.) [EO] / [IR]
         /// </summary>
-        private bool _isFrameSizePrinted;
+        private readonly string _streamName;
 
         #endregion
 
@@ -83,6 +85,31 @@ namespace OpenCvWpfTracking.Services.Video
         /// [RTSP] 연결 및 [Decoder] 초기화 완료 여부
         /// </summary>
         public bool IsOpened { get; private set; }
+
+        /// <summary>
+        /// [RTSP] 원본 영상 너비
+        /// </summary>
+        public int VideoWidth { get; private set; }
+
+        /// <summary>
+        /// [RTSP] 원본 영상 높이
+        /// </summary>
+        public int VideoHeight { get; private set; }
+
+        #endregion
+
+        #region [Constructor]
+
+        /// <summary>
+        /// [FFmpeg Decoder Service]
+        /// </summary>
+        /// <param name="streamName">
+        /// 로그 출력용 영상 이름
+        /// </param>
+        public FFmpegDecoderService(string streamName)
+        {
+            _streamName = streamName;
+        }
 
         #endregion
 
@@ -100,7 +127,6 @@ namespace OpenCvWpfTracking.Services.Video
         /// 5. [Video Stream] 탐색
         /// 6. [Codec Context] 생성 및 [Decoder] [Open]
         /// 7. [Packet] / [Frame] 버퍼 생성
-        /// 
         /// </summary>
         /// <param name="rtspUrl">[RTSP] 주소</param>
         /// <returns>연결 및 [Decoder] 초기화 성공 여부</returns>
@@ -108,9 +134,19 @@ namespace OpenCvWpfTracking.Services.Video
         {
             Close();
 
-            Console.WriteLine("[FFmpeg RTSP] Open Try...");
+            /// <summary>
+            /// [RTSP] 연결 시도 로그
+            /// </summary>
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP] Open Try...");
 
-            Console.WriteLine("[FFmpeg RTSP] Source : " + rtspUrl);
+            /// <summary>
+            /// [RTSP] 연결 대상 주소 로그
+            /// </summary>
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP] Source : {rtspUrl}");
+
+            Console.WriteLine("=======================================================");
 
             ffmpeg.avformat_network_init();
 
@@ -125,16 +161,20 @@ namespace OpenCvWpfTracking.Services.Video
                     null,
                     &options);
 
-            Console.WriteLine("[FFmpeg RTSP] avformat_open_input Result : " + result);
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP] avformat_open_input Result : {result}");
 
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
 
             ffmpeg.av_dict_free(&options);
 
             if (result < 0)
             {
-                Console.WriteLine("[FFmpeg RTSP] avformat_open_input Failed");
+                Console.WriteLine(
+                    $"[{_streamName}] [FFmpeg RTSP] avformat_open_input Failed");
+
                 Console.WriteLine();
+
                 return false;
             }
 
@@ -153,7 +193,9 @@ namespace OpenCvWpfTracking.Services.Video
 
             IsOpened = true;
 
-            Console.WriteLine("[FFmpeg RTSP] Open Success.");
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP] Open Success.");
+
             Console.WriteLine();
 
             return true;
@@ -203,9 +245,11 @@ namespace OpenCvWpfTracking.Services.Video
 
             if (result < 0)
             {
-                Console.WriteLine("[FFmpeg RTSP] avformat_find_stream_info Failed");
+                Console.WriteLine(
+                    $"[{_streamName}] [FFmpeg RTSP] avformat_find_stream_info Failed");
 
                 Close();
+
                 return false;
             }
             return true;
@@ -224,6 +268,7 @@ namespace OpenCvWpfTracking.Services.Video
                     AVMediaType.AVMEDIA_TYPE_VIDEO)
                 {
                     _videoStreamIndex = i;
+
                     break;
                 }
 
@@ -231,9 +276,11 @@ namespace OpenCvWpfTracking.Services.Video
 
             if (_videoStreamIndex < 0)
             {
-                Console.WriteLine("[FFmpeg RTSP] Video Stream Not Found");
+                Console.WriteLine(
+                    $"[{_streamName}] [FFmpeg RTSP] Video Stream Not Found");
 
                 Close();
+
                 return false;
             }
             return true;
@@ -253,7 +300,9 @@ namespace OpenCvWpfTracking.Services.Video
 
             if (codec == null)
             {
-                Console.WriteLine("[FFmpeg RTSP] Decoder Not Found");
+                Console.WriteLine(
+                    $"[{_streamName}] [FFmpeg RTSP] Decoder Not Found");
+
                 Close();
 
                 return false;
@@ -266,6 +315,26 @@ namespace OpenCvWpfTracking.Services.Video
                 _codecContext,
                 codecParameters);
 
+            /// <summary>
+            /// [RTSP] 원본 영상 해상도 저장
+            /// 
+            /// [AI Detector] [Bounding Box] 좌표 기준과
+            /// [Canvas Overlay] 좌표 기준을 맞추기 위해 사용한다.
+            /// </summary>
+            VideoWidth = _codecContext->width;
+            VideoHeight = _codecContext->height;
+
+            /// <summary>
+            /// [RTSP] 원본 영상 해상도 로그
+            /// 
+            /// [FFmpeg]에서 읽은 실제 영상 해상도를 출력하며,
+            /// [AI Detector] [Bounding Box] 좌표 기준과
+            /// [Overlay Canvas] 크기 설정 확인에 사용한다.
+            /// </summary>
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP SIZE] {VideoWidth} x {VideoHeight}");
+            Console.WriteLine();
+
             int result =
                 ffmpeg.avcodec_open2(
                     _codecContext,
@@ -274,13 +343,16 @@ namespace OpenCvWpfTracking.Services.Video
 
             if (result < 0)
             {
-                Console.WriteLine("[FFmpeg RTSP] avcodec_open2 Failed");
+                Console.WriteLine(
+                    $"[{_streamName}] [FFmpeg RTSP] avcodec_open2 Failed");
+
                 Close();
 
                 return false;
             }
 
-            Console.WriteLine("[FFmpeg RTSP] Codec : " +
+            Console.WriteLine(
+                $"[{_streamName}] [FFmpeg RTSP] Codec : " +
                 ffmpeg.avcodec_get_name(codecParameters->codec_id));
 
             return true;
@@ -292,6 +364,7 @@ namespace OpenCvWpfTracking.Services.Video
         private void AllocateDecodeBuffer()
         {
             _packet = ffmpeg.av_packet_alloc();
+
             _frame = ffmpeg.av_frame_alloc();
         }
 
@@ -400,17 +473,6 @@ namespace OpenCvWpfTracking.Services.Video
 
             int height = sourceFrame->height;
 
-            if (!_isFrameSizePrinted)
-            {
-                Console.WriteLine(
-                    $"[FFmpeg FRAME SIZE] {width} x {height}");
-
-                Console.WriteLine(
-                    "=====================================================");
-
-                _isFrameSizePrinted = true;
-            }
-
             Mat mat =
                 new Mat(
                     height,
@@ -433,9 +495,11 @@ namespace OpenCvWpfTracking.Services.Video
                     null);
 
             byte_ptrArray4 dstData = default;
+
             int_array4 dstLineSize = default;
 
             dstData[0] = (byte*)mat.Data;
+
             dstLineSize[0] = (int)mat.Step();
 
             ffmpeg.sws_scale(
@@ -478,6 +542,9 @@ namespace OpenCvWpfTracking.Services.Video
                 FreeSwsContext();
 
                 _videoStreamIndex = -1;
+
+                VideoWidth = 0;
+                VideoHeight = 0;
             }
 
         }
@@ -491,6 +558,7 @@ namespace OpenCvWpfTracking.Services.Video
                 return;
 
             AVPacket* packet = _packet;
+
             ffmpeg.av_packet_free(&packet);
 
             _packet = null;
@@ -505,6 +573,7 @@ namespace OpenCvWpfTracking.Services.Video
                 return;
 
             AVFrame* frame = _frame;
+
             ffmpeg.av_frame_free(&frame);
 
             _frame = null;
@@ -519,6 +588,7 @@ namespace OpenCvWpfTracking.Services.Video
                 return;
 
             AVCodecContext* codecContext = _codecContext;
+
             ffmpeg.avcodec_free_context(&codecContext);
 
             _codecContext = null;
@@ -533,6 +603,7 @@ namespace OpenCvWpfTracking.Services.Video
                 return;
 
             AVFormatContext* formatContext = _formatContext;
+
             ffmpeg.avformat_close_input(&formatContext);
 
             _formatContext = null;

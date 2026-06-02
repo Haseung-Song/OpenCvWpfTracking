@@ -15,30 +15,45 @@ namespace OpenCvWpfTracking.Services.Communication.AI
     /// 3. [CMD 55] 탐지데이터 [Payload]를 [AiDetectionResult]로 변환
     ///
     /// [Packet] 구조:
-    /// [0]      [STX]      : '$' = 0x24
+    /// [0]      [STX]      : 0x02
     /// [1..2]   [CMD]      : [ASCII] 2자리
     /// [3..5]   [SIZE]     : [Payload] [UTF-8] [byte] 길이, [ASCII] 3자리
     /// [6..N]   [PAYLOAD]  : [UTF-8] 문자열
     /// [N+1]    [CHECKSUM] : [CMD] [ASCII] + [Payload] [bytes] 합산 하위 1[byte]
-    /// [N+2]    [ETX]      : '\n' = 0x0A
+    /// [N+2]    [ETX]      : 0x03
+    ///
+    /// [Payload] 내부 파라미터 구분자:
+    /// 
+    /// [US] [Unit Separator] : 
+    /// 1) [Space]
+    /// 2) [US] [Unit Separator] [0x1F]
     /// </summary>
     public class AiDetectorPacketParser
     {
         #region [Constants]
 
         /// <summary>
-        /// [Packet] 시작 문자 '$'
+        /// [Packet] 시작 문자 [STX]
         /// </summary>
-        private const byte Stx = 0x24;
+        private const byte Stx = 0x02;
 
         /// <summary>
-        /// [Packet] 종료 문자 '\n'
+        /// [Packet] 종료 문자 [ETX]
         /// </summary>
-        private const byte Etx = 0x0A;
+        private const byte Etx = 0x03;
+
+        /// <summary>
+        /// [Payload] 내부 파라미터 구분자
+        ///
+        /// 기존 [Space] 구분자는
+        /// [RTSP] 문자열 / 비밀번호 등에서 충돌 가능성이 있어
+        /// [US] [Unit Separator] [0x1F] 기준으로 변경되었다.
+        /// </summary>
+        private const char PayloadSeparator = (char)0x1F;
 
         /// <summary>
         /// [Header] 크기
-        /// '$' 1[byte] + [CMD] 2[byte] + [SIZE] 3[byte] = 6[byte]
+        /// [STX] 1[byte] + [CMD] 2[byte] + [SIZE] 3[byte] = 6[byte]
         /// </summary>
         private const int HeaderSize = 6;
 
@@ -79,17 +94,17 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
             while (true)
             {
-                // 1. '$' 위치 찾기
+                // 1. [STX] 위치 찾기
                 int stxIndex = receiveBuffer.IndexOf(Stx);
 
-                // '$'가 아예 없으면 쓰레기 데이터이므로 비움
+                // [STX]가 아예 없으면 쓰레기 데이터이므로 비움
                 if (stxIndex < 0)
                 {
                     receiveBuffer.Clear();
                     break;
                 }
 
-                // '$' 앞에 쓰레기 [byte]가 있으면 제거
+                // [STX] 앞에 쓰레기 [byte]가 있으면 제거
                 if (stxIndex > 0)
                 {
                     receiveBuffer.RemoveRange(0, stxIndex);
@@ -107,7 +122,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
                 int payloadSize;
 
-                // [SIZE]가 숫자가 아니면 비정상 [Packet]으로 보고 '$' 하나 제거 후 재탐색
+                // [SIZE]가 숫자가 아니면 비정상 [Packet]으로 보고 [STX] 하나 제거 후 재탐색
                 if (!int.TryParse(sizeText, out payloadSize))
                 {
                     receiveBuffer.RemoveAt(0);
@@ -130,14 +145,13 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 // 4. 마지막 [byte]가 [ETX]인지 확인
                 if (receiveBuffer[packetSize - 1] != Etx)
                 {
-                    // [ETX] 위치가 안 맞으면 현재 '$'가 잘못된 시작점일 수 있음
+                    // [ETX] 위치가 안 맞으면 현재 [STX]가 잘못된 시작점일 수 있음
                     receiveBuffer.RemoveAt(0);
                     continue;
                 }
 
                 // 5. 완성 [Packet] 복사
-                byte[] packet =
-                    receiveBuffer.GetRange(0, packetSize).ToArray();
+                byte[] packet = receiveBuffer.GetRange(0, packetSize).ToArray();
 
                 // 6. [Buffer]에서 잘라낸 [Packet] 제거
                 receiveBuffer.RemoveRange(0, packetSize);
@@ -189,6 +203,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             {
                 return false;
             }
+
             // 4. [Payload] 문자열을 탐지 결과 [Model]로 변환
             return TryParseDetectionPayload(payload, out result);
         }
@@ -276,8 +291,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             byte calculatedChecksum =
                 CalculateChecksum(command, payloadBytes);
 
-            checksumValid =
-                receivedChecksum == calculatedChecksum;
+            checksumValid = receivedChecksum == calculatedChecksum;
 
             return true;
         }
@@ -325,6 +339,11 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [FrameTime] [InferenceMs] [RtspIndex] [DetectionCount]
         /// [ObjectId] [ClassIndex] [Confidence] [Left] [Top] [Right] [Bottom] ...
         ///
+        /// [Payload] 내부 파라미터는
+        /// [Space] 또는
+        /// [US] [Unit Separator] [0x1F]
+        /// 기준으로 구분된다.
+        ///
         /// 객체가 1개면 7개 필드가 한 번,
         /// 객체가 2개면 7개 필드가 두 번 반복된다.
         /// </summary>
@@ -339,8 +358,16 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 return false;
             }
 
+            /// <summary>
+            /// [Payload] 내부 파라미터 분리
+            /// 
+            /// [구버전] [AI Detector Agent]는 [Space],
+            /// [신버전] [AI Detector Agent]는
+            /// [US] [Unit Separator] [0x1F]를 사용하므로
+            /// 두 구분자를 모두 지원한다.
+            /// </summary>
             string[] tokens = payload.Split(
-                new[] { ' ' },
+                new[] { PayloadSeparator },
                 StringSplitOptions.RemoveEmptyEntries);
 
             // 최소 4개는 있어야 함:
@@ -378,8 +405,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
 
             // 객체 1개당 7개 필드
-            int expectedTokenCount =
-                4 + detectionCount * 7;
+            int expectedTokenCount = 4 + detectionCount * 7;
 
             if (tokens.Length < expectedTokenCount)
             {

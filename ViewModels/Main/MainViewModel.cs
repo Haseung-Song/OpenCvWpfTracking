@@ -1,14 +1,15 @@
 ﻿using OpenCvSharp;
 using OpenCvWpfTracking.Common;
 using OpenCvWpfTracking.Converters;
+using OpenCvWpfTracking.Models.AI;
 using OpenCvWpfTracking.Services.Communication;
 using OpenCvWpfTracking.Services.Communication.AI;
 using OpenCvWpfTracking.Services.Video;
-using OpenCvWpfTracking.Models.AI;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -138,6 +139,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private readonly AiDetectorPacketParser _aiDetectorPacketParser;
 
+        /// <summary>
+        /// [AI Detector Agent] 요청 [Packet] 생성 객체
+        ///
+        /// 향후 [ONNX] 목록 조회,
+        /// [RTSP] 정보 조회 등의 요청 [Packet] 생성에 사용한다.
+        /// </summary>
+        private readonly AiDetectorPacketBuilder _aiPacketBuilder;
+
         #endregion
 
         #region [Control State Fields]
@@ -242,13 +251,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 마지막 [LA] 상태 로그 출력 시간
         /// 
-        /// 상태 [Packet]은 [10Hz]로 계속 들어오므로,
-        /// [Console] 도배 방지 목적
+        /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus]
+        /// 상태 [Packet]은 약 [10Hz] 주기로 수신되므로,
+        /// [Console] 도배 방지 목적으로 사용한다.
         /// </summary>
         private DateTime _lastLaStatusLogTime = DateTime.MinValue;
 
         /// <summary>
+        /// 마지막 [LA] [Extended Status] 로그 출력 시간
+        /// 
+        /// [IR] 확장 상태 [Packet]은
+        /// 지속적으로 수신되므로,
+        /// [Console] 도배 방지 목적으로 사용한다.
+        /// </summary>
+        private DateTime _lastLaExtendedStatusLogTime = DateTime.MinValue;
+
+        /// <summary>
         /// [LA] 상태 로그 출력 간격
+        /// 
+        /// [0x01] 기본 상태 Packet
+        /// [0xA1] 확장 상태 Packet
+        /// 로그 출력 주기 계산에 사용한다.
         /// </summary>
         private const int LaLogIntervalSeconds = 1;
 
@@ -268,6 +291,42 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [AI Detector] 탐지 로그 출력 간격
         /// </summary>
         private const int AiDetectorLogIntervalSeconds = 1;
+
+        #endregion
+
+        #region [AI Overlay Size Binding Fields]
+
+        /// <summary>
+        /// [EO] [RTSP] 원본 영상 너비
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 
+        /// 실제 [RTSP] 원본 해상도 저장용.
+        /// </summary>
+        private int _eoVideoWidth;
+
+        /// <summary>
+        /// [EO] [RTSP] 원본 영상 높이
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 
+        /// 실제 [RTSP] 원본 해상도 저장용.
+        /// </summary>
+        private int _eoVideoHeight;
+
+        /// <summary>
+        /// [IR] [RTSP] 원본 영상 너비
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 
+        /// 실제 [RTSP] 원본 해상도 저장용.
+        /// </summary>
+        private int _irVideoWidth;
+
+        /// <summary>
+        /// [IR] [RTSP] 원본 영상 높이
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 
+        /// 실제 [RTSP] 원본 해상도 저장용.
+        /// </summary>
+        private int _irVideoHeight;
 
         #endregion
 
@@ -455,7 +514,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN -{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -471,7 +530,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN +{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -487,7 +546,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT +{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -503,7 +562,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT -{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -523,7 +582,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.EoZoomGoPosition(targetZoom);
             });
@@ -589,9 +648,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             LrfMeasureCommand = new RelayCommand(() =>
             {
                 Console.WriteLine();
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
                 Console.WriteLine("[CONTROL] LRF MEASURE REQUEST");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 _controlCommandService.ReadOnceLrfValue();
             });
@@ -609,7 +668,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[CONTROL] STOP MOVE");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 StopContinuousMove();
             });
@@ -626,8 +685,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// 영상 서비스 생성
             /// </summary>
             _vdDecoder = new VideoCaptureService();
-            _eoDecoder = new FFmpegDecoderService();
-            _irDecoder = new FFmpegDecoderService();
+            _eoDecoder = new FFmpegDecoderService("EO");
+            _irDecoder = new FFmpegDecoderService("IR");
 
             /// <summary>
             /// [LA] 통신 서비스 생성
@@ -651,7 +710,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [OnLaMessageReceived] 함수가 호출된다.
             /// </summary>
             _laTcpService.MessageReceived += OnLaMessageReceived;
-            _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
 
             /// <summary>
             /// [AI Detector] 통신 서비스 생성
@@ -664,31 +722,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _aiDetectorPacketParser = new AiDetectorPacketParser();
 
             /// <summary>
+            /// [AI Detector Agent] 요청 [Packet] 생성
+            /// <summary>
+            _aiPacketBuilder = new AiDetectorPacketBuilder();
+
+            /// <summary>
             /// [AI Detector] 수신 이벤트 연결
             /// 
             /// [AiDetectorClientService]에서 완성 [Packet] 수신 시
             /// [OnAiDetectorPacketReceived] 함수가 호출된다.
             /// </summary>
             _aiDetectorClientService.PacketReceived += OnAiDetectorPacketReceived;
-
-            /// <summary>
-            /// [AI] [Detector Agent] 수동 연결 테스트용
-            /// 
-            /// 현재는 [Auto Reconnect] 구조 사용으로 인해
-            /// 따로 호출하지는 않는다.
-            /// </summary>
-            //_ = ConnectAiDetectorAsync();
-
-            /// <summary>
-            /// [AI Detector Agent] 자동 재연결 시작
-            /// 
-            /// [AI Detector Agent] 프로그램이 나중에 실행되거나
-            /// 중간에 종료 후 재실행되어도 일정 주기로 재연결을 시도한다.
-            /// </summary>
-            _ = _aiDetectorClientService.StartAutoReconnectAsync(
-                "192.168.20.160",
-                5055,
-                3000);
 
             #endregion
 
@@ -699,9 +743,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             InitializeDefaultSourceAddress();
 
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
             Console.WriteLine("[LA] Service Initialize Complete");
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
 
             #endregion
         }
@@ -790,24 +834,75 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
-        #region [AI Detector Binding Properties]
+        #region [AI Overlay Video Size Properties]
 
         /// <summary>
-        /// [EO] 화면에 표시할 [AI Detector] [Bounding Box] 목록
-        ///
-        /// [XAML] [Canvas Overlay] 바인딩용 컬렉션
-        /// </summary>
-        public ObservableCollection<AiDetectionBox> EoDetectionBoxes { get; }
-            = new ObservableCollection<AiDetectionBox>();
-
-        /// <summary>
-        /// [IR] 화면 [Bounding Box] 표시용 컬렉션
+        /// [EO] [RTSP] 원본 영상 너비
         /// 
-        /// 초기 [AI Detector] 테스트 시 사용하였으며,
-        /// 현재는 [EO] 화면 기준으로 표시하여 사용하지 않는다.
+        /// [FFmpegDecoderService]에서 읽은 실제 [RTSP] 원본 해상도를
+        /// [AI] [Bounding Box] [Overlay] 기준 너비로 사용한다.
         /// </summary>
-        public ObservableCollection<AiDetectionBox> IrDetectionBoxes { get; }
-            = new ObservableCollection<AiDetectionBox>();
+        public int EoVideoWidth
+        {
+            get => _eoVideoWidth;
+            set
+            {
+                _eoVideoWidth = value;
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// [EO] [RTSP] 원본 영상 높이
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 실제 [RTSP] 원본 해상도를
+        /// [AI] [Bounding Box] [Overlay] 기준 높이로 사용한다.
+        /// </summary>
+        public int EoVideoHeight
+        {
+            get => _eoVideoHeight;
+            set
+            {
+                _eoVideoHeight = value;
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// [IR] [RTSP] 원본 영상 너비
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 실제 [RTSP] 원본 해상도를
+        /// [AI] [Bounding Box] [Overlay] 기준 너비로 사용한다.
+        /// </summary>
+        public int IrVideoWidth
+        {
+            get => _irVideoWidth;
+            set
+            {
+                _irVideoWidth = value;
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// [IR] [RTSP] 원본 영상 높이
+        /// 
+        /// [FFmpegDecoderService]에서 읽은 실제 [RTSP] 원본 해상도를
+        /// [AI] [Bounding Box] [Overlay] 기준 높이로 사용한다.
+        /// </summary>
+        public int IrVideoHeight
+        {
+            get => _irVideoHeight;
+            set
+            {
+                _irVideoHeight = value;
+                OnPropertyChanged();
+            }
+
+        }
 
         #endregion
 
@@ -970,6 +1065,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [Binding Collections]
+
+        /// <summary>
+        /// [EO] 화면에 표시할 [AI Detector] [Bounding Box] 목록
+        /// </summary>
+        public ObservableCollection<AiDetectionBox> EoDetectionBoxes { get; }
+            = new ObservableCollection<AiDetectionBox>();
+
+        /// <summary>
+        /// [IR] 화면에 표시할 [AI Detector] [Bounding Box] 목록
+        /// </summary>
+        public ObservableCollection<AiDetectionBox> IrDetectionBoxes { get; }
+            = new ObservableCollection<AiDetectionBox>();
+
+        #endregion
+
         #region [Initialize]
 
         /// <summary>
@@ -1032,8 +1143,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
 
             // 1-2. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-            IrSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
+            //IrSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-2. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             //IrSourceAddress =
@@ -1041,8 +1152,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             // 3-2. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
             // [ID], [PW] 및 [PORT] 맞는지 Config 확인 완료
-            //IrSourceAddress =
-            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
+            IrSourceAddress =
+                "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 4-2. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
@@ -1401,10 +1512,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 return;
             }
+
+            /// <summary>
+            /// [EO/IR] 영상 재연결 시작 전 [AI Detector] 화면 표시 상태 초기화
+            /// </summary>
+            _isEoFrameDisplayed = false;
+            _isIrFrameDisplayed = false;
+
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                EoDetectionBoxes.Clear();
+                IrDetectionBoxes.Clear();
+            });
 
             if (IsAllVideoConnected())
             {
@@ -1413,7 +1536,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 IrStatusText = "Already Connected...";
 
                 Console.WriteLine("[VIDEO] Already Connected.");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 return;
             }
@@ -1427,6 +1550,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
             try
             {
                 ResetCancellationToken();
+
+                /// <summary>
+                /// [AI] [Detector Agent] 수동 연결 테스트용
+                /// 
+                /// 현재는 [Auto Reconnect] 구조 사용으로 인해
+                /// 따로 호출하지는 않는다.
+                /// </summary>
+                //_ = ConnectAiDetectorAsync();
+
+                _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
+
+                /// <summary>
+                /// [AI Detector Agent] 자동 재연결 시작
+                /// 
+                /// [AI Detector Agent] 프로그램이 나중에 실행되거나
+                /// 중간에 종료 후 재실행되어도 일정 주기로 재연결을 시도한다.
+                /// </summary>
+                _ = _aiDetectorClientService.StartAutoReconnectAsync(
+                        "192.168.20.160",
+                        5055,
+                        3000);
 
                 /// <summary>
                 /// [VD]도 [EO / IR]처럼 연결 시도 자체를 백그라운드에서 처리
@@ -1507,10 +1651,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     !result.IrResult)
                 {
                     Console.WriteLine("[VIDEO] All Connect Failed.");
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     return;
                 }
                 StartVideoLoops(result);
+
+                /// <summary>
+                /// [AI Detector] 다중 객체 [Bounding Box] 표시 테스트
+                /// 
+                /// 실제 [AI Detector Agent] 연결 전,
+                /// 더미 탐지 결과를 이용하여 [Overlay] 표시 상태를 확인한다.
+                /// 테스트 완료 후 주석 처리한다.
+                /// </summary>
+                //TestDummyAiDetectionResult();
             }
             finally
             {
@@ -1545,7 +1698,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 return;
             }
@@ -1563,16 +1716,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _isIrFrameDisplayed = false;
 
-            // 3. [AI] [Detector Agent] 자동 재연결 및 [TCP] 연결 종료
-            _aiDetectorClientService.StopAutoReconnect();
-
-            // 4. [Service / Decoder] 객체 종료
+            // 3. [Service / Decoder] 객체 종료
             _vdDecoder.Release();
 
             _eoDecoder.Close();
             _irDecoder.Close();
 
-            // 5. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
+            // 4. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
             App.Current.Dispatcher.Invoke(() =>
             {
                 ClearVideoView(); // [VD] / [EO] / [IR] Viewer 화면을 검은 화면으로 초기화
@@ -1590,8 +1740,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 EoStatusText = "Disconnected";
                 IrStatusText = "Disconnected";
             });
+            // 5. [VIDEO] 연결 해제 완료 로그 출력
             Console.WriteLine("[VIDEO] Disconnect Complete.");
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
         }
 
         #endregion
@@ -1711,6 +1862,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
             bool irResult =
                 _irDecoder.Open(IrSourceAddress);
 
+            /// <summary>
+            /// [EO] [RTSP] => 연결 성공 시
+            /// [FFmpeg]에서 읽은 원본 해상도 저장
+            /// </summary>
+            if (eoResult)
+            {
+                EoVideoWidth = _eoDecoder.VideoWidth;
+                EoVideoHeight = _eoDecoder.VideoHeight;
+            }
+
+            /// <summary>
+            /// [IR] [RTSP] => 연결 성공 시
+            /// [FFmpeg]에서 읽은 원본 해상도 저장
+            /// </summary>
+            if (irResult)
+            {
+                IrVideoWidth = _irDecoder.VideoWidth;
+                IrVideoHeight = _irDecoder.VideoHeight;
+            }
+
             return new VideoConnectResult
             {
                 EoResult = eoResult,
@@ -1736,7 +1907,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[IR] "
                 + (result.IrResult ? "Connect Success" : "Connect Failure"));
 
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
         }
 
         /// <summary>
@@ -2011,7 +2182,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[LA CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("=====================================================");
+            Console.WriteLine("=======================================================");
         }
 
         #endregion
@@ -2060,11 +2231,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             if (!packet.IsValid)
             {
+                Console.WriteLine("=======================================================");
                 Console.WriteLine("[LA PACKET] Invalid Checksum");
+                Console.WriteLine("=======================================================");
                 return;
             }
 
             bool canPrintLog = CanPrintLaLog();
+            bool canPrintExtendedStatusLog = CanPrintLaExtendedStatusLog();
 
             switch (packet.Function)
             {
@@ -2078,13 +2252,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         return;
                     }
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     Console.WriteLine("[LA PACKET] [Pan] / [Tilt] / [Zoom] / [Focus] Status");
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
 
                     ParseLaStatusPacket(packet.RawData, true);
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     break;
 
                 case 0x07:
@@ -2092,9 +2266,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// [Alive] 또는 [ACK] 계열 Packet
                     /// </summary>
                     if (!canPrintLog)
-                        return;
+                        break;
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
 
                     Console.WriteLine();
@@ -2102,19 +2276,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 case 0xA1:
                     /// <summary>
-                    /// 문서상 세부 매핑 추가 확인 필요
-                    /// 현재 수신 패턴상 정상 확장 상태 [Packet]으로 분류
+                    /// [Function] [0xA1]
+                    /// 
+                    /// [Extended Status] Packet.
+                    /// 
+                    /// 현재 수신은 정상 확인되었으나,
+                    /// [LA] 프로그램의 열화상 [Zoom] / [Focus] 표시값과
+                    /// 직접 일치하지 않아 정확한 필드 의미는 미확정 상태이다.
+                    /// 
+                    /// 따라서 현재는 원시 상태값 확인용으로만 출력한다.
                     /// </summary>
-                    if (!canPrintLog)
-                        return;
+                    if (!canPrintExtendedStatusLog)
+                        break;
 
-                    Console.WriteLine("=====================================================");
-                    Console.WriteLine("[LA PACKET] Extended Status Packet");
-                    Console.WriteLine();
+                    Console.WriteLine("=======================================================");
+                    Console.WriteLine("[LA PACKET] [IR] Extended Status Packet");
+                    Console.WriteLine("=======================================================");
 
                     ParseLaExtendedStatusPacket(packet.RawData);
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     break;
 
                 case 0x04:
@@ -2122,13 +2303,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// [LRF] 거리측정 응답 Packet
                     /// </summary>
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     Console.WriteLine("[LA PACKET] [LRF] Distance Packet");
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
 
                     ParseLrfDistancePacket(packet.RawData);
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     break;
 
                 default:
@@ -2139,9 +2320,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// 로그 제한 없이 출력한다.
                     /// </summary>
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     Console.WriteLine($"[LA PACKET] Unknown Function: 0x{packet.Function:X2}");
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
 
                     foreach (byte b in packet.RawData)
                     {
@@ -2149,7 +2330,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     }
                     Console.WriteLine();
 
-                    Console.WriteLine("=====================================================");
+                    Console.WriteLine("=======================================================");
                     break;
             }
 
@@ -2163,7 +2344,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [LA] 상태 로그 출력 여부 확인
         /// 
         /// 현재 시간과 마지막 출력 시간을 비교하여
-        /// 일정 시간 이내면 => [Console] 출력 생략
+        /// 설정된 출력 간격 이내인 경우
+        /// [Console] 출력을 생략한다.
+        /// 
+        /// [0x01] 상태 [Packet] 로그 출력 제어용
         /// </summary>
         private bool CanPrintLaLog()
         {
@@ -2175,6 +2359,29 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return false;
             }
             _lastLaStatusLogTime = DateTime.Now;
+
+            return true;
+        }
+
+        /// <summary>
+        /// [LA] [Extended Status] 로그 출력 여부 확인
+        /// 
+        /// 현재 시간과 마지막 출력 시간을 비교하여
+        /// 설정된 출력 간격 이내인 경우
+        /// [Console] 출력을 생략한다.
+        /// 
+        /// [0xA1] 확장 상태 Packet 로그 출력 제어용.
+        /// </summary>
+        private bool CanPrintLaExtendedStatusLog()
+        {
+            if ((DateTime.Now -
+                 _lastLaExtendedStatusLogTime)
+                .TotalSeconds
+                < LaLogIntervalSeconds)
+            {
+                return false;
+            }
+            _lastLaExtendedStatusLogTime = DateTime.Now;
 
             return true;
         }
@@ -2268,21 +2475,39 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [LA] [Extended] [Status] Packet 파싱
+        /// [LA] [Extended Status] [Packet] 파싱
         /// 
-        /// [Function] [0xA1]:
-        /// 현재 주기적으로 수신되는 확장 상태 [Packet].
-        /// 세부 필드 정의 확인 전까지 [Raw HEX] 출력용으로 사용.
+        /// [Function] [0xA1]
+        /// 
+        /// 문서상 [열영상 카메라] 상태 정보 응답.
+        /// 
+        /// 현재 수신 패턴상 [Byte 2~3], [Byte 4~5] 값이
+        /// 열영상 카메라 상태에 따라 변화하는 것은 확인되었으나,
+        /// 실제 [Zoom] / [Focus] 표시값과 직접 일치하지 않아
+        /// 원시 상태값(Raw Value)으로 출력한다.
+        /// 
+        /// 추후 문서 확인 또는 실장비 검증 후
+        /// 정확한 의미를 반영할 예정이다.
         /// </summary>
         private void ParseLaExtendedStatusPacket(byte[] packet)
         {
-            Console.Write("[LA EXT STATUS RAW] ");
+            ushort irValue1 =
+                BitConverter.ToUInt16(packet, 2);
 
-            foreach (byte b in packet)
-            {
-                Console.Write($"{b:X2} ");
-            }
+            ushort irValue2 =
+                BitConverter.ToUInt16(packet, 4);
+
+            Console.WriteLine(
+                $"[LA EXT STATUS] [Value1] : {irValue1}");
+
+            Console.WriteLine(
+                $"[LA EXT STATUS] [Value2] : {irValue2}");
+
             Console.WriteLine();
+
+            Console.WriteLine(
+                "[LA EXT STATUS RAW] " +
+                BitConverter.ToString(packet));
         }
 
         /// <summary>
@@ -2304,7 +2529,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
             double distance = BitConverter.ToDouble(packet, 2);
-
             LrfDistanceText = $"DISTANCE : {distance:F1} m";
             Console.WriteLine($"[LRF] Distance : {distance:F1} m");
         }
@@ -2343,7 +2567,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[AI DETECTOR CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("===========================================================================");
+            Console.WriteLine("==============================================================================");
         }
 
         #endregion
@@ -2382,70 +2606,77 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector] 탐지 결과 처리 함수
         /// 
-        /// 현재 단계에서는 화면에 [Bounding Box]를 그리기 전
-        /// 수신 / 파싱 정상 여부를 [Console Log]로 확인하는 목적이다.
+        /// [AI Detector Agent]에서 파싱된 탐지 결과를
+        /// [RTSP Index] 기준으로 화면 [Bounding Box] 컬렉션에 반영한다.
         /// 
-        /// 추후, [RtspIndex] 기준으로 [EO] 영상 위에 [Bounding Box]를 표시하도록 확장한다.
+        /// 현재 기준:
+        /// [RTSP Index 0] => [EO] 화면 표시
+        /// [RTSP Index 1] => 수신은 하지만 [IR] 화면에는 표시하지 않음
+        /// 
+        /// 현재 [AI Detector Agent]에서 [RTSP Index 0] / [1] 데이터가 모두 수신되므로,
+        /// 데모 화면 기준상 [EO]에만 [Bounding Box]를 표시하고
+        /// [IR] [Bounding Box]는 항상 제거한다.
         /// </summary>
         private void HandleAiDetectionResult(
             AiDetectionResult result,
-            DateTime receiveTime)
+            DateTime receiveTime,
+            bool forcePrintLog = false)
         {
-            /// <summary>
-            /// [RTSP Index] 기준으로 [AI Detector] 탐지 결과를
-            /// 대상 영상 화면에 반영한다.
-            /// 
-            /// 현재 기준:
-            /// [RTSP Index 0] => [EO]
-            /// [RTSP Index 1] => [IR]
-            /// 
-            /// 추후 [AI Detector Agent] 설정 기준이 변경되면
-            /// 이 분기 기준만 조정한다.
-            /// </summary>
             App.Current.Dispatcher.Invoke(() =>
             {
                 switch (result.RtspIndex)
                 {
                     case 0:
                         /// <summary>
-                        /// [EO] [RTSP] 연결이 되어 있지 않거나
-                        /// [EO] 영상이 화면에 표시되지 않은 상태에서는
-                        /// [AI Detector] 탐지 결과를 반영하지 않는다.
+                        /// [RTSP Index 0]
+                        /// 
+                        /// [Drone] 전용 탐지 결과로 사용된다.
+                        /// 
+                        /// 현재 데모 환경에서는
+                        /// [RTSP Index 1]의 [Drone + best.onnx] 통합 탐지 결과만
+                        /// [EO] 화면에 표시하므로 화면에는 반영하지 않는다.
                         /// </summary>
-                        if (!_eoDecoder.IsOpened ||
-                            !_isEoFrameDisplayed)
-                        {
-                            EoDetectionBoxes.Clear();
-                            return;
-                        }
-
-                        /// <summary>
-                        /// [EO] 화면에 [AI Detector] 탐지 결과 반영
-                        /// </summary>
-                        UpdateDetectionBoxes(
-                            EoDetectionBoxes,
-                            result.Boxes);
                         break;
 
                     case 1:
                         /// <summary>
-                        /// [IR] [RTSP] 연결이 되어 있지 않거나
-                        /// [IR] 영상이 화면에 표시되지 않은 상태에서는
-                        /// [AI Detector] 탐지 결과를 반영하지 않는다.
+                        /// [AI Detector] 탐지 결과 중
+                        /// 신뢰도가 일정 수준 이상인 객체만 화면에 표시한다.
+                        ///
+                        /// 현재 [AI Detector Agent]에서
+                        /// 낮은 신뢰도의 탐지 결과가 함께 수신될 수 있으므로,
+                        /// 불필요한 오탐지 [Bounding Box] 표시를 줄이기 위해 사용한다.
+                        ///
+                        /// 현재 기준:
+                        /// [Confidence] 0.4 (40%) 미만 => 표시 안 함
+                        /// [Confidence] 0.4 (40%) 이상 => 표시
+                        ///
+                        /// 실제 운용 환경에 따라 임계값은 조정 가능하다.
                         /// </summary>
-                        if (!_irDecoder.IsOpened ||
-                            !_isIrFrameDisplayed)
-                        {
-                            IrDetectionBoxes.Clear();
-                            return;
-                        }
+                        List<AiDetectionBox> displayBoxes =
+                            result.Boxes
+                                .Where(box => box.Confidence >= 0.4)
+                                .ToList();
 
                         /// <summary>
-                        /// [IR] 화면에 [AI Detector] 탐지 결과 반영
+                        /// [RTSP Index 1]
+                        /// 
+                        /// [Drone + best.onnx] 통합 탐지 결과로,
+                        /// [Drone] / [Vehicle] / [Ship] 등
+                        /// 다양한 객체가 탐지될 수 있다.
+                        /// 
+                        /// 현재 데모 기준으로
+                        /// [EO] 화면에만 [Bounding Box]를 표시한다.
                         /// </summary>
                         UpdateDetectionBoxes(
-                            IrDetectionBoxes,
-                            result.Boxes);
+                            EoDetectionBoxes,
+                            displayBoxes);
+
+                        /// <summary>
+                        /// 현재 [IR] 화면에는
+                        /// [AI Detector] 탐지 결과를 표시하지 않는다.
+                        /// </summary>
+                        IrDetectionBoxes.Clear();
                         break;
 
                     default:
@@ -2456,88 +2687,135 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             });
 
-            /// <summary>
-            /// [RTSP Index] 기준 탐지 결과 화면 반영
-            /// 
-            /// 현재:
-            /// [RTSP Index 0] => [EO]
-            /// 
-            /// 추후:
-            /// [RTSP Index 1] => [IR]
-            /// </summary>
-            App.Current.Dispatcher.Invoke(() =>
-            {
-                switch (result.RtspIndex)
-                {
-                    case 0:
-                        EoDetectionBoxes.Clear();
-
-                        foreach (AiDetectionBox box in result.Boxes)
-                        {
-                            EoDetectionBoxes.Add(box);
-                        }
-                        break;
-
-                    case 1:
-                        IrDetectionBoxes.Clear();
-
-                        foreach (AiDetectionBox box in result.Boxes)
-                        {
-                            IrDetectionBoxes.Add(box);
-                        }
-                        break;
-
-                }
-
-            });
-
-            /// <summary>
-            /// 탐지 객체 개수 [로그 출력]
-            /// 
-            /// [로그 과다 출력] 방지를 위해
-            /// [CanPrintAiDetectorLog()] 기준으로 1초에 한 번만 출력한다.
-            /// </summary>
-            if (CanPrintAiDetectorLog())
-            {
-                Console.WriteLine(
-                    $"[AI OVERLAY] [RTSP {result.RtspIndex}] [Count] : {result.DetectionCount}");
-                Console.WriteLine();
-            }
-
-            bool canPrintLog = CanPrintAiDetectorLog();
+            bool canPrintLog =
+                forcePrintLog ||
+                CanPrintAiDetectorLog();
 
             /// <summary>
             /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
             /// 일정 시간 이내라면 [Console] 출력만 생략한다.
             /// 
-            /// 실제 수신 / 파싱은 계속 수행된다.
+            /// 실제 수신 / 파싱 / 화면 반영은 계속 수행된다.
             /// </summary>
             if (!canPrintLog)
             {
                 return;
             }
 
-            Console.WriteLine("===========================================================================");
+            Console.WriteLine("==============================================================================");
             Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
-            Console.WriteLine("===========================================================================");
+            Console.WriteLine("==============================================================================");
 
             Console.WriteLine($"[AI DETECT] [Receive Time] : {receiveTime:HH:mm:ss.fff}");
             Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
             Console.WriteLine($"[AI DETECT] [Inference ms] : {result.InferenceMs}");
             Console.WriteLine($"[AI DETECT] [RTSP Index]   : {result.RtspIndex}");
             Console.WriteLine($"[AI DETECT] [Count]        : {result.DetectionCount}");
+            Console.WriteLine($"[AI DETECT] [Box Count]    : {result.Boxes.Count}");
 
-            foreach (AiDetectionBox box in result.Boxes)
+            for (int i = 0; i < result.Boxes.Count; i++)
             {
+                AiDetectionBox box = result.Boxes[i];
+
                 Console.WriteLine(
-                    $"[AI BOX] " +
+                    $"[AI BOX #{i + 1}] " +
                     $"[ID] {box.ObjectId}, " +
                     $"[Class] {box.ClassIndex}, " +
-                    $"[Confidence] {box.Confidence:F2}, " +
+                    $"[Confidence] {box.Confidence * 100:F0}%, " +
                     $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
             }
-            Console.WriteLine("===========================================================================");
+            Console.WriteLine("==============================================================================");
         }
+
+        #endregion
+
+        #region [AI Detector Testing Helpers]
+
+        /// <summary>
+        /// [AI Detector] 다중 객체 [Bounding Box] 표시 테스트
+        /// 
+        /// 실제 [AI Detector Agent] 수신 없이
+        /// 여러 개의 탐지 객체가 들어온 상황을 가정하여
+        /// [Bounding Box] 표시 상태를 확인한다.
+        /// 
+        /// 테스트 목적:
+        /// 1. [DetectionCount] 기준 다중 객체 표시 확인
+        /// 2. 객체별 [ObjectId] / [ClassIndex] / [Confidence] 표시 확인
+        /// 3. [Canvas Overlay]에서 여러 [Bounding Box]가 겹치지 않고 표시되는지 확인
+        /// 4. [RtspIndex] 기준 [EO] / [IR] 분기 동작 확인
+        /// </summary>
+        private void TestDummyAiDetectionResult()
+        {
+            AiDetectionResult result =
+                new AiDetectionResult
+                {
+                    FrameTime = DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                    InferenceMs = 30,
+                    RtspIndex = 0,
+                    DetectionCount = 3
+                };
+
+            result.Boxes.Add(
+                new AiDetectionBox
+                {
+                    ObjectId = 101,
+                    ClassIndex = 0,
+                    Confidence = 0.55,
+                    Left = 1074,
+                    Top = 519,
+                    Right = 1233,
+                    Bottom = 645
+                });
+
+            result.Boxes.Add(
+                new AiDetectionBox
+                {
+                    ObjectId = 102,
+                    ClassIndex = 0,
+                    Confidence = 0.48,
+                    Left = 600,
+                    Top = 300,
+                    Right = 800,
+                    Bottom = 500
+                });
+
+            result.Boxes.Add(
+                new AiDetectionBox
+                {
+                    ObjectId = 103,
+                    ClassIndex = 0,
+                    Confidence = 0.72,
+                    Left = 300,
+                    Top = 200,
+                    Right = 450,
+                    Bottom = 360
+                });
+
+            HandleAiDetectionResult(
+                result,
+                DateTime.Now,
+                true);
+        }
+
+        #endregion
+
+        #region [AI Detector Request Test]
+
+        /// <summary>
+        /// [AI Detector Info] 조회 요청
+        ///
+        /// [CMD 51]
+        /// </summary>
+        private async Task RequestAiDetectorInfoAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildAiDetectorInfoRequest();
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
 
         #endregion
 

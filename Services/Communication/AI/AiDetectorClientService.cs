@@ -44,14 +44,12 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [TCP]는 [Packet] 단위로 들어오지 않으므로,
         /// 수신된 [byte[]]를 여기에 계속 누적한다.
         /// </summary>
-        private readonly List<byte> _receiveBuffer
-            = new List<byte>();
+        private readonly List<byte> _receiveBuffer = new List<byte>();
 
         /// <summary>
         /// 누적 [Buffer]에서 완성 [Packet]을 분리하기 위한 [Parser]
         /// </summary>
-        private readonly AiDetectorPacketParser _packetParser
-            = new AiDetectorPacketParser();
+        private readonly AiDetectorPacketParser _packetParser = new AiDetectorPacketParser();
 
         /// <summary>
         /// [AI Detector] 자동 재연결 루프 실행 여부
@@ -109,9 +107,10 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     return true;
                 }
 
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
                 Console.WriteLine("[AI TCP] Connect Try...");
                 Console.WriteLine($"[AI TCP] Target : {ip}:{port}");
+                Console.WriteLine();
 
                 tcpClient = new TcpClient();
 
@@ -126,14 +125,14 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
 
                 Console.WriteLine("[AI TCP] Connect Success.");
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
 
                 try
                 {
@@ -173,11 +172,17 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             _isReconnectLoopStarted = true;
             _isReconnectRunning = true;
 
-            Console.WriteLine("=====================================================");
             Console.WriteLine("[AI TCP] Auto Reconnect Start.");
 
             while (_isReconnectRunning)
             {
+                /// <summary>
+                /// 현재 연결이 끊긴 상태일 때만
+                /// [AI Detector Agent] 재연결을 시도한다.
+                /// 
+                /// 연결 성공 후, [IsConnected]가 true이므로
+                /// 추가 [Connect] 시도 없이 상태만 유지한다.
+                /// </summary>
                 if (!IsConnected)
                 {
                     bool connected = await ConnectAsync(ip, port);
@@ -190,24 +195,15 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     {
                         Console.WriteLine(
                             $"[AI TCP] Reconnect Retry After {retryIntervalMs} ms");
+                        Console.WriteLine();
                     }
-                    Console.WriteLine();
+
                 }
                 await Task.Delay(retryIntervalMs);
             }
             _isReconnectLoopStarted = false;
 
             Console.WriteLine("[AI TCP] Auto Reconnect Stop.");
-        }
-
-        /// <summary>
-        /// [AI Detector Agent] 자동 재연결 중지
-        /// </summary>
-        public void StopAutoReconnect()
-        {
-            _isReconnectRunning = false;
-
-            Disconnect();
         }
 
         #endregion
@@ -250,8 +246,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     AppendReceiveBuffer(buffer, readSize);
 
                     // 누적 [Buffer]에서 완성 [Packet] 분리
-                    List<byte[]> packets =
-                        _packetParser.ExtractPackets(_receiveBuffer);
+                    List<byte[]> packets = _packetParser.ExtractPackets(_receiveBuffer);
 
                     foreach (byte[] packet in packets)
                     {
@@ -275,7 +270,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch (Exception ex)
             {
-                Console.WriteLine("=====================================================");
+                Console.WriteLine("=======================================================");
                 Console.WriteLine("[AI TCP ERROR] Receive Failed : " + ex.Message);
             }
             Disconnect();
@@ -289,6 +284,57 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             for (int i = 0; i < readSize; i++)
             {
                 _receiveBuffer.Add(buffer[i]);
+            }
+
+        }
+
+        #endregion
+
+        #region [Packet Send]
+
+        /// <summary>
+        /// [AI Detector Agent] 요청 [Packet] 송신
+        ///
+        /// 연결 상태 확인 후
+        /// [AI Detector Agent]로 [Packet]을 전송한다.
+        ///
+        /// [CMD 51]
+        /// [CMD 52]
+        /// [CMD 53]
+        /// [CMD 54]
+        /// 조회 요청에 사용한다.
+        /// </summary>
+        public async Task SendAsync(
+            byte[] packet)
+        {
+            if (_tcpClient == null ||
+                !_tcpClient.Connected)
+            {
+                Console.WriteLine(
+                    "[AI TCP] Send Failed : Not Connected");
+
+                return;
+            }
+
+            try
+            {
+                NetworkStream stream =
+                    _tcpClient.GetStream();
+
+                await stream.WriteAsync(
+                    packet,
+                    0,
+                    packet.Length);
+
+                Console.WriteLine(
+                    "[AI TCP SEND] " +
+                    BitConverter.ToString(packet));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "[AI TCP ERROR] Send Failed : " +
+                    ex.Message);
             }
 
         }

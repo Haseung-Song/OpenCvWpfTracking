@@ -1,6 +1,6 @@
-﻿using System.Windows.Input;
-using OpenCvWpfTracking.ViewModels.Main;
+﻿using OpenCvWpfTracking.ViewModels.Main;
 using System.Windows;
+using System.Windows.Input;
 
 namespace OpenCvWpfTracking
 {

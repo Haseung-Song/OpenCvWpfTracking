@@ -43,13 +43,15 @@
                              IsHitTestVisible="False">
 
                         <ItemsControl ItemsSource="{Binding EoDetectionBoxes}"
-                                      Width="1920" 
-                                      Height="1080">
+                                      Width="{Binding EoVideoWidth}"
+                                      Height="{Binding EoVideoHeight}">
 
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <Canvas Width="1920"
-                                            Height="1080"
+                                    <Canvas Width="{Binding Width,
+                                            RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            Height="{Binding Height,
+                                            RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             ClipToBounds="True" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
@@ -70,7 +72,6 @@
                                                    Height="{Binding Height}"
                                                    Stroke="#FFFF0000"
                                                    StrokeThickness="4" />
-
                                         <!-- [AI] 탐지 객체 이름 / 정확도 표시 -->
                                         <Border Background="#FFFF0000"
                                                 HorizontalAlignment="Left"
@@ -119,6 +120,58 @@
                         <!-- [IR] 영상 -->
                         <Image Source="{Binding IRCameraImage}"
                                Stretch="Uniform" />
+
+                        <!-- [AI] [Bounding Box] [Overlay] -->
+                        <Viewbox Stretch="Uniform"
+                                 IsHitTestVisible="False">
+
+                            <ItemsControl ItemsSource="{Binding IrDetectionBoxes}"
+                                          Width="{Binding IrVideoWidth}"
+                                          Height="{Binding IrVideoHeight}">
+
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas Width="{Binding Width,
+                                                RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                Height="{Binding Height,
+                                                RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                ClipToBounds="True" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                        <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- [AI] [Bounding Box] 표시 영역 -->
+                                        <Grid>
+                                            <!-- [AI] 탐지 객체 [Bounding Box] -->
+                                            <Rectangle Width="{Binding Width}"
+                                                       Height="{Binding Height}"
+                                                       Stroke="#FFFF0000"
+                                                       StrokeThickness="4" />
+                                            <!-- [AI] 탐지 객체 이름 / 정확도 표시 -->
+                                            <Border Background="#FFFF0000"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding DisplayText}"
+                                                           Foreground="White"
+                                                           FontSize="14"
+                                                           FontWeight="Bold"
+                                                           Padding="5,1" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+
+                            </ItemsControl>
+
+                        </Viewbox>
 
                         <!-- 안내 문자 (오른쪽 상단에 보이게) -->
                         <TextBlock Text="{Binding IrStatusText}"
@@ -209,6 +262,7 @@
                                        FontSize="16"
                                        FontWeight="Bold"
                                        Margin="0,0,0,10"/>
+
                             <!-- 제어 패널 Scroll 영역 -->
                             <ScrollViewer Grid.Row="1"
                                           VerticalScrollBarVisibility="Auto"
@@ -216,6 +270,7 @@
                                           HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel Orientation="Vertical" 
                                             Margin="0,0,0,10">
+
                                     <!-- 테스트용 장비 선택 RadioButton 
                                          현재는 단일 장비 연결 구조로 사용하므로
                                          임시 비활성화 처리.
@@ -223,8 +278,7 @@
                                     <!--<RadioButton Content="연결 해제"
                                                  Foreground="#6EC1FF"
                                                  FontSize="15"
-                                                 Margin="0,5"/>
-                                    
+                                                 Margin="0,5"/>                      
                                     <RadioButton Content="TORUSS-LR1000"
                                                  Foreground="#6EC1FF"
                                                  FontSize="15"
@@ -621,4 +675,5 @@
         </Grid>
 
     </Grid>
+
 </Window>
