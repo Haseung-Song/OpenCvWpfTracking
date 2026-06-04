@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows;
 using Microsoft.Win32.SafeHandles;
 using FFmpeg.AutoGen;
+using OpenCvWpfTracking.Common;
 
 namespace OpenCvWpfTracking
 {
@@ -186,9 +187,8 @@ namespace OpenCvWpfTracking
             /// </summary>
             Console.SetError(consoleWriter);
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console Start");
-            Console.WriteLine("=======================================================");
 #endif
         }
 
@@ -199,9 +199,8 @@ namespace OpenCvWpfTracking
         /// </summary>
         protected override void OnExit(ExitEventArgs e)
         {
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console End");
-            Console.WriteLine("=======================================================");
 
 #if DEBUG
             FreeConsole(); // 콘솔 창 해제

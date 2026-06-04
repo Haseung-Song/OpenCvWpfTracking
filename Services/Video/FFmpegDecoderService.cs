@@ -1,5 +1,6 @@
 ﻿using FFmpeg.AutoGen;
 using OpenCvSharp;
+using OpenCvWpfTracking.Common;
 using System;
 
 namespace OpenCvWpfTracking.Services.Video
@@ -146,7 +147,7 @@ namespace OpenCvWpfTracking.Services.Video
             Console.WriteLine(
                 $"[{_streamName}] [FFmpeg RTSP] Source : {rtspUrl}");
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
 
             ffmpeg.avformat_network_init();
 
@@ -164,7 +165,7 @@ namespace OpenCvWpfTracking.Services.Video
             Console.WriteLine(
                 $"[{_streamName}] [FFmpeg RTSP] avformat_open_input Result : {result}");
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
 
             ffmpeg.av_dict_free(&options);
 

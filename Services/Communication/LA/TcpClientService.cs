@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OpenCvWpfTracking.Common;
+using System;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -90,7 +91,7 @@ namespace OpenCvWpfTracking.Services.Communication
                     return true;
                 }
 
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[TCP] Connect Try...");
                 Console.WriteLine($"[TCP] Target : {ip}:{port}");
 
@@ -110,13 +111,13 @@ namespace OpenCvWpfTracking.Services.Communication
                 _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
 
                 Console.WriteLine("[TCP] Connect Success.");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[TCP ERROR] Connect Failed : " + ex.Message);
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 Disconnect();
                 return false;

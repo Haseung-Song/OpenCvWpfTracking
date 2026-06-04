@@ -514,7 +514,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN -{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -530,7 +530,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] PAN +{PanTiltMoveStep} => Target : {targetPan:F2}");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.PanGoPosition(targetPan);
             });
@@ -546,7 +546,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT +{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -562,7 +562,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] TILT -{PanTiltMoveStep} => Target : {targetTilt:F2}");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.TiltGoPosition(targetTilt);
             });
@@ -582,7 +582,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.EoZoomGoPosition(targetZoom);
             });
@@ -648,9 +648,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             LrfMeasureCommand = new RelayCommand(() =>
             {
                 Console.WriteLine();
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[CONTROL] LRF MEASURE REQUEST");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.ReadOnceLrfValue();
             });
@@ -668,7 +668,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[CONTROL] STOP MOVE");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 StopContinuousMove();
             });
@@ -743,9 +743,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             InitializeDefaultSourceAddress();
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[LA] Service Initialize Complete");
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
 
             #endregion
         }
@@ -1512,7 +1512,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 return;
             }
@@ -1536,7 +1536,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 IrStatusText = "Already Connected...";
 
                 Console.WriteLine("[VIDEO] Already Connected.");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 return;
             }
@@ -1604,7 +1604,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     await Task.Delay(300);
 
-                    await RequestAiDetectorMappingSetAsync(); // 여기 추가
+                    /// <summary>
+                    /// [RTSP 1] 채널에 [ONNX 2] 모델 적용
+                    /// </summary>
+                    await RequestAiDetectorMappingSetAsync();
 
                     await Task.Delay(300);
 
@@ -1690,7 +1693,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     !result.IrResult)
                 {
                     Console.WriteLine("[VIDEO] All Connect Failed.");
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     return;
                 }
                 StartVideoLoops(result);
@@ -1737,7 +1740,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 return;
             }
@@ -1781,7 +1784,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             });
             // 5. [VIDEO] 연결 해제 완료 로그 출력
             Console.WriteLine("[VIDEO] Disconnect Complete.");
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -1946,7 +1949,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[IR] "
                 + (result.IrResult ? "Connect Success" : "Connect Failure"));
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         /// <summary>
@@ -2221,7 +2224,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[LA CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -2270,9 +2273,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             if (!packet.IsValid)
             {
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[LA PACKET] Invalid Checksum");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 return;
             }
 
@@ -2291,13 +2294,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         return;
                     }
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     Console.WriteLine("[LA PACKET] [Pan] / [Tilt] / [Zoom] / [Focus] Status");
-                    Console.WriteLine("=======================================================");
-
+                    Console.WriteLine();
                     ParseLaStatusPacket(packet.RawData, true);
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     break;
 
                 case 0x07:
@@ -2307,10 +2309,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     if (!canPrintLog)
                         break;
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
-
                     Console.WriteLine();
+                    ConsoleLogHelper.PrintLine();
                     break;
 
                 case 0xA1:
@@ -2328,13 +2330,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     if (!canPrintExtendedStatusLog)
                         break;
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     Console.WriteLine("[LA PACKET] [IR] Extended Status Packet");
-                    Console.WriteLine("=======================================================");
-
+                    Console.WriteLine();
                     ParseLaExtendedStatusPacket(packet.RawData);
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     break;
 
                 case 0x04:
@@ -2342,13 +2343,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// [LRF] 거리측정 응답 Packet
                     /// </summary>
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     Console.WriteLine("[LA PACKET] [LRF] Distance Packet");
-                    Console.WriteLine("=======================================================");
-
+                    Console.WriteLine();
                     ParseLrfDistancePacket(packet.RawData);
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     break;
 
                 default:
@@ -2359,9 +2359,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// 로그 제한 없이 출력한다.
                     /// </summary>
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     Console.WriteLine($"[LA PACKET] Unknown Function: 0x{packet.Function:X2}");
-                    Console.WriteLine("=======================================================");
+                    Console.WriteLine();
 
                     foreach (byte b in packet.RawData)
                     {
@@ -2369,7 +2369,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     }
                     Console.WriteLine();
 
-                    Console.WriteLine("=======================================================");
+                    ConsoleLogHelper.PrintLine();
                     break;
             }
 
@@ -2606,7 +2606,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[AI DETECTOR CONNECT RESULT] "
                 + result);
 
-            Console.WriteLine("==============================================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -2738,20 +2738,55 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 switch (result.RtspIndex)
                 {
                     case 0:
-                        List<AiDetectionBox> displayBoxes =
+                        if (!_isEoFrameDisplayed)
+                        {
+                            return;
+                        }
+
+                        /// <summary>
+                        /// [RTSP Index 0]
+                        /// 
+                        /// 현재 [AI Detector Agent] 설정 기준:
+                        /// [RTSP Index 0] => [ONNX Index 1] [best_uav.onnx]
+                        /// 
+                        /// [Drone] 전용 탐지 결과로 사용되며,
+                        /// [EO] 화면에 [Bounding Box]를 표시한다.
+                        /// </summary>
+                        List<AiDetectionBox> rtspIndex0DisplayBoxes =
                             result.Boxes
-                                .Where(box => box.Confidence >= 0.1)
+                                .Where(box => box.Confidence >= 0.4)
                                 .ToList();
 
                         UpdateDetectionBoxes(
                             EoDetectionBoxes,
-                            displayBoxes);
+                            rtspIndex0DisplayBoxes);
 
-                        IrDetectionBoxes.Clear();
                         break;
 
                     case 1:
-                        // [RTSP Index 1]은 현재 화면 표시 대상이 아니므로 무시한다.
+                        if (!_isIrFrameDisplayed)
+                        {
+                            return;
+                        }
+
+                        /// <summary>
+                        /// [RTSP Index 1]
+                        /// 
+                        /// 현재 [AI Detector Agent] 설정 기준:
+                        /// [RTSP Index 1] => [ONNX Index 2] [best_yolov7.onnx]
+                        /// 
+                        /// [YOLOv7] 탐지 결과로 사용되며,
+                        /// [IR] 화면에 [Bounding Box]를 표시한다.
+                        /// </summary>
+                        List<AiDetectionBox> rtspIndex1DisplayBoxes =
+                            result.Boxes
+                                .Where(box => box.Confidence >= 0.4)
+                                .ToList();
+
+                        UpdateDetectionBoxes(
+                            IrDetectionBoxes,
+                            rtspIndex1DisplayBoxes);
+
                         break;
 
                     default:
@@ -2762,9 +2797,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             });
 
-            bool canPrintLog =
-                forcePrintLog ||
-                CanPrintAiDetectorLog();
+            bool canPrintAiLog = forcePrintLog || CanPrintAiDetectorLog();
 
             /// <summary>
             /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
@@ -2772,34 +2805,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// 
             /// 실제 수신 / 파싱 / 화면 반영은 계속 수행된다.
             /// </summary>
-            if (!canPrintLog)
+            if (canPrintAiLog)
             {
-                return;
+                ConsoleLogHelper.PrintLine();
+                Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
+                Console.WriteLine();
+                Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
+                Console.WriteLine($"[AI DETECT] [Inference ms] : {result.InferenceMs}");
+                Console.WriteLine($"[AI DETECT] [RTSP Index]   : {result.RtspIndex}");
+                Console.WriteLine($"[AI DETECT] [Count]        : {result.DetectionCount}");
+                Console.WriteLine($"[AI DETECT] [Box Count]    : {result.Boxes.Count}");
+
+                for (int i = 0; i < result.Boxes.Count; i++)
+                {
+                    AiDetectionBox box = result.Boxes[i];
+
+                    Console.WriteLine(
+                        $"[AI BOX #{i + 1}] [ID] {box.ObjectId}, " +
+                        $"[Class] {box.ClassIndex}, " +
+                        $"[Confidence] {box.Confidence * 100:F0}%, " +
+                        $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
+                }
+                ConsoleLogHelper.PrintLine();
             }
 
-            Console.WriteLine("==============================================================================");
-            Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
-            Console.WriteLine("==============================================================================");
-
-            Console.WriteLine($"[AI DETECT] [Receive Time] : {receiveTime:HH:mm:ss.fff}");
-            Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
-            Console.WriteLine($"[AI DETECT] [Inference ms] : {result.InferenceMs}");
-            Console.WriteLine($"[AI DETECT] [RTSP Index]   : {result.RtspIndex}");
-            Console.WriteLine($"[AI DETECT] [Count]        : {result.DetectionCount}");
-            Console.WriteLine($"[AI DETECT] [Box Count]    : {result.Boxes.Count}");
-
-            for (int i = 0; i < result.Boxes.Count; i++)
-            {
-                AiDetectionBox box = result.Boxes[i];
-
-                Console.WriteLine(
-                    $"[AI BOX #{i + 1}] " +
-                    $"[ID] {box.ObjectId}, " +
-                    $"[Class] {box.ClassIndex}, " +
-                    $"[Confidence] {box.Confidence * 100:F0}%, " +
-                    $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
-            }
-            Console.WriteLine("==============================================================================");
         }
 
         #endregion
@@ -2814,10 +2843,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void HandleAiDetectorInfoResponse(string payload)
         {
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 51] Detector Info");
             Console.WriteLine("[AI PAYLOAD] " + payload);
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         /// <summary>
@@ -2831,15 +2860,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             List<AiRtspInfo> rtspList =
                 _aiDetectorPacketParser.ParseRtspListPayload(payload);
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 52] RTSP List");
-
+            Console.WriteLine();
             foreach (AiRtspInfo rtsp in rtspList)
             {
                 Console.WriteLine(
                     $"[RTSP] [Index] {rtsp.Index}, [URL] {rtsp.Url}");
             }
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         /// <summary>
@@ -2853,7 +2882,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             List<AiOnnxInfo> onnxList =
                 _aiDetectorPacketParser.ParseOnnxListPayload(payload);
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 53] ONNX List");
 
             foreach (AiOnnxInfo onnx in onnxList)
@@ -2861,7 +2890,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine(
                     $"[ONNX] [Index] {onnx.Index}, [File] {onnx.FileName}, [Classes] {string.Join(", ", onnx.Classes)}");
             }
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         /// <summary>
@@ -2875,9 +2904,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             List<AiMappingInfo> mappingList =
                 _aiDetectorPacketParser.ParseMappingPayload(payload);
 
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] Mapping Info");
-
+            Console.WriteLine();
             foreach (AiMappingInfo mapping in mappingList)
             {
                 Console.WriteLine(
@@ -2886,7 +2915,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[Confidence] {mapping.Confidence:F2}, " +
                     $"[IOU] {mapping.Iou:F2}");
             }
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -3039,8 +3068,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspOnnxMappingSetRequest(
-                        0,      // RTSP Index
-                        1,      // ONNX Index
                         0.10,
                         0.45);
 
@@ -3072,9 +3099,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private async Task TestRequestAiDetectorInfoAsync()
         {
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI REQUEST] Detector Info Request");
-            Console.WriteLine("=======================================================");
+            ConsoleLogHelper.PrintLine();
 
             await RequestAiDetectorInfoAsync();
         }

@@ -115,6 +115,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Common\AsyncRelayCommand.cs" />
+    <Compile Include="Common\ConsoleLogHelper.cs" />
     <Compile Include="Common\ParameterRelayCommand.cs" />
     <Compile Include="Common\RelayCommand.cs" />
     <Compile Include="Converters\MatToBitmapSourceConverter.cs" />

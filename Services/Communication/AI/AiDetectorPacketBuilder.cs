@@ -104,17 +104,31 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [RTSP] / [ONNX] Mapping 설정 요청 [Packet] 생성
         /// 
         /// 요청 [CMD 05]
-        /// 예: RTSP 0번 채널에 ONNX 1번 모델 연결
-        /// Payload : 0:1^0.10^0.45
+        /// 
+        /// 현재 설정:
+        /// [RTSP 0] => [ONNX 1] / [Confidence] 0.10 / [IOU] 0.45
+        /// [RTSP 1] => [ONNX 2] / [Confidence] 0.10 / [IOU] 0.45
+        /// 
+        /// [RTSP] 항목 간 구분은 [US] [0x1F]를 사용한다.
         /// </summary>
         public byte[] BuildRtspOnnxMappingSetRequest(
-            int rtspIndex,
-            int onnxIndex,
-            double confidence = 0.10,
-            double iou = 0.45)
+            double confidence,
+            double iou)
         {
+            string confidenceText =
+                confidence.ToString(
+                    "0.00",
+                    System.Globalization.CultureInfo.InvariantCulture);
+
+            string iouText =
+                iou.ToString(
+                    "0.00",
+                    System.Globalization.CultureInfo.InvariantCulture);
+
             string payload =
-                $"{rtspIndex}:{onnxIndex}^{confidence:F2}^{iou:F2}";
+                $"0:1^{confidenceText}^{iouText}" +
+                ((char)0x1F).ToString() +
+                $"1:2^{confidenceText}^{iouText}";
 
             return BuildRequestPacket("05", payload);
         }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OpenCvWpfTracking.Common;
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
@@ -107,7 +108,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     return true;
                 }
 
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP] Connect Try...");
                 Console.WriteLine($"[AI TCP] Target : {ip}:{port}");
                 Console.WriteLine();
@@ -125,14 +126,14 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
 
                 Console.WriteLine("[AI TCP] Connect Success.");
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
 
                 try
                 {
@@ -195,9 +196,8 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     {
                         Console.WriteLine(
                             $"[AI TCP] Reconnect Retry After {retryIntervalMs} ms");
-                        Console.WriteLine();
                     }
-
+                    ConsoleLogHelper.PrintLine();
                 }
                 await Task.Delay(retryIntervalMs);
             }
@@ -270,7 +270,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch (Exception ex)
             {
-                Console.WriteLine("=======================================================");
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP ERROR] Receive Failed : " + ex.Message);
             }
             Disconnect();
@@ -312,7 +312,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             {
                 Console.WriteLine(
                     "[AI TCP] Send Failed : Not Connected");
-
+                ConsoleLogHelper.PrintLine();
                 return;
             }
 
@@ -335,6 +335,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 Console.WriteLine(
                     "[AI TCP ERROR] Send Failed : " +
                     ex.Message);
+                ConsoleLogHelper.PrintLine();
             }
 
         }
