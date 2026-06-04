@@ -105,13 +105,15 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// 
         /// 요청 [CMD 05]
         /// 
-        /// 현재 설정:
-        /// [RTSP 0] => [ONNX 1] / [Confidence] 0.10 / [IOU] 0.45
-        /// [RTSP 1] => [ONNX 2] / [Confidence] 0.10 / [IOU] 0.45
+        /// UI에서 입력한 [RTSP 0] / [RTSP 1]별 [ONNX Index],
+        /// [Confidence], [IOU] 값을 기준으로 Mapping 설정 Packet을 생성한다.
         /// 
-        /// [RTSP] 항목 간 구분은 [US] [0x1F]를 사용한다.
+        /// 생성 Payload 예:
+        /// 0:1^0.10^0.45[US]1:2^0.10^0.45
         /// </summary>
         public byte[] BuildRtspOnnxMappingSetRequest(
+            int rtsp0OnnxIndex,
+            int rtsp1OnnxIndex,
             double confidence,
             double iou)
         {
@@ -126,9 +128,9 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                     System.Globalization.CultureInfo.InvariantCulture);
 
             string payload =
-                $"0:1^{confidenceText}^{iouText}" +
+                $"0:{rtsp0OnnxIndex}^{confidenceText}^{iouText}" +
                 ((char)0x1F).ToString() +
-                $"1:2^{confidenceText}^{iouText}";
+                $"1:{rtsp1OnnxIndex}^{confidenceText}^{iouText}";
 
             return BuildRequestPacket("05", payload);
         }

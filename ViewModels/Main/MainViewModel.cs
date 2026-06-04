@@ -290,7 +290,65 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector] 탐지 로그 출력 간격
         /// </summary>
-        private const int AiDetectorLogIntervalSeconds = 1;
+        private const int AiDetectorLogIntervalSeconds = 3;
+
+        #endregion
+
+        #region [AI Detector Setting Fields]
+
+        /// <summary>
+        /// [AI Detector Agent] 연결 IP
+        /// </summary>
+        private string _aiAgentIp = "192.168.20.160";
+
+        /// <summary>
+        /// [AI Detector Agent] 연결 Port
+        /// </summary>
+        private int _aiAgentPort = 5055;
+
+        /// <summary>
+        /// [AI Detector Agent] 분석 대상 [RTSP Index 0] 주소
+        /// 
+        /// 기본값은 [EO] 영상 주소를 사용한다.
+        /// </summary>
+        private string _aiRtsp0Address;
+
+        /// <summary>
+        /// [AI Detector Agent] 분석 대상 [RTSP Index 1] 주소
+        /// 
+        /// 기본값은 [IR] 영상 주소를 사용한다.
+        /// </summary>
+        private string _aiRtsp1Address;
+
+        /// <summary>
+        /// [RTSP Index 0]에 연결할 [ONNX Index]
+        /// </summary>
+        private int _aiRtsp0OnnxIndex = 1;
+
+        /// <summary>
+        /// [RTSP Index 1]에 연결할 [ONNX Index]
+        /// </summary>
+        private int _aiRtsp1OnnxIndex = 2;
+
+        /// <summary>
+        /// [AI Detector] Mapping Confidence 기준값
+        /// </summary>
+        private double _aiMappingConfidence = 0.10;
+
+        /// <summary>
+        /// [AI Detector] Mapping IOU 기준값
+        /// </summary>
+        private double _aiMappingIou = 0.45;
+
+        /// <summary>
+        /// 화면에 표시할 [Bounding Box] 최소 신뢰도 기준값
+        /// </summary>
+        private double _aiDisplayConfidenceThreshold = 0.40;
+
+        /// <summary>
+        /// [AI Detector Setting] 상태 표시 문자열
+        /// </summary>
+        private string _aiSettingStatusText = "AI Setting Ready";
 
         #endregion
 
@@ -472,6 +530,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [AI Detector Setting Commands]
+
+        /// <summary>
+        /// [AI Detector Agent] 수동 연결 [Command]
+        /// </summary>
+        public ICommand ConnectAiAgentCommand { get; }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] 주소 설정 적용 [Command]
+        /// </summary>
+        public ICommand ApplyAiRtspCommand { get; }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] / [ONNX] Mapping 설정 적용 [Command]
+        /// </summary>
+        public ICommand ApplyAiMappingCommand { get; }
+
+        /// <summary>
+        /// [AI Detector Agent] 현재 설정 조회 [Command]
+        /// </summary>
+        public ICommand RefreshAiSettingCommand { get; }
+
+        #endregion
+
         #endregion
 
         #region [Constructor]
@@ -498,6 +580,92 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// 영상 스트림 및 [LA] [TCP] 통신 연결을 종료한다.
             /// </summary>
             DisconnectCommand = new RelayCommand(Disconnect);
+
+            #endregion
+
+            #region [AI Detector Setting Command Binding]
+
+            #region [AI Detector Setting Command Binding]
+
+            /// <summary>
+            /// [AI Detector Agent] 수동 연결
+            /// 
+            /// UI에 입력된 [IP] / [Port] 기준으로
+            /// [AI Detector Agent] 자동 재연결 루프를 시작한다.
+            /// </summary>
+            ConnectAiAgentCommand =
+                new RelayCommand(() =>
+                {
+                    AiSettingStatusText = "[AI] Auto Reconnect Start...";
+
+                    _ = _aiDetectorClientService.StartAutoReconnectAsync(
+                        AiAgentIp,
+                        AiAgentPort,
+                        3000);
+
+                    AiSettingStatusText = "[AI] Auto Reconnect Started";
+                });
+
+            /// <summary>
+            /// [AI Detector Agent] [RTSP] 주소 적용
+            /// 
+            /// UI에 입력한 [RTSP 0] / [RTSP 1] 주소를
+            /// [CMD 02] 요청 Packet으로 송신한다.
+            /// </summary>
+            ApplyAiRtspCommand =
+                new AsyncRelayCommand(
+                    async () =>
+                    {
+                        AiSettingStatusText = "[AI] Apply RTSP...";
+
+                        await RequestAiDetectorRtspAddressSetAsync();
+
+                        AiSettingStatusText = "[AI] RTSP Apply Complete";
+                    });
+
+            /// <summary>
+            /// [AI Detector Agent] Mapping 설정 적용
+            /// 
+            /// UI에 입력한 [ONNX Index] / [Confidence] / [IOU] 값을
+            /// [CMD 05] 요청 Packet으로 송신한다.
+            /// </summary>
+            ApplyAiMappingCommand =
+                new AsyncRelayCommand(
+                    async () =>
+                    {
+                        AiSettingStatusText = "[AI] Apply Mapping...";
+
+                        await RequestAiDetectorMappingSetAsync();
+
+                        AiSettingStatusText = "[AI] Mapping Apply Complete";
+                    });
+
+            /// <summary>
+            /// [AI Detector Agent] 현재 설정 조회
+            /// 
+            /// [Detector Info] / [RTSP List] / [ONNX List] / [Mapping Info]를 순차 조회한다.
+            /// </summary>
+            RefreshAiSettingCommand =
+                new AsyncRelayCommand(
+                    async () =>
+                    {
+                        AiSettingStatusText = "[AI] Refresh Setting...";
+
+                        await RequestAiDetectorInfoAsync();
+                        await Task.Delay(200);
+
+                        await RequestAiDetectorRtspAddressAsync();
+                        await Task.Delay(200);
+
+                        await RequestAiDetectorOnnxListAsync();
+                        await Task.Delay(200);
+
+                        await RequestAiDetectorMappingAsync();
+
+                        AiSettingStatusText = "[AI] Refresh Complete";
+                    });
+
+            #endregion
 
             #endregion
 
@@ -743,11 +911,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             InitializeDefaultSourceAddress();
 
+
+            /// <summary>
+            /// [AI Detector] 설정 기본값 초기화
+            /// </summary>
+            InitializeAiDetectorSetting();
+
             ConsoleLogHelper.PrintLine();
             Console.WriteLine("[LA] Service Initialize Complete");
             ConsoleLogHelper.PrintLine();
 
             #endregion
+
         }
 
         #endregion
@@ -900,6 +1075,190 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 _irVideoHeight = value;
                 OnPropertyChanged();
+            }
+
+        }
+
+        #endregion
+
+        #region [AI Detector Setting Properties]
+
+        /// <summary>
+        /// [AI Detector Agent] 연결 IP
+        /// </summary>
+        public string AiAgentIp
+        {
+            get => _aiAgentIp;
+            set
+            {
+                if (_aiAgentIp != value)
+                {
+                    _aiAgentIp = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] 연결 Port
+        /// </summary>
+        public int AiAgentPort
+        {
+            get => _aiAgentPort;
+            set
+            {
+                if (_aiAgentPort != value)
+                {
+                    _aiAgentPort = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP Index 0] 주소
+        /// </summary>
+        public string AiRtsp0Address
+        {
+            get => _aiRtsp0Address;
+            set
+            {
+                if (_aiRtsp0Address != value)
+                {
+                    _aiRtsp0Address = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP Index 1] 주소
+        /// </summary>
+        public string AiRtsp1Address
+        {
+            get => _aiRtsp1Address;
+            set
+            {
+                if (_aiRtsp1Address != value)
+                {
+                    _aiRtsp1Address = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [RTSP Index 0]에 적용할 [ONNX Index]
+        /// </summary>
+        public int AiRtsp0OnnxIndex
+        {
+            get => _aiRtsp0OnnxIndex;
+            set
+            {
+                if (_aiRtsp0OnnxIndex != value)
+                {
+                    _aiRtsp0OnnxIndex = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [RTSP Index 1]에 적용할 [ONNX Index]
+        /// </summary>
+        public int AiRtsp1OnnxIndex
+        {
+            get => _aiRtsp1OnnxIndex;
+            set
+            {
+                if (_aiRtsp1OnnxIndex != value)
+                {
+                    _aiRtsp1OnnxIndex = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector] Mapping Confidence 기준값
+        /// </summary>
+        public double AiMappingConfidence
+        {
+            get => _aiMappingConfidence;
+            set
+            {
+                if (_aiMappingConfidence != value)
+                {
+                    _aiMappingConfidence = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector] Mapping IOU 기준값
+        /// </summary>
+        public double AiMappingIou
+        {
+            get => _aiMappingIou;
+            set
+            {
+                if (_aiMappingIou != value)
+                {
+                    _aiMappingIou = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// 화면 표시용 [Bounding Box] 최소 신뢰도 기준값
+        /// </summary>
+        public double AiDisplayConfidenceThreshold
+        {
+            get => _aiDisplayConfidenceThreshold;
+            set
+            {
+                if (_aiDisplayConfidenceThreshold != value)
+                {
+                    _aiDisplayConfidenceThreshold = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
+
+        /// <summary>
+        /// [AI Detector Setting] 상태 표시 문자열
+        /// </summary>
+        public string AiSettingStatusText
+        {
+            get => _aiSettingStatusText;
+            private set
+            {
+                if (_aiSettingStatusText != value)
+                {
+                    _aiSettingStatusText = value;
+                    OnPropertyChanged();
+                }
+
             }
 
         }
@@ -1079,6 +1438,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public ObservableCollection<AiDetectionBox> IrDetectionBoxes { get; }
             = new ObservableCollection<AiDetectionBox>();
 
+        /// <summary>
+        /// [AI Detector Agent]에서 조회한 [RTSP] 목록
+        /// 
+        /// [CMD 52] 응답 결과를 화면에 표시하기 위해 사용한다.
+        /// </summary>
+        public ObservableCollection<AiRtspInfo> AiRtspList { get; }
+            = new ObservableCollection<AiRtspInfo>();
+
+        /// <summary>
+        /// [AI Detector Agent]에서 조회한 [ONNX] 모델 목록
+        /// 
+        /// [CMD 53] 응답 결과를 화면에 표시하기 위해 사용한다.
+        /// </summary>
+        public ObservableCollection<AiOnnxInfo> AiOnnxList { get; }
+            = new ObservableCollection<AiOnnxInfo>();
+
+        /// <summary>
+        /// [AI Detector Agent]에서 조회한 [RTSP] / [ONNX] Mapping 목록
+        /// 
+        /// [CMD 56] 응답 결과를 화면에 표시하기 위해 사용한다.
+        /// </summary>
+        public ObservableCollection<AiMappingInfo> AiMappingList { get; }
+            = new ObservableCollection<AiMappingInfo>();
+
         #endregion
 
         #region [Initialize]
@@ -1158,6 +1541,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
             // 4-2. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
             //    "rtsp://admin:Cg600ip100m@192.168.1.30:554/stream1";
+        }
+
+        /// <summary>
+        /// [AI Detector] 설정 기본값 초기화
+        /// 
+        /// Viewer에서 사용하는 [EO] / [IR] 주소를
+        /// [AI Detector Agent]의 [RTSP 0] / [RTSP 1] 기본값으로 복사한다.
+        /// </summary>
+        private void InitializeAiDetectorSetting()
+        {
+            AiRtsp0Address = EoSourceAddress;
+            AiRtsp1Address = IrSourceAddress;
+
+            AiRtsp0OnnxIndex = 1;
+            AiRtsp1OnnxIndex = 2;
+
+            AiMappingConfidence = 0.10;
+            AiMappingIou = 0.45;
+
+            AiDisplayConfidenceThreshold = 0.40;
         }
 
         #endregion
@@ -1568,8 +1971,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 중간에 종료 후 재실행되어도 일정 주기로 재연결을 시도한다.
                 /// </summary>
                 _ = _aiDetectorClientService.StartAutoReconnectAsync(
-                        "192.168.20.160",
-                        5055,
+                        AiAgentIp,
+                        AiAgentPort,
                         3000);
 
                 /// <summary>
@@ -2652,6 +3055,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             switch (command)
             {
+                case "50":
+                    /// <summary>
+                    /// [CMD 50] 설정 요청 결과 응답
+                    /// 
+                    /// [CMD 02] RTSP 주소 설정,
+                    /// [CMD 05] RTSP / ONNX Mapping 설정 등
+                    /// 설정 계열 요청 이후 수신되는 결과 Packet.
+                    /// 
+                    /// 현재 확인 기준:
+                    /// Payload "o" => 설정 성공
+                    /// 그 외 값       => Agent 응답 원문 출력
+                    /// </summary>
+                    if (payload == "o")
+                    {
+                        Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 50] Setting Result : OK");
+                        AiSettingStatusText = "[AI] Setting Result : OK";
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"[AI DETECTOR RESPONSE] [CMD 50] Setting Result : {payload}");
+
+                        AiSettingStatusText =
+                            $"[AI] Setting Result : {payload}";
+                    }
+                    break;
+
                 case "51":
                     HandleAiDetectorInfoResponse(payload);
                     break;
@@ -2754,7 +3184,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         /// </summary>
                         List<AiDetectionBox> rtspIndex0DisplayBoxes =
                             result.Boxes
-                                .Where(box => box.Confidence >= 0.4)
+                                .Where(box => box.Confidence >= AiDisplayConfidenceThreshold)
                                 .ToList();
 
                         UpdateDetectionBoxes(
@@ -2780,7 +3210,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         /// </summary>
                         List<AiDetectionBox> rtspIndex1DisplayBoxes =
                             result.Boxes
-                                .Where(box => box.Confidence >= 0.4)
+                                .Where(box => box.Confidence >= AiDisplayConfidenceThreshold)
                                 .ToList();
 
                         UpdateDetectionBoxes(
@@ -2857,17 +3287,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void HandleAiDetectorRtspResponse(string payload)
         {
-            List<AiRtspInfo> rtspList =
-                _aiDetectorPacketParser.ParseRtspListPayload(payload);
-
             ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 52] RTSP List");
             Console.WriteLine();
+
+            List<AiRtspInfo> rtspList =
+                _aiDetectorPacketParser.ParseRtspListPayload(payload);
+
             foreach (AiRtspInfo rtsp in rtspList)
             {
                 Console.WriteLine(
                     $"[RTSP] [Index] {rtsp.Index}, [URL] {rtsp.Url}");
             }
+            // [AI Detector Agent][RTSP] 조회 결과를 [UI Collection]에 반영
+            UpdateAiRtspList(rtspList);
+
             ConsoleLogHelper.PrintLine();
         }
 
@@ -2879,17 +3313,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void HandleAiDetectorOnnxResponse(string payload)
         {
-            List<AiOnnxInfo> onnxList =
-                _aiDetectorPacketParser.ParseOnnxListPayload(payload);
-
             ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 53] ONNX List");
+
+            List<AiOnnxInfo> onnxList =
+                _aiDetectorPacketParser.ParseOnnxListPayload(payload);
 
             foreach (AiOnnxInfo onnx in onnxList)
             {
                 Console.WriteLine(
-                    $"[ONNX] [Index] {onnx.Index}, [File] {onnx.FileName}, [Classes] {string.Join(", ", onnx.Classes)}");
+                    $"[ONNX] [Index] {onnx.Index}, " +
+                    $"[File] {onnx.FileName}, " +
+                    $"[Classes] {string.Join(", ", onnx.Classes)}");
             }
+            // [AI Detector Agent] [ONNX] 조회 결과를 [UI Collection]에 반영
+            UpdateAiOnnxList(onnxList);
+
             ConsoleLogHelper.PrintLine();
         }
 
@@ -2901,12 +3340,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void HandleAiDetectorMappingResponse(string payload)
         {
-            List<AiMappingInfo> mappingList =
-                _aiDetectorPacketParser.ParseMappingPayload(payload);
-
             ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] Mapping Info");
             Console.WriteLine();
+
+            List<AiMappingInfo> mappingList =
+                _aiDetectorPacketParser.ParseMappingPayload(payload);
+
             foreach (AiMappingInfo mapping in mappingList)
             {
                 Console.WriteLine(
@@ -2915,6 +3355,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[Confidence] {mapping.Confidence:F2}, " +
                     $"[IOU] {mapping.Iou:F2}");
             }
+            // [AI Detector Agent] [RTSP] / [ONNX] Mapping 조회 결과를 [UI Collection]에 반영
+            UpdateAiMappingList(mappingList);
+
             ConsoleLogHelper.PrintLine();
         }
 
@@ -3011,16 +3454,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector Agent] [RTSP] 주소 설정 요청
         /// 
-        /// 현재 [OpenCvWpfTracking]에서 사용하는
-        /// [EO] / [IR] [RTSP] 주소를 [AI Detector Agent]에 전달한다.
+        /// UI에서 입력한 [RTSP 0] / [RTSP 1] 주소를
+        /// [AI Detector Agent]에 전달한다.
         /// </summary>
         private async Task RequestAiDetectorRtspAddressSetAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspAddressSetRequest(
-                        EoSourceAddress,
-                        IrSourceAddress);
+                        AiRtsp0Address,
+                        AiRtsp1Address);
 
             await _aiDetectorClientService
                 .SendAsync(packet);
@@ -3061,15 +3504,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector Agent] [RTSP] / [ONNX] Mapping 설정 요청
         /// 
-        /// RTSP 0번 채널에 ONNX 1번 모델을 연결한다.
+        /// UI에서 입력한 [RTSP 0] / [RTSP 1]별 [ONNX Index],
+        /// [Confidence], [IOU] 값을 기준으로 [CMD 05] Packet을 송신한다.
         /// </summary>
         private async Task RequestAiDetectorMappingSetAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspOnnxMappingSetRequest(
-                        0.10,
-                        0.45);
+                        AiRtsp0OnnxIndex,
+                        AiRtsp1OnnxIndex,
+                        AiMappingConfidence,
+                        AiMappingIou);
 
             await _aiDetectorClientService
                 .SendAsync(packet);
@@ -3126,6 +3572,67 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 targetBoxes.Add(box);
             }
+
+        }
+
+        #endregion
+
+        #region [AI Detector UI Update Helpers]
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] 조회 결과를 [UI Collection]에 반영한다.
+        /// </summary>
+        private void UpdateAiRtspList(
+            List<AiRtspInfo> rtspList)
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                AiRtspList.Clear();
+
+                foreach (AiRtspInfo rtspInfo in rtspList)
+                {
+                    AiRtspList.Add(rtspInfo);
+                }
+
+            });
+
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] [ONNX] 조회 결과를 [UI Collection]에 반영한다.
+        /// </summary>
+        private void UpdateAiOnnxList(
+            List<AiOnnxInfo> onnxList)
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                AiOnnxList.Clear();
+
+                foreach (AiOnnxInfo onnxInfo in onnxList)
+                {
+                    AiOnnxList.Add(onnxInfo);
+                }
+
+            });
+
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] / [ONNX] Mapping 조회 결과를 [UI Collection]에 반영한다.
+        /// </summary>
+        private void UpdateAiMappingList(
+            List<AiMappingInfo> mappingList)
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                AiMappingList.Clear();
+
+                foreach (AiMappingInfo mappingInfo in mappingList)
+                {
+                    AiMappingList.Add(mappingInfo);
+                }
+
+            });
 
         }
 

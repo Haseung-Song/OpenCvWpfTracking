@@ -674,6 +674,342 @@
 
         </Grid>
 
+        <!-- [AI Detector] 설정 패널 -->
+        <Border Grid.Row="1"
+                Margin="8,6,8,8"
+                Background="#3F464D"
+                BorderBrush="#8B949E"
+                BorderThickness="2"
+                CornerRadius="4"
+                Padding="8">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 제목 -->
+                <TextBlock Grid.Row="0"
+                           Text="AI DETECTOR SETTING"
+                           Foreground="White"
+                           FontSize="15"
+                           FontWeight="Bold"
+                           Margin="0,0,0,6"/>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="2.5*"/>
+                        <ColumnDefinition Width="1.6*"/>
+                        <ColumnDefinition Width="1.2*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- [1] AI Agent 연결 설정 -->
+                    <GroupBox Grid.Column="0"
+                              Header="AI Agent"
+                              Foreground="White"
+                              Margin="0,0,8,0">
+
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="IP"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiAgentIp, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="Port"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiAgentPort, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <Button Grid.Row="2"
+                                    Grid.ColumnSpan="2"
+                                    Content="AI CONNECT"
+                                    Height="28"
+                                    Margin="0,5,0,0"
+                                    FontWeight="Bold"
+                                    Command="{Binding ConnectAiAgentCommand}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- [2] RTSP 주소 설정 -->
+                    <GroupBox Grid.Column="1"
+                              Header="RTSP Setting"
+                              Foreground="White"
+                              Margin="0,0,8,0">
+
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="RTSP 0"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiRtsp0Address, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="RTSP 1"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiRtsp1Address, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <Button Grid.Row="2"
+                                    Grid.ColumnSpan="2"
+                                    Content="APPLY RTSP"
+                                    Height="28"
+                                    Margin="0,5,0,0"
+                                    FontWeight="Bold"
+                                    Command="{Binding ApplyAiRtspCommand}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- [3] Mapping 설정 -->
+                    <GroupBox Grid.Column="2"
+                              Header="Mapping Setting"
+                              Foreground="White"
+                              Margin="0,0,8,0">
+
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="RTSP0 ONNX"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <ComboBox Grid.Row="0"
+                                      Grid.Column="1"
+                                      Height="24"
+                                      Margin="0,0,0,5"
+                                      ItemsSource="{Binding AiOnnxList}"
+                                      SelectedValue="{Binding AiRtsp0OnnxIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedValuePath="Index"
+                                      DisplayMemberPath="FileName"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="RTSP1 ONNX"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      Height="24"
+                                      Margin="0,0,0,5"
+                                      ItemsSource="{Binding AiOnnxList}"
+                                      SelectedValue="{Binding AiRtsp1OnnxIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedValuePath="Index"
+                                      DisplayMemberPath="FileName"/>
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Confidence"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiMappingConfidence, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="3"
+                                       Grid.Column="0"
+                                       Text="IOU"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="3"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiMappingIou, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <Button Grid.Row="4"
+                                    Grid.ColumnSpan="2"
+                                    Content="APPLY MAPPING"
+                                    Height="28"
+                                    Margin="0,5,0,0"
+                                    FontWeight="Bold"
+                                    Command="{Binding ApplyAiMappingCommand}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- [4] 표시 / 조회 설정 -->
+                    <GroupBox Grid.Column="3"
+                              Header="Display / Query"
+                              Foreground="White">
+
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="85"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="Box Filter"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,5"/>
+
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Margin="0,0,0,5"
+                                     Text="{Binding AiDisplayConfidenceThreshold, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <Button Grid.Row="1"
+                                    Grid.ColumnSpan="2"
+                                    Content="REFRESH AI INFO"
+                                    Height="28"
+                                    Margin="0,5,0,0"
+                                    FontWeight="Bold"
+                                    Command="{Binding RefreshAiSettingCommand}"/>
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.ColumnSpan="2"
+                                       Text="{Binding AiSettingStatusText}"
+                                       Foreground="#00E676"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,6"/>
+
+                            <TabControl Grid.Row="3"
+                                        Grid.ColumnSpan="2"
+                                        FontSize="11">
+
+                                <TabItem Header="RTSP">
+                                    <ListBox ItemsSource="{Binding AiRtspList}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock TextWrapping="Wrap">
+                                <Run Text="{Binding Index}"/>
+                                <Run Text=" : "/>
+                                <Run Text="{Binding Url}"/>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </TabItem>
+
+                                <TabItem Header="ONNX">
+                                    <ListBox ItemsSource="{Binding AiOnnxList}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <TextBlock FontWeight="Bold">
+                                    <Run Text="{Binding Index}"/>
+                                    <Run Text=" : "/>
+                                    <Run Text="{Binding FileName}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </TabItem>
+
+                                <TabItem Header="MAP">
+                                    <ListBox ItemsSource="{Binding AiMappingList}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock>
+                                <Run Text="RTSP "/>
+                                <Run Text="{Binding RtspIndex}"/>
+                                <Run Text=" → ONNX "/>
+                                <Run Text="{Binding OnnxIndex}"/>
+                                <Run Text=" / C "/>
+                                <Run Text="{Binding Confidence}"/>
+                                <Run Text=" / I "/>
+                                <Run Text="{Binding Iou}"/>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </TabItem>
+                            </TabControl>
+                        </Grid>
+                    </GroupBox>
+
+                </Grid>
+            </Grid>
+
+        </Border>
+
     </Grid>
 
 </Window>
