@@ -166,6 +166,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         {
             if (_isReconnectLoopStarted)
             {
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP] Auto Reconnect Already Running.");
                 return;
             }

@@ -1203,11 +1203,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiMappingConfidence = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(AiMappingConfidenceText));
                 }
 
             }
 
         }
+
+        /// <summary>
+        /// [AI Detector] Mapping Confidence 화면 표시 문자열
+        /// </summary>
+        public string AiMappingConfidenceText =>
+            AiMappingConfidence.ToString("0.00");
 
         /// <summary>
         /// [AI Detector] Mapping IOU 기준값
@@ -1221,11 +1228,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiMappingIou = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(AiMappingIouText));
                 }
 
             }
 
         }
+
+        /// <summary>
+        /// [AI Detector] Mapping IOU 화면 표시 문자열
+        /// </summary>
+        public string AiMappingIouText =>
+            AiMappingIou.ToString("0.00");
 
         /// <summary>
         /// 화면 표시용 [Bounding Box] 최소 신뢰도 기준값
@@ -1239,11 +1253,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiDisplayConfidenceThreshold = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(AiDisplayConfidenceThresholdText));
                 }
 
             }
 
         }
+
+        /// <summary>
+        /// [AI Detector] 화면 표시용 [Bounding Box] 최소 신뢰도 표시 문자열
+        /// </summary>
+        public string AiDisplayConfidenceThresholdText =>
+            AiDisplayConfidenceThreshold.ToString("0.00");
 
         /// <summary>
         /// [AI Detector Setting] 상태 표시 문자열
@@ -2706,16 +2727,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     break;
 
                 case 0x07:
-                    /// <summary>
-                    /// [Alive] 또는 [ACK] 계열 Packet
-                    /// </summary>
-                    if (!canPrintLog)
-                        break;
 
-                    ConsoleLogHelper.PrintLine();
-                    Console.WriteLine("[LA PACKET] [Alive] / [ACK] Packet");
-                    Console.WriteLine();
-                    ConsoleLogHelper.PrintLine();
+                    /// <summary>
+                    /// [Alive] / [ACK]
+                    /// 
+                    /// 정상 Heartbeat Packet
+                    /// Console 출력 생략
+                    /// </summary>
                     break;
 
                 case 0xA1:
@@ -2739,6 +2757,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     ParseLaExtendedStatusPacket(packet.RawData);
 
                     ConsoleLogHelper.PrintLine();
+                    break;
+
+                case 0xA3:
+
+                    /// <summary>
+                    /// [Function] [0xA3]
+                    /// 
+                    /// 현재 장비에서 주기적으로 수신되는
+                    /// 확장 상태 Packet
+                    /// 
+                    /// 세부 의미 미확인
+                    /// Console 출력 생략
+                    /// </summary>
                     break;
 
                 case 0x04:
@@ -3069,16 +3100,20 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     /// </summary>
                     if (payload == "o")
                     {
+                        Console.WriteLine();
                         Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 50] Setting Result : OK");
                         AiSettingStatusText = "[AI] Setting Result : OK";
+                        Console.WriteLine();
                     }
                     else
                     {
+                        Console.WriteLine();
                         Console.WriteLine(
                             $"[AI DETECTOR RESPONSE] [CMD 50] Setting Result : {payload}");
 
                         AiSettingStatusText =
                             $"[AI] Setting Result : {payload}";
+                        Console.WriteLine();
                     }
                     break;
 
@@ -3227,7 +3262,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             });
 
-            bool canPrintAiLog = forcePrintLog || CanPrintAiDetectorLog();
+            /// <summary>
+            /// 탐지 객체 존재 여부
+            /// 
+            /// 객체가 없는 경우에는
+            /// Console 출력만 생략한다.
+            /// </summary>
+            bool hasDetection =
+                result.DetectionCount > 0 ||
+                result.Boxes.Count > 0;
+
+            bool canPrintAiLog = hasDetection && (forcePrintLog || CanPrintAiDetectorLog());
 
             /// <summary>
             /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
@@ -3237,7 +3282,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             if (canPrintAiLog)
             {
-                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
                 Console.WriteLine();
                 Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
@@ -3459,6 +3503,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private async Task RequestAiDetectorRtspAddressSetAsync()
         {
+            /// <summary>
+            /// [Viewer] 영상 연결 주소 갱신
+            /// 
+            /// 이후 장비 연결 해제 후 다시 연결하면
+            /// 변경된 RTSP 주소로 [EO] / [IR] 영상 연결을 시도한다.
+            /// </summary>
+            EoSourceAddress = AiRtsp0Address;
+            IrSourceAddress = AiRtsp1Address;
+
+            OnPropertyChanged(nameof(EoSourceAddress));
+            OnPropertyChanged(nameof(IrSourceAddress));
+            OnPropertyChanged(nameof(SourceAddress));
+
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspAddressSetRequest(
@@ -3613,6 +3670,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     AiOnnxList.Add(onnxInfo);
                 }
 
+                /// <summary>
+                /// [ONNX] 목록 조회 후 선택값 보정
+                /// 
+                /// 현재 선택된 [ONNX Index]가 목록에 없으면
+                /// 데모 기본 Mapping 기준으로 다시 설정한다.
+                /// </summary>
+                if (!AiOnnxList.Any(onnx => onnx.Index == AiRtsp0OnnxIndex))
+                {
+                    AiRtsp0OnnxIndex = AiOnnxList.Any(onnx => onnx.Index == 1)
+                        ? 1
+                        : AiOnnxList.FirstOrDefault()?.Index ?? 0;
+                }
+
+                if (!AiOnnxList.Any(onnx => onnx.Index == AiRtsp1OnnxIndex))
+                {
+                    AiRtsp1OnnxIndex = AiOnnxList.Any(onnx => onnx.Index == 2)
+                        ? 2
+                        : AiOnnxList.FirstOrDefault()?.Index ?? 0;
+                }
+                OnPropertyChanged(nameof(AiRtsp0OnnxIndex));
+                OnPropertyChanged(nameof(AiRtsp1OnnxIndex));
             });
 
         }
