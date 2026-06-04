@@ -210,7 +210,217 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
         #endregion
 
+        #region [Response Payload Parse]
+
+        /// <summary>
+        /// [CMD 52] [RTSP] 주소 목록 [Payload] 파싱
+        /// 
+        /// [Payload] 예:
+        /// rtsp://... [US] rtsp://...
+        /// </summary>
+        public List<AiRtspInfo> ParseRtspListPayload(string payload)
+        {
+            List<AiRtspInfo> rtspList = new List<AiRtspInfo>();
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return rtspList;
+            }
+
+            string[] tokens = payload.Split(
+                new[] { PayloadSeparator },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                rtspList.Add(
+                    new AiRtspInfo
+                    {
+                        Index = i,
+                        Url = tokens[i]
+                    });
+            }
+            return rtspList;
+        }
+
+        /// <summary>
+        /// [CMD 53] [ONNX] 목록 [Payload] 파싱
+        /// 
+        /// [Payload] 예:
+        /// best.onnx:person,ship,car,drone [US] best_uav.onnx:uav
+        /// </summary>
+        public List<AiOnnxInfo> ParseOnnxListPayload(string payload)
+        {
+            List<AiOnnxInfo> onnxList = new List<AiOnnxInfo>();
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return onnxList;
+            }
+
+            string[] tokens = payload.Split(
+                new[] { PayloadSeparator },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                string[] parts = tokens[i].Split(':');
+
+                AiOnnxInfo info = new AiOnnxInfo
+                {
+                    Index = i,
+                    FileName = parts[0]
+                };
+
+                if (parts.Length > 1)
+                {
+                    string[] classes = parts[1].Split(',');
+
+                    foreach (string className in classes)
+                    {
+                        info.Classes.Add(className);
+                    }
+                }
+                onnxList.Add(info);
+            }
+            return onnxList;
+        }
+
+        /// <summary>
+        /// [CMD 54 / 56] [RTSP] / [ONNX] Mapping [Payload] 파싱
+        /// 
+        /// [Payload] 예:
+        /// 0:1^0.10^0.45 [US] 1:0^0.10^0.45,1^0.10^0.45
+        /// </summary>
+        public List<AiMappingInfo> ParseMappingPayload(string payload)
+        {
+            List<AiMappingInfo> mappingList = new List<AiMappingInfo>();
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return mappingList;
+            }
+
+            string[] rtspTokens = payload.Split(
+                new[] { PayloadSeparator },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string rtspToken in rtspTokens)
+            {
+                string[] rtspParts = rtspToken.Split(':');
+
+                if (rtspParts.Length != 2)
+                {
+                    continue;
+                }
+
+                int rtspIndex;
+
+                if (!int.TryParse(rtspParts[0], out rtspIndex))
+                {
+                    continue;
+                }
+
+                string[] mappingTokens = rtspParts[1].Split(',');
+
+                foreach (string mappingToken in mappingTokens)
+                {
+                    string[] values = mappingToken.Split('^');
+
+                    if (values.Length != 3)
+                    {
+                        continue;
+                    }
+
+                    int onnxIndex;
+                    double confidence;
+                    double iou;
+
+                    if (!int.TryParse(values[0], out onnxIndex))
+                    {
+                        continue;
+                    }
+
+                    if (!double.TryParse(
+                        values[1],
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out confidence))
+                    {
+                        continue;
+                    }
+
+                    if (!double.TryParse(
+                        values[2],
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out iou))
+                    {
+                        continue;
+                    }
+
+                    mappingList.Add(
+                        new AiMappingInfo
+                        {
+                            RtspIndex = rtspIndex,
+                            OnnxIndex = onnxIndex,
+                            Confidence = confidence,
+                            Iou = iou
+                        });
+                }
+
+            }
+            return mappingList;
+        }
+
+        #endregion
+
+
+
+
+
+
+
+
         #region [Common Packet Parse]
+
+        /// <summary>
+        /// [AI] [Packet] 공통 구조를 외부에서 파싱한다.
+        /// 
+        /// [CMD 55] 탐지데이터 외에도
+        /// [CMD 51] / [CMD 52] / [CMD 53] / [CMD 54] / [CMD 56]
+        /// 응답 [Packet]을 구분하기 위해 사용한다.
+        /// 
+        /// 내부적으로 [TryParsePacket()]을 호출하여
+        /// [STX] / [CMD] / [SIZE] / [Payload] / [Checksum] / [ETX] 검증을 수행한다.
+        /// </summary>
+        /// <param name="packet">수신된 [AI] [Packet]</param>
+        /// <param name="command">[Packet] [CMD]</param>
+        /// <param name="payload">[Packet] [Payload]</param>
+        /// <returns>정상 [Packet] 여부</returns>
+        public bool TryParseCommonPacket(
+            byte[] packet,
+            out string command,
+            out string payload)
+        {
+            bool checksumValid;
+
+            if (!TryParsePacket(
+                packet,
+                out command,
+                out payload,
+                out checksumValid))
+            {
+                return false;
+            }
+
+            if (!checksumValid)
+            {
+                Console.WriteLine("[AI PARSER] Checksum Invalid.");
+                return false;
+            }
+            return true;
+        }
 
         /// <summary>
         /// [AI] [Packet] 공통 구조를 파싱한다.

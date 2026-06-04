@@ -38,6 +38,13 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
         #endregion
 
+        /// <summary>
+        /// 요청 [Payload] 파라미터 구분자
+        /// 
+        /// 요청 Packet은 문서 기준 [Space] 구분자를 사용한다.
+        /// </summary>
+        private const char RequestSeparator = ' ';
+
         #region [Request Packet Builder]
 
         /// <summary>
@@ -49,6 +56,26 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         public byte[] BuildAiDetectorInfoRequest()
         {
             return BuildRequestPacket("01", string.Empty);
+        }
+
+        /// <summary>
+        /// [RTSP] 주소 설정 요청 [Packet] 생성
+        /// 
+        /// 요청 [CMD 02]
+        /// 
+        /// [RTSP] 주소 목록은 [US] [Unit Separator] [0x1F] 기준으로 구분한다.
+        /// </summary>
+        public byte[] BuildRtspAddressSetRequest(
+            string eoRtspAddress,
+            string irRtspAddress)
+        {
+            string payload =
+                string.Join(
+                    ((char)0x1F).ToString(),
+                    eoRtspAddress,
+                    irRtspAddress);
+
+            return BuildRequestPacket("02", payload);
         }
 
         /// <summary>
@@ -71,6 +98,25 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         public byte[] BuildOnnxListRequest()
         {
             return BuildRequestPacket("04", string.Empty);
+        }
+
+        /// <summary>
+        /// [RTSP] / [ONNX] Mapping 설정 요청 [Packet] 생성
+        /// 
+        /// 요청 [CMD 05]
+        /// 예: RTSP 0번 채널에 ONNX 1번 모델 연결
+        /// Payload : 0:1^0.10^0.45
+        /// </summary>
+        public byte[] BuildRtspOnnxMappingSetRequest(
+            int rtspIndex,
+            int onnxIndex,
+            double confidence = 0.10,
+            double iou = 0.45)
+        {
+            string payload =
+                $"{rtspIndex}:{onnxIndex}^{confidence:F2}^{iou:F2}";
+
+            return BuildRequestPacket("05", payload);
         }
 
         /// <summary>

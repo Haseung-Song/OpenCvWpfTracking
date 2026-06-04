@@ -120,6 +120,9 @@
     <Compile Include="Converters\MatToBitmapSourceConverter.cs" />
     <Compile Include="Models\AI\AiDetectionBox.cs" />
     <Compile Include="Models\AI\AiDetectionResult.cs" />
+    <Compile Include="Models\AI\AiMappingInfo.cs" />
+    <Compile Include="Models\AI\AiOnnxInfo.cs" />
+    <Compile Include="Models\AI\AiRtspInfo.cs" />
     <Compile Include="Services\Communication\AI\AiDetectorClientService.cs" />
     <Compile Include="Services\Communication\AI\AiDetectorPacketBuilder.cs" />
     <Compile Include="Services\Communication\AI\AiDetectorPacketParser.cs" />

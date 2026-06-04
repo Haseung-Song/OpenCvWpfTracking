@@ -1127,16 +1127,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
             // 1-1. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
             //EoSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+            EoSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 4-1. 옥상 [GOP] 주간(EO) 카메라
             //EoSourceAddress =
@@ -1571,6 +1571,45 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         "192.168.20.160",
                         5055,
                         3000);
+
+                /// <summary>
+                /// [AI Detector Agent] 설정 요청 / 조회 테스트
+                /// 
+                /// [Auto Reconnect] 연결 완료 대기 시간을 고려하여
+                /// 일정 시간 지연 후 [RTSP] 주소 설정 및 조회 요청을 순차 수행한다.
+                /// </summary>
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(3000);
+
+                    /// <summary>
+                    /// [AI Detector Agent] [RTSP] 주소 설정
+                    /// 
+                    /// Viewer에서 사용하는 [EO] / [IR] 주소와
+                    /// AI Agent 분석 대상 [RTSP] 주소를 맞춘다.
+                    /// </summary>
+                    await RequestAiDetectorRtspAddressSetAsync();
+
+                    await Task.Delay(300);
+
+                    await RequestAiDetectorInfoAsync();
+
+                    await Task.Delay(300);
+
+                    await RequestAiDetectorRtspAddressAsync();
+
+                    await Task.Delay(300);
+
+                    await RequestAiDetectorOnnxListAsync();
+
+                    await Task.Delay(300);
+
+                    await RequestAiDetectorMappingSetAsync(); // 여기 추가
+
+                    await Task.Delay(300);
+
+                    await RequestAiDetectorMappingAsync();
+                });
 
                 /// <summary>
                 /// [VD]도 [EO / IR]처럼 연결 시도 자체를 백그라운드에서 처리
@@ -2577,26 +2616,98 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector Agent] [TCP] 수신 [Packet] 처리 함수
         /// 
-        /// [AiDetectorClientService]에서 완성된 [byte[] Packet]을 받으면,
-        /// [AiDetectorPacketParser]를 통해 [CMD 55] 탐지데이터인지 확인하고 파싱한다.
+        /// 공통 [Packet] 구조를 먼저 검증한 뒤,
+        /// [CMD] 값에 따라 응답 처리 함수를 분기한다.
         /// </summary>
         private void OnAiDetectorPacketReceived(
             byte[] packet,
             DateTime receiveTime)
         {
-            AiDetectionResult result; // [AI Detector] 탐지 결과 [1 Frame] 정보
+            string command;
+            string payload;
 
             /// <summary>
-            /// [CMD 55] 탐지데이터 [Packet]이 아니거나
-            /// [Checksum] / [Payload] 구조가 맞지 않으면 처리하지 않는다.
+            /// [AI Detector] 공통 [Packet] 구조 파싱
+            /// 
+            /// [STX] / [CMD] / [SIZE] / [Payload] / [Checksum] / [ETX] 검증 후,
+            /// [CMD]와 [Payload]를 추출한다.
             /// </summary>
+            if (!_aiDetectorPacketParser.TryParseCommonPacket(
+                packet,
+                out command,
+                out payload))
+            {
+                return;
+            }
+
+            /// <summary>
+            /// [CMD] 기준 응답 분기
+            /// 
+            /// [CMD 51] : [AI Detector Info] 응답
+            /// [CMD 52] : [RTSP] 주소 조회 응답
+            /// [CMD 53] : [ONNX] 목록 조회 응답
+            /// [CMD 54] : [RTSP] / [ONNX] Mapping 조회 응답
+            /// [CMD 55] : 탐지데이터 응답
+            /// [CMD 56] : Mapping 설정 응답 또는 확장 Mapping 응답
+            /// </summary>
+            switch (command)
+            {
+                case "51":
+                    HandleAiDetectorInfoResponse(payload);
+                    break;
+
+                case "52":
+                    HandleAiDetectorRtspResponse(payload);
+                    break;
+
+                case "53":
+                    HandleAiDetectorOnnxResponse(payload);
+                    break;
+
+                case "54":
+                    HandleAiDetectorMappingResponse(payload);
+                    break;
+
+                case "55":
+                    HandleAiDetectorDetectionPacket(
+                        packet,
+                        receiveTime);
+                    break;
+
+                case "56":
+                    HandleAiDetectorMappingResponse(payload);
+                    break;
+
+                default:
+                    Console.WriteLine(
+                        $"[AI DETECTOR] Unknown CMD : {command}, Payload : {payload}");
+                    break;
+            }
+
+        }
+
+        /// <summary>
+        /// [CMD 55] 탐지데이터 [Packet] 처리
+        /// 
+        /// [AiDetectorPacketParser]에서 [AiDetectionResult]로 변환한 뒤,
+        /// 화면 [Bounding Box] 반영 및 로그 출력을 수행한다.
+        /// </summary>
+        private void HandleAiDetectorDetectionPacket(
+            byte[] packet,
+            DateTime receiveTime)
+        {
+            AiDetectionResult result;
+
             if (!_aiDetectorPacketParser.TryParseDetectionPacket(
                 packet,
                 out result))
             {
                 return;
             }
-            HandleAiDetectionResult(result, receiveTime); // [AI Detector] 탐지 결과 처리 함수
+
+            HandleAiDetectionResult(
+                result,
+                receiveTime);
         }
 
         #endregion
@@ -2627,56 +2738,20 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 switch (result.RtspIndex)
                 {
                     case 0:
-                        /// <summary>
-                        /// [RTSP Index 0]
-                        /// 
-                        /// [Drone] 전용 탐지 결과로 사용된다.
-                        /// 
-                        /// 현재 데모 환경에서는
-                        /// [RTSP Index 1]의 [Drone + best.onnx] 통합 탐지 결과만
-                        /// [EO] 화면에 표시하므로 화면에는 반영하지 않는다.
-                        /// </summary>
-                        break;
-
-                    case 1:
-                        /// <summary>
-                        /// [AI Detector] 탐지 결과 중
-                        /// 신뢰도가 일정 수준 이상인 객체만 화면에 표시한다.
-                        ///
-                        /// 현재 [AI Detector Agent]에서
-                        /// 낮은 신뢰도의 탐지 결과가 함께 수신될 수 있으므로,
-                        /// 불필요한 오탐지 [Bounding Box] 표시를 줄이기 위해 사용한다.
-                        ///
-                        /// 현재 기준:
-                        /// [Confidence] 0.4 (40%) 미만 => 표시 안 함
-                        /// [Confidence] 0.4 (40%) 이상 => 표시
-                        ///
-                        /// 실제 운용 환경에 따라 임계값은 조정 가능하다.
-                        /// </summary>
                         List<AiDetectionBox> displayBoxes =
                             result.Boxes
-                                .Where(box => box.Confidence >= 0.4)
+                                .Where(box => box.Confidence >= 0.1)
                                 .ToList();
 
-                        /// <summary>
-                        /// [RTSP Index 1]
-                        /// 
-                        /// [Drone + best.onnx] 통합 탐지 결과로,
-                        /// [Drone] / [Vehicle] / [Ship] 등
-                        /// 다양한 객체가 탐지될 수 있다.
-                        /// 
-                        /// 현재 데모 기준으로
-                        /// [EO] 화면에만 [Bounding Box]를 표시한다.
-                        /// </summary>
                         UpdateDetectionBoxes(
                             EoDetectionBoxes,
                             displayBoxes);
 
-                        /// <summary>
-                        /// 현재 [IR] 화면에는
-                        /// [AI Detector] 탐지 결과를 표시하지 않는다.
-                        /// </summary>
                         IrDetectionBoxes.Clear();
+                        break;
+
+                    case 1:
+                        // [RTSP Index 1]은 현재 화면 표시 대상이 아니므로 무시한다.
                         break;
 
                     default:
@@ -2725,6 +2800,93 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[Box] {box.Left}, {box.Top}, {box.Right}, {box.Bottom}");
             }
             Console.WriteLine("==============================================================================");
+        }
+
+        #endregion
+
+        #region [AI Detector Response Handling]
+
+        /// <summary>
+        /// [CMD 51] [AI Detector Info] 응답 처리
+        /// 
+        /// 현재는 응답 [Payload] 구조 확인 단계이므로
+        /// [Raw Payload]를 [Console]에 출력한다.
+        /// </summary>
+        private void HandleAiDetectorInfoResponse(string payload)
+        {
+            Console.WriteLine("=======================================================");
+            Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 51] Detector Info");
+            Console.WriteLine("[AI PAYLOAD] " + payload);
+            Console.WriteLine("=======================================================");
+        }
+
+        /// <summary>
+        /// [CMD 52] [RTSP] 주소 조회 응답 처리
+        /// 
+        /// 현재는 응답 [Payload] 구조 확인 단계이므로
+        /// [Raw Payload]를 [Console]에 출력한다.
+        /// </summary>
+        private void HandleAiDetectorRtspResponse(string payload)
+        {
+            List<AiRtspInfo> rtspList =
+                _aiDetectorPacketParser.ParseRtspListPayload(payload);
+
+            Console.WriteLine("=======================================================");
+            Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 52] RTSP List");
+
+            foreach (AiRtspInfo rtsp in rtspList)
+            {
+                Console.WriteLine(
+                    $"[RTSP] [Index] {rtsp.Index}, [URL] {rtsp.Url}");
+            }
+            Console.WriteLine("=======================================================");
+        }
+
+        /// <summary>
+        /// [CMD 53] [ONNX] 목록 조회 응답 처리
+        /// 
+        /// 현재는 응답 [Payload] 구조 확인 단계이므로
+        /// [Raw Payload]를 [Console]에 출력한다.
+        /// </summary>
+        private void HandleAiDetectorOnnxResponse(string payload)
+        {
+            List<AiOnnxInfo> onnxList =
+                _aiDetectorPacketParser.ParseOnnxListPayload(payload);
+
+            Console.WriteLine("=======================================================");
+            Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 53] ONNX List");
+
+            foreach (AiOnnxInfo onnx in onnxList)
+            {
+                Console.WriteLine(
+                    $"[ONNX] [Index] {onnx.Index}, [File] {onnx.FileName}, [Classes] {string.Join(", ", onnx.Classes)}");
+            }
+            Console.WriteLine("=======================================================");
+        }
+
+        /// <summary>
+        /// [CMD 54] / [CMD 56] [RTSP] / [ONNX] Mapping 응답 처리
+        /// 
+        /// 현재는 응답 [Payload] 구조 확인 단계이므로
+        /// [Raw Payload]를 [Console]에 출력한다.
+        /// </summary>
+        private void HandleAiDetectorMappingResponse(string payload)
+        {
+            List<AiMappingInfo> mappingList =
+                _aiDetectorPacketParser.ParseMappingPayload(payload);
+
+            Console.WriteLine("=======================================================");
+            Console.WriteLine("[AI DETECTOR RESPONSE] Mapping Info");
+
+            foreach (AiMappingInfo mapping in mappingList)
+            {
+                Console.WriteLine(
+                    $"[MAPPING] [RTSP] {mapping.RtspIndex}, " +
+                    $"[ONNX] {mapping.OnnxIndex}, " +
+                    $"[Confidence] {mapping.Confidence:F2}, " +
+                    $"[IOU] {mapping.Iou:F2}");
+            }
+            Console.WriteLine("=======================================================");
         }
 
         #endregion
@@ -2799,12 +2961,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
-        #region [AI Detector Request Test]
+        #region [AI Detector Request]
 
         /// <summary>
         /// [AI Detector Info] 조회 요청
         ///
-        /// [CMD 51]
+        /// 요청 [CMD 01]
+        /// 응답 [CMD 51]
         /// </summary>
         private async Task RequestAiDetectorInfoAsync()
         {
@@ -2816,6 +2979,105 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 .SendAsync(packet);
         }
 
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] 주소 설정 요청
+        /// 
+        /// 현재 [OpenCvWpfTracking]에서 사용하는
+        /// [EO] / [IR] [RTSP] 주소를 [AI Detector Agent]에 전달한다.
+        /// </summary>
+        private async Task RequestAiDetectorRtspAddressSetAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildRtspAddressSetRequest(
+                        EoSourceAddress,
+                        IrSourceAddress);
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
+        /// <summary>
+        /// [RTSP] 주소 조회 요청
+        ///
+        /// 요청 [CMD 03]
+        /// 응답 [CMD 52]
+        /// </summary>
+        private async Task RequestAiDetectorRtspAddressAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildRtspAddressRequest();
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
+        /// <summary>
+        /// [ONNX] 파일 목록 조회 요청
+        ///
+        /// 요청 [CMD 04]
+        /// 응답 [CMD 53]
+        /// </summary>
+        private async Task RequestAiDetectorOnnxListAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildOnnxListRequest();
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] [RTSP] / [ONNX] Mapping 설정 요청
+        /// 
+        /// RTSP 0번 채널에 ONNX 1번 모델을 연결한다.
+        /// </summary>
+        private async Task RequestAiDetectorMappingSetAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildRtspOnnxMappingSetRequest(
+                        0,      // RTSP Index
+                        1,      // ONNX Index
+                        0.10,
+                        0.45);
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
+        /// <summary>
+        /// [RTSP] / [ONNX] Mapping 조회 요청
+        ///
+        /// 요청 [CMD 06]
+        /// 응답 [CMD 54]
+        /// </summary>
+        private async Task RequestAiDetectorMappingAsync()
+        {
+            byte[] packet =
+                _aiPacketBuilder
+                    .BuildRtspOnnxMappingRequest();
+
+            await _aiDetectorClientService
+                .SendAsync(packet);
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] 정보 조회 요청 테스트
+        /// 
+        /// 현재 단계에서는 [CMD 51] 응답 Payload 구조 확인을 위해
+        /// [AI Detector Info] 조회 요청만 우선 송신한다.
+        /// </summary>
+        private async Task TestRequestAiDetectorInfoAsync()
+        {
+            Console.WriteLine("=======================================================");
+            Console.WriteLine("[AI REQUEST] Detector Info Request");
+            Console.WriteLine("=======================================================");
+
+            await RequestAiDetectorInfoAsync();
+        }
 
         #endregion
 
