@@ -332,6 +332,7 @@ namespace OpenCvWpfTracking.Services.Video
             /// [AI Detector] [Bounding Box] 좌표 기준과
             /// [Overlay Canvas] 크기 설정 확인에 사용한다.
             /// </summary>
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine(
                 $"[{_streamName}] [FFmpeg RTSP SIZE] {VideoWidth} x {VideoHeight}");
             Console.WriteLine();
@@ -470,7 +471,6 @@ namespace OpenCvWpfTracking.Services.Video
         private Mat ConvertFrameToMat(AVFrame* sourceFrame)
         {
             int width = sourceFrame->width;
-
             int height = sourceFrame->height;
 
             Mat mat =

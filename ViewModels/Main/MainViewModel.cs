@@ -588,20 +588,123 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// [AI Detector Agent] 수동 연결
             /// 
-            /// UI에 입력된 [IP] / [Port] 기준으로
-            /// [AI Detector Agent] 자동 재연결 루프를 시작한다.
+            /// 기존 [AI Detector Agent] 연결 및 자동 재연결 루프를 정리한 뒤,
+            /// UI에 입력된 [IP] / [Port] 기준으로 새 자동 재연결 루프를 시작한다.
             /// </summary>
             ConnectAiAgentCommand =
                 new RelayCommand(() =>
                 {
-                    AiSettingStatusText = "[AI] Auto Reconnect Start...";
+                    AiSettingStatusText = "[AI] Reconnect Start...";
 
-                    _ = _aiDetectorClientService.StartAutoReconnectAsync(
+                    _ = _aiDetectorClientService.RestartAutoReconnectAsync(
                         AiAgentIp,
                         AiAgentPort,
                         3000);
 
-                    AiSettingStatusText = "[AI] Auto Reconnect Started";
+                    AiSettingStatusText = "[AI] Reconnect Started";
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Task.Delay(3000);
+
+                            /// <summary>
+                            /// [AI Detector Agent] 연결 상태 확인
+                            /// 
+                            /// [IP] / [Port] 오류 또는
+                            /// [AI Agent] 미실행 상태일 경우
+                            /// 설정 요청을 진행하지 않는다.
+                            /// </summary>
+                            if (!_aiDetectorClientService.IsConnected)
+                            {
+                                AiSettingStatusText = "[AI] Connect Failed";
+                                return;
+                            }
+
+                            /// <summary>
+                            /// [AI Detector Agent] [RTSP] 주소 적용
+                            /// </summary>
+                            if (!await RequestAiDetectorRtspAddressSetAsync())
+                            {
+                                AiSettingStatusText = "[AI] RTSP Apply Failed";
+                                return;
+                            }
+
+                            await Task.Delay(300);
+
+                            /// <summary>
+                            /// [AI Detector Agent] 정보 조회
+                            /// </summary>
+                            if (!await RequestAiDetectorInfoAsync())
+                            {
+                                AiSettingStatusText = "[AI] Info Request Failed";
+                                return;
+                            }
+
+                            await Task.Delay(300);
+
+                            /// <summary>
+                            /// [AI Detector Agent] [RTSP] 주소 조회
+                            /// </summary>
+                            if (!await RequestAiDetectorRtspAddressAsync())
+                            {
+                                AiSettingStatusText = "[AI] RTSP Request Failed";
+                                return;
+                            }
+
+                            await Task.Delay(300);
+
+                            /// <summary>
+                            /// [AI Detector Agent] [ONNX] 모델 목록 조회
+                            /// </summary>
+                            if (!await RequestAiDetectorOnnxListAsync())
+                            {
+                                AiSettingStatusText = "[AI] ONNX Request Failed";
+                                return;
+                            }
+
+                            await Task.Delay(300);
+
+                            /// <summary>
+                            /// [RTSP] ↔ [ONNX] [Mapping] 설정 적용
+                            /// </summary>
+                            if (!await RequestAiDetectorMappingSetAsync())
+                            {
+                                AiSettingStatusText = "[AI] Mapping Apply Failed";
+                                return;
+                            }
+
+                            await Task.Delay(300);
+
+                            /// <summary>
+                            /// [RTSP] ↔ [ONNX] [Mapping] 정보 조회
+                            /// </summary>
+                            if (!await RequestAiDetectorMappingAsync())
+                            {
+                                AiSettingStatusText = "[AI] Mapping Request Failed";
+                                return;
+                            }
+
+                            /// <summary>
+                            /// [AI Detector Agent] 연결 및 설정 완료
+                            /// </summary>
+                            AiSettingStatusText = "[AI] Connect / Setting Complete";
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(
+                                "[AI ERROR] Connect / Setting Exception : " +
+                                ex.Message);
+
+                            ConsoleLogHelper.PrintLine();
+
+                            AiSettingStatusText =
+                                "[AI] Connect / Setting Incomplete";
+                        }
+
+                    });
+
                 });
 
             /// <summary>
@@ -763,7 +866,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] ZOOM -{ZoomMoveStep} => Target : {targetZoom}");
-                Console.WriteLine("========================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.EoZoomGoPosition(targetZoom);
             });
@@ -779,7 +882,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
-                Console.WriteLine("========================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.EoFocusGoPosition(targetFocus);
             });
@@ -795,7 +898,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine();
                 Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
-                Console.WriteLine("========================================");
+                ConsoleLogHelper.PrintLine();
 
                 _controlCommandService.EoFocusGoPosition(targetFocus);
             });
@@ -1573,12 +1676,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiRtsp1Address = IrSourceAddress;
 
             AiRtsp0OnnxIndex = 1;
-            AiRtsp1OnnxIndex = 2;
+            AiRtsp1OnnxIndex = 1;
 
             AiMappingConfidence = 0.10;
             AiMappingIou = 0.45;
 
-            AiDisplayConfidenceThreshold = 0.40;
+            AiDisplayConfidenceThreshold = 0.10;
         }
 
         #endregion
@@ -1599,7 +1702,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine($"[CONTROL] [EO/IR] PAN LEFT START / SPEED : {PanTiltSpeedLevel}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartPanLeft(PanTiltSpeedLevel);
         }
@@ -1616,7 +1719,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine($"[CONTROL] [EO/IR] PAN RIGHT START / SPEED : {PanTiltSpeedLevel}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartPanRight(PanTiltSpeedLevel);
         }
@@ -1633,7 +1736,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine($"[CONTROL] [EO/IR] TILT UP START / SPEED : {PanTiltSpeedLevel}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartTiltUp(PanTiltSpeedLevel);
         }
@@ -1650,7 +1753,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine($"[CONTROL] [EO/IR] TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
         }
@@ -1668,7 +1771,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] EO ZOOM TELE START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartEoZoomTele();
         }
@@ -1682,7 +1785,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] EO ZOOM WIDE START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartEoZoomWide();
         }
@@ -1696,7 +1799,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] EO FOCUS NEAR START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartEoFocusNear();
         }
@@ -1710,7 +1813,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] EO FOCUS FAR START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartEoFocusFar();
         }
@@ -1728,7 +1831,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR ZOOM IN START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrZoomTele();
         }
@@ -1742,7 +1845,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR ZOOM OUT START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrZoomWide();
         }
@@ -1756,7 +1859,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         {
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR ZOOM STOP");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StopIrZoom();
 
@@ -1772,7 +1875,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR FOCUS NEAR START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrFocusNear();
         }
@@ -1786,7 +1889,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR FOCUS FAR START");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrFocusFar();
         }
@@ -1798,7 +1901,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         {
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR FOCUS STOP");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StopIrFocus();
         }
@@ -1813,7 +1916,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR DIGITAL ZOOM IN START");
             Console.WriteLine($"[CONTROL] Current Common Zoom : {_currentEoZoom}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrDigitalZoomIn();
         }
@@ -1828,7 +1931,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR DIGITAL ZOOM OUT START");
             Console.WriteLine($"[CONTROL] Current Common Zoom : {_currentEoZoom}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrDigitalZoomOut();
         }
@@ -1841,7 +1944,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine();
             Console.WriteLine("[CONTROL] IR AUTO FOCUS REQUEST");
             Console.WriteLine($"[CONTROL] Current Common Focus : {_currentEoFocus}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             _controlCommandService.StartIrAutoFocus();
         }
@@ -1866,7 +1969,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine($"[CONTROL] MOVE STOP: {_currentMoveType}");
-            Console.WriteLine("========================================");
+            ConsoleLogHelper.PrintLine();
 
             /// <summary>
             /// 마지막으로 실행된 연속 제어 종류에 따라
@@ -1983,57 +2086,124 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
 
                 /// <summary>
-                /// [AI Detector Agent] 자동 재연결 시작
+                /// [AI Detector Agent] 자동 재연결 시작은
+                /// 하단 [AI CONNECT] 버튼에서 수동으로 수행한다.
                 /// 
-                /// [AI Detector Agent] 프로그램이 나중에 실행되거나
-                /// 중간에 종료 후 재실행되어도 일정 주기로 재연결을 시도한다.
+                /// 필요 시 기존 주석 제거 후 동시 연결도 가능하다.
+                /// 
+                /// [장비 연결] 버튼은 [VD] / [EO] / [IR] / [LA] 연결만 담당한다.
                 /// </summary>
-                _ = _aiDetectorClientService.StartAutoReconnectAsync(
-                        AiAgentIp,
-                        AiAgentPort,
-                        3000);
+                //_ = _aiDetectorClientService.StartAutoReconnectAsync(
+                //        AiAgentIp,
+                //        AiAgentPort,
+                //        3000);
 
                 /// <summary>
-                /// [AI Detector Agent] 설정 요청 / 조회 테스트
+                /// [AI Detector Agent] 설정 요청 / 조회 테스트는
+                /// 하단 [AI CONNECT] 버튼에서 수동으로 수행한다.
+                /// 
+                /// 필요 시 기존 주석 제거 후 동시 연결도 가능하다.
                 /// 
                 /// [Auto Reconnect] 연결 완료 대기 시간을 고려하여
                 /// 일정 시간 지연 후 [RTSP] 주소 설정 및 조회 요청을 순차 수행한다.
                 /// </summary>
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(3000);
+                //try
+                //{
+                //    await Task.Delay(3000);
 
-                    /// <summary>
-                    /// [AI Detector Agent] [RTSP] 주소 설정
-                    /// 
-                    /// Viewer에서 사용하는 [EO] / [IR] 주소와
-                    /// AI Agent 분석 대상 [RTSP] 주소를 맞춘다.
-                    /// </summary>
-                    await RequestAiDetectorRtspAddressSetAsync();
+                //    /// <summary>
+                //    /// [AI Detector Agent] 연결 상태 확인
+                //    /// 
+                //    /// [IP] / [Port] 오류 또는
+                //    /// [AI Agent] 미실행 상태일 경우
+                //    /// 설정 요청을 진행하지 않는다.
+                //    /// </summary>
+                //    if (!_aiDetectorClientService.IsConnected)
+                //    {
+                //        AiSettingStatusText = "[AI] Connect Failed";
+                //        return;
+                //    }
 
-                    await Task.Delay(300);
+                //    /// <summary>
+                //    /// [AI Detector Agent] [RTSP] 주소 적용
+                //    /// </summary>
+                //    if (!await RequestAiDetectorRtspAddressSetAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] RTSP Apply Failed";
+                //        return;
+                //    }
 
-                    await RequestAiDetectorInfoAsync();
+                //    await Task.Delay(300);
 
-                    await Task.Delay(300);
+                //    /// <summary>
+                //    /// [AI Detector Agent] 정보 조회
+                //    /// </summary>
+                //    if (!await RequestAiDetectorInfoAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] Info Request Failed";
+                //        return;
+                //    }
 
-                    await RequestAiDetectorRtspAddressAsync();
+                //    await Task.Delay(300);
 
-                    await Task.Delay(300);
+                //    /// <summary>
+                //    /// [AI Detector Agent] [RTSP] 주소 조회
+                //    /// </summary>
+                //    if (!await RequestAiDetectorRtspAddressAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] RTSP Request Failed";
+                //        return;
+                //    }
 
-                    await RequestAiDetectorOnnxListAsync();
+                //    await Task.Delay(300);
 
-                    await Task.Delay(300);
+                //    /// <summary>
+                //    /// [AI Detector Agent] [ONNX] 모델 목록 조회
+                //    /// </summary>
+                //    if (!await RequestAiDetectorOnnxListAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] ONNX Request Failed";
+                //        return;
+                //    }
 
-                    /// <summary>
-                    /// [RTSP 1] 채널에 [ONNX 2] 모델 적용
-                    /// </summary>
-                    await RequestAiDetectorMappingSetAsync();
+                //    await Task.Delay(300);
 
-                    await Task.Delay(300);
+                //    /// <summary>
+                //    /// [RTSP] ↔ [ONNX] [Mapping] 설정 적용
+                //    /// </summary>
+                //    if (!await RequestAiDetectorMappingSetAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] Mapping Apply Failed";
+                //        return;
+                //    }
 
-                    await RequestAiDetectorMappingAsync();
-                });
+                //    await Task.Delay(300);
+
+                //    /// <summary>
+                //    /// [RTSP] ↔ [ONNX] [Mapping] 정보 조회
+                //    /// </summary>
+                //    if (!await RequestAiDetectorMappingAsync())
+                //    {
+                //        AiSettingStatusText = "[AI] Mapping Request Failed";
+                //        return;
+                //    }
+
+                //    /// <summary>
+                //    /// [AI Detector Agent] 연결 및 설정 완료
+                //    /// </summary>
+                //    AiSettingStatusText = "[AI] Connect / Setting Complete";
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine(
+                //        "[AI ERROR] Connect / Setting Exception : " +
+                //        ex.Message);
+
+                //    ConsoleLogHelper.PrintLine();
+
+                //    AiSettingStatusText =
+                //        "[AI] Connect / Setting Incomplete";
+                //}
 
                 /// <summary>
                 /// [VD]도 [EO / IR]처럼 연결 시도 자체를 백그라운드에서 처리
@@ -2724,12 +2894,41 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     break;
 
                 case 0x07:
+                    /// <summary>
+                    /// [Function] [0x07]
+                    /// 
+                    /// 기본적으로 [Alive] / [ACK] 계열 [Packet]이다.
+                    /// 
+                    /// 현재 장비에서 [FF 07 EF 05 ...] 형태의 [Packet]이
+                    /// 반복 수신되지만, 값이 고정되어 있어
+                    /// [IR] [Zoom] / [Focus] 상태값으로 사용하지 않는다.
+                    /// </summary>
+                    if (packet.RawData.Length >= 12 &&
+                        packet.RawData[2] == 0xEF &&
+                        packet.RawData[3] == 0x05)
+                    {
+                        if (!CanPrintLaLog())
+                            break;
+
+                        ConsoleLogHelper.PrintLine();
+
+                        Console.WriteLine(
+                            "[LA PACKET] [IR] Response / Status Candidate");
+
+                        Console.WriteLine(
+                            "[IR RAW] " +
+                            BitConverter.ToString(packet.RawData)
+                                .Replace("-", " "));
+
+                        ConsoleLogHelper.PrintLine();
+                        break;
+                    }
 
                     /// <summary>
                     /// [Alive] / [ACK]
                     /// 
-                    /// 정상 Heartbeat Packet
-                    /// Console 출력 생략
+                    /// 정상 [Heartbeat] [Packet]
+                    /// [Console] 출력 생략
                     /// </summary>
                     break;
 
@@ -2904,7 +3103,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             double tiltDegree = tiltRaw / 100.0;
 
             /// <summary>
-            /// 현재 [PAN / TILT] 값 저장
+            /// 현재 [PAN] / [TILT] 값 저장
             /// 
             /// 버튼 클릭 시
             /// 현재 위치 기준 [상대 이동 계산]에 사용한다.
@@ -2923,6 +3122,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentEoZoom = zoomRaw;
             _currentEoFocus = focusRaw;
 
+            /// <summary>
+            /// [Console] 로그 출력 주기 제한
+            /// 
+            /// 1초 이내 중복 상태 로그는 출력하지 않는다.
+            /// </summary>
             if (!printLog)
             {
                 return;
@@ -3341,6 +3545,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine(
                     $"[RTSP] [Index] {rtsp.Index}, [URL] {rtsp.Url}");
             }
+
             // [AI Detector Agent][RTSP] 조회 결과를 [UI Collection]에 반영
             UpdateAiRtspList(rtspList);
 
@@ -3368,6 +3573,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[File] {onnx.FileName}, " +
                     $"[Classes] {string.Join(", ", onnx.Classes)}");
             }
+
             // [AI Detector Agent] [ONNX] 조회 결과를 [UI Collection]에 반영
             UpdateAiOnnxList(onnxList);
 
@@ -3397,6 +3603,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     $"[Confidence] {mapping.Confidence:F2}, " +
                     $"[IOU] {mapping.Iou:F2}");
             }
+
             // [AI Detector Agent] [RTSP] / [ONNX] Mapping 조회 결과를 [UI Collection]에 반영
             UpdateAiMappingList(mappingList);
 
@@ -3483,14 +3690,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 요청 [CMD 01]
         /// 응답 [CMD 51]
         /// </summary>
-        private async Task RequestAiDetectorInfoAsync()
+        private async Task<bool> RequestAiDetectorInfoAsync()
         {
             byte[] packet =
-                _aiPacketBuilder
-                    .BuildAiDetectorInfoRequest();
+                _aiPacketBuilder.BuildAiDetectorInfoRequest();
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         /// <summary>
@@ -3499,7 +3704,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// UI에서 입력한 [RTSP 0] / [RTSP 1] 주소를
         /// [AI Detector Agent]에 전달한다.
         /// </summary>
-        private async Task RequestAiDetectorRtspAddressSetAsync()
+        private async Task<bool> RequestAiDetectorRtspAddressSetAsync()
         {
             /// <summary>
             /// [Viewer] 영상 연결 주소 갱신
@@ -3520,8 +3725,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         AiRtsp0Address,
                         AiRtsp1Address);
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         /// <summary>
@@ -3530,14 +3734,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 요청 [CMD 03]
         /// 응답 [CMD 52]
         /// </summary>
-        private async Task RequestAiDetectorRtspAddressAsync()
+        private async Task<bool> RequestAiDetectorRtspAddressAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspAddressRequest();
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         /// <summary>
@@ -3546,14 +3749,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 요청 [CMD 04]
         /// 응답 [CMD 53]
         /// </summary>
-        private async Task RequestAiDetectorOnnxListAsync()
+        private async Task<bool> RequestAiDetectorOnnxListAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
                     .BuildOnnxListRequest();
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         /// <summary>
@@ -3562,7 +3764,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// UI에서 입력한 [RTSP 0] / [RTSP 1]별 [ONNX Index],
         /// [Confidence], [IOU] 값을 기준으로 [CMD 05] Packet을 송신한다.
         /// </summary>
-        private async Task RequestAiDetectorMappingSetAsync()
+        private async Task<bool> RequestAiDetectorMappingSetAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
@@ -3572,8 +3774,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         AiMappingConfidence,
                         AiMappingIou);
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         /// <summary>
@@ -3582,29 +3783,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 요청 [CMD 06]
         /// 응답 [CMD 54]
         /// </summary>
-        private async Task RequestAiDetectorMappingAsync()
+        private async Task<bool> RequestAiDetectorMappingAsync()
         {
             byte[] packet =
                 _aiPacketBuilder
                     .BuildRtspOnnxMappingRequest();
 
-            await _aiDetectorClientService
-                .SendAsync(packet);
-        }
-
-        /// <summary>
-        /// [AI Detector Agent] 정보 조회 요청 테스트
-        /// 
-        /// 현재 단계에서는 [CMD 51] 응답 Payload 구조 확인을 위해
-        /// [AI Detector Info] 조회 요청만 우선 송신한다.
-        /// </summary>
-        private async Task TestRequestAiDetectorInfoAsync()
-        {
-            ConsoleLogHelper.PrintLine();
-            Console.WriteLine("[AI REQUEST] Detector Info Request");
-            ConsoleLogHelper.PrintLine();
-
-            await RequestAiDetectorInfoAsync();
+            return await _aiDetectorClientService.SendAsync(packet);
         }
 
         #endregion

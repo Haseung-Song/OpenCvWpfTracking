@@ -92,7 +92,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// <summary>
         /// [AI] [Detector Agent]에 [TCP] 연결
         ///
-        /// [Ex]   :
+        /// [기본] :
         /// [IP]   : [192.168.20.160]
         /// [PORT] : [5055]
         /// </summary>
@@ -132,6 +132,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch (Exception ex)
             {
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
                 ConsoleLogHelper.PrintLine();
 
@@ -174,6 +175,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             _isReconnectLoopStarted = true;
             _isReconnectRunning = true;
 
+            ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI TCP] Auto Reconnect Start.");
 
             while (_isReconnectRunning)
@@ -205,6 +207,46 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             _isReconnectLoopStarted = false;
 
             Console.WriteLine("[AI TCP] Auto Reconnect Stop.");
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] 자동 재연결 재시작
+        /// 
+        /// 기존 연결 및 자동 재연결 루프를 정리한 뒤,
+        /// 새 [IP] / [Port] 기준으로 자동 재연결을 다시 시작한다.
+        /// </summary>
+        public async Task RestartAutoReconnectAsync(
+            string ip,
+            int port,
+            int retryIntervalMs = 3000)
+        {
+            // [AI] [Detector] [TCP] 연결 종료 및 리소스 정리
+            Disconnect();
+
+            /// <summary>
+            /// 기존 [Auto Reconnect] 루프가 종료될 시간을 짧게 확보한다.
+            /// </summary>
+            await Task.Delay(300);
+
+            _isReconnectLoopStarted = false;
+
+            await StartAutoReconnectAsync(
+                ip,
+                port,
+                retryIntervalMs);
+        }
+
+        /// <summary>
+        /// [AI Detector Agent] 자동 재연결 중지 요청
+        /// 
+        /// 기존 [Auto Reconnect] 루프를 종료시키기 위해 사용한다.
+        /// </summary>
+        public void StopAutoReconnect()
+        {
+            _isReconnectRunning = false;
+
+            ConsoleLogHelper.PrintLine();
+            Console.WriteLine("[AI TCP] Auto Reconnect Stop Request.");
         }
 
         #endregion
@@ -305,7 +347,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [CMD 54]
         /// 조회 요청에 사용한다.
         /// </summary>
-        public async Task SendAsync(
+        public async Task<bool> SendAsync(
             byte[] packet)
         {
             if (_tcpClient == null ||
@@ -313,14 +355,15 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             {
                 Console.WriteLine(
                     "[AI TCP] Send Failed : Not Connected");
+
                 ConsoleLogHelper.PrintLine();
-                return;
+
+                return false;
             }
 
             try
             {
-                NetworkStream stream =
-                    _tcpClient.GetStream();
+                NetworkStream stream = _tcpClient.GetStream();
 
                 await stream.WriteAsync(
                     packet,
@@ -330,13 +373,20 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 Console.WriteLine(
                     "[AI TCP SEND] " +
                     BitConverter.ToString(packet));
+
+                ConsoleLogHelper.PrintLine();
+
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine(
                     "[AI TCP ERROR] Send Failed : " +
                     ex.Message);
+
                 ConsoleLogHelper.PrintLine();
+
+                return false;
             }
 
         }
@@ -374,8 +424,8 @@ namespace OpenCvWpfTracking.Services.Communication.AI
 
                 _receiveBuffer.Clear();
 
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP] Disconnected.");
-                Console.WriteLine();
             }
 
         }
