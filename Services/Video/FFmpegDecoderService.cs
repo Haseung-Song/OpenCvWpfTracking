@@ -365,7 +365,6 @@ namespace OpenCvWpfTracking.Services.Video
         private void AllocateDecodeBuffer()
         {
             _packet = ffmpeg.av_packet_alloc();
-
             _frame = ffmpeg.av_frame_alloc();
         }
 

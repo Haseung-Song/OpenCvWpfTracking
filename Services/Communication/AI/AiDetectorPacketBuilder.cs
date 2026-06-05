@@ -4,23 +4,25 @@ using System.Text;
 namespace OpenCvWpfTracking.Services.Communication.AI
 {
     /// <summary>
-    /// [AI Detector Agent] 요청 [Packet] 생성 클래스
+    /// [AI] [Detector Agent] 요청 [Packet] 생성 클래스
     /// 
-    /// [AI Detector Agent]로 송신할 요청 [Packet]을 생성한다.
+    /// [AI] [Detector Agent]로 송신할 요청 [Packet]을 생성한다.
     /// 
     /// [Packet] 구조:
     /// [0]      [STX]      : 0x02
     /// [1..2]   [CMD]      : [ASCII] 2자리
     /// [3..5]   [SIZE]     : [Payload] [UTF-8] [byte] 길이, [ASCII] 3자리
     /// [6..N]   [PAYLOAD]  : [UTF-8] 문자열
-    /// [N+1]    [CHECKSUM] : [CMD] [ASCII] + [Payload] [bytes] 합산 하위 1[byte]
+    /// [N+1]    [CHECKSUM] : [CMD] [ASCII] + [Payload] [byte] 합산 하위 1[byte]
     /// [N+2]    [ETX]      : 0x03
     /// 
     /// 현재 사용 목적:
-    /// 1. [CMD 51] [AI Detector Info] 조회
-    /// 2. [CMD 52] [RTSP] 주소 조회
-    /// 3. [CMD 53] [ONNX] 파일 목록 조회
-    /// 4. [CMD 54] [RTSP] / [ONNX] 매핑 조회
+    /// 1. [CMD 01] [AI Detector Info] 조회
+    /// 2. [CMD 02] [RTSP] 주소 설정
+    /// 3. [CMD 03] [RTSP] 주소 조회
+    /// 4. [CMD 04] [ONNX] 파일 목록 조회
+    /// 5. [CMD 05] [RTSP] / [ONNX] [Mapping] 설정
+    /// 6. [CMD 06] [RTSP] / [ONNX] [Mapping] 조회
     /// </summary>
     public class AiDetectorPacketBuilder
     {
@@ -36,14 +38,15 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// </summary>
         private const byte Etx = 0x03;
 
-        #endregion
-
         /// <summary>
         /// 요청 [Payload] 파라미터 구분자
         /// 
-        /// 요청 Packet은 문서 기준 [Space] 구분자를 사용한다.
+        /// 현재 [RTSP] / [Mapping] 설정 [Payload]는
+        /// [US] [Unit Separator] 기준으로 생성하므로 현재는 사용하지 않는다.
         /// </summary>
         private const char RequestSeparator = ' ';
+
+        #endregion
 
         #region [Request Packet Builder]
 
@@ -82,7 +85,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [RTSP] 주소 조회 요청 [Packet] 생성
         /// 
         /// 요청 [CMD 03]
-        /// 응답 [CMD 53]
+        /// 응답 [CMD 52]
         /// </summary>
         public byte[] BuildRtspAddressRequest()
         {
@@ -93,7 +96,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [ONNX] 파일 목록 조회 요청 [Packet] 생성
         /// 
         /// 요청 [CMD 04]
-        /// 응답 [CMD 54]
+        /// 응답 [CMD 53]
         /// </summary>
         public byte[] BuildOnnxListRequest()
         {
@@ -101,14 +104,14 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         }
 
         /// <summary>
-        /// [RTSP] / [ONNX] Mapping 설정 요청 [Packet] 생성
+        /// [RTSP] / [ONNX] [Mapping] 설정 요청 [Packet] 생성
         /// 
         /// 요청 [CMD 05]
         /// 
-        /// UI에서 입력한 [RTSP 0] / [RTSP 1]별 [ONNX Index],
-        /// [Confidence], [IOU] 값을 기준으로 Mapping 설정 Packet을 생성한다.
+        /// [UI]에서 입력한 [RTSP 0] / [RTSP 1]별 [ONNX Index],
+        /// [Confidence], [IOU] 값을 기준으로 [Mapping] 설정 [Packet]을 생성한다.
         /// 
-        /// 생성 Payload 예:
+        /// 생성 [Payload] 예:
         /// 0:1^0.10^0.45[US]1:2^0.10^0.45
         /// </summary>
         public byte[] BuildRtspOnnxMappingSetRequest(
@@ -136,7 +139,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         }
 
         /// <summary>
-        /// [RTSP] / [ONNX] 매핑 조회 요청 [Packet] 생성
+        /// [RTSP] / [ONNX] [Mapping] 조회 요청 [Packet] 생성
         /// 
         /// 요청 [CMD 06]
         /// 응답 [CMD 56]
@@ -154,7 +157,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// 공통 요청 [Packet] 생성
         /// 
         /// [CMD]와 [Payload]를 기반으로
-        /// [AI Detector Agent] 송신용 완성 [Packet]을 생성한다.
+        /// [AI] [Detector Agent] 송신용 완성 [Packet]을 생성한다.
         /// 
         /// 조회 요청의 경우 [Payload]가 비어 있을 수 있으므로
         /// [SIZE]는 [000]으로 생성된다.
@@ -235,7 +238,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             index += payloadBytes.Length;
 
             packet[index++] = checksum;
-
             packet[index] = Etx;
 
             return packet;

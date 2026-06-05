@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace OpenCvWpfTracking.Services.Communication.AI
 {
     /// <summary>
-    /// [AI] [Detector Agent]와 [TCP] 통신을 담당하는 [Client Service]
+    /// [AI] [Detector Agent]와 [TCP] 통신을 담당하는 [Client] [Service]
     ///
     /// 역할:
     /// 1. [AI] [Detector Agent]에 [TCP] [Client]로 연결
@@ -35,7 +35,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         private NetworkStream _networkStream;
 
         /// <summary>
-        /// [ReceiveLoop] 종료 제어용 [Token]
+        /// [ReceiveLoop] 종료 제어용 [CancellationToken]
         /// </summary>
         private CancellationTokenSource _cts;
 
@@ -236,7 +236,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                             0,
                             buffer.Length);
 
-                    // [readSize]가 0이면 상대방이 연결 종료한 것
+                    // [readSize]가 [0]이면 상대방이 연결 종료한 상태
                     if (readSize <= 0)
                     {
                         Console.WriteLine("[AI TCP] Server Disconnected.");
@@ -266,7 +266,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             catch (ObjectDisposedException)
             {
                 // [Disconnect] 중 [Stream]이 닫히면서 발생 가능하므로,
-                // 정상 종료 흐름으로 처리.
+                // 정상 종료 흐름으로 처리한다.
                 Console.WriteLine("[AI TCP] Receive Loop Closed.");
             }
             catch (Exception ex)
@@ -365,7 +365,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch
             {
-                // 종료 과정에서 발생하는 예외는 무시
+                // 종료 과정에서 발생하는 예외는 무시한다.
             }
             finally
             {
@@ -387,7 +387,9 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// <summary>
         /// 수신 [Packet] [HEX] 로그 출력
         /// </summary>
-        private void PrintHex(string title, byte[] data)
+        private void PrintHex(
+            string title,
+            byte[] data)
         {
             Console.WriteLine(title + " " + BitConverter.ToString(data));
         }

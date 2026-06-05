@@ -71,12 +71,14 @@
                BasedOn="{StaticResource DeviceControlButtonStyle}">
             <Setter Property="Background"
                     Value="#37474F"/>
+            <Setter Property="Margin"
+                    Value="4"/>
             <Setter Property="Width"
                     Value="32"/>
             <Setter Property="Height"
                     Value="32"/>
             <Setter Property="FontSize"
-                    Value="16"/>
+                    Value="18"/>
         </Style>
 
         <!-- [STOP] 버튼 스타일 -->
@@ -92,7 +94,7 @@
             <Setter Property="BorderBrush"
                     Value="#708090"/>
             <Setter Property="FontSize"
-                    Value="11"/>
+                    Value="10"/>
         </Style>
 
         <!-- [EO] 제어 버튼 스타일 -->
@@ -128,16 +130,17 @@
             <Setter Property="Height"
                     Value="32"/>
             <Setter Property="FontSize"
-                    Value="13"/>
+                    Value="12"/>
         </Style>
     </Window.Resources>
 
     <!-- 메인 화면 전체 레이아웃 -->
-    <Grid Margin="10">
+    <Grid Margin="10"
+          Background="#2C313A">
         <Grid.RowDefinitions>
             <RowDefinition Height="3*"/>
-            <RowDefinition Height="1.15*"/>
-            <RowDefinition Height="90"/>
+            <RowDefinition Height="1.2*"/>
+            <RowDefinition Height="100"/>
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
@@ -215,9 +218,9 @@
 
                     <!-- 안내 문자 (왼쪽 상하단에 보이게) -->
                     <TextBlock Text="{Binding EoStatusText}"
-                               Margin="0,0,10,5"
-                               Foreground="#00E676"
-                               FontSize="18"
+                               Margin="0,0,8,2"
+                               Foreground="#7FB3E6"
+                               FontSize="15.5"
                                FontWeight="Bold"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Bottom"
@@ -298,8 +301,8 @@
 
                         <!-- 안내 문자 (오른쪽 상단에 보이게) -->
                         <TextBlock Text="{Binding IrStatusText}"
-                                   Margin="0,0,10,5"
-                                   Foreground="#FF7043"
+                                   Margin="0,0,8,2"
+                                   Foreground="#C4B5FD"
                                    FontSize="14.5"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Right"
@@ -320,8 +323,8 @@
 
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding VdStatusText}"
-                                   Margin="0,0,10,5"
-                                   Foreground="#4FC3F7"
+                                   Margin="0,0,8,2"
+                                   Foreground="#5EC8C8"
                                    FontSize="14.5"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Right"
@@ -353,7 +356,7 @@
                             Style="{StaticResource DisconnectButtonStyle}"
                             Command="{Binding DisconnectCommand}"/>
 
-                    <!-- 장비 연결 버튼 -->
+                    <!-- 장비 연결 -->
                     <Button Grid.Row="1"
                             Height="34"
                             Width="130"
@@ -380,12 +383,11 @@
                                        Foreground="White"
                                        FontSize="16"
                                        FontWeight="Bold"
-                                       Margin="0,0,0,10"/>
+                                       Margin="0,0,0,5"/>
 
                             <!-- 제어 패널 Scroll 영역 -->
                             <ScrollViewer Grid.Row="1"
                                           VerticalScrollBarVisibility="Auto"
-                                          Margin="0,0,0,10"
                                           HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel Orientation="Vertical" 
                                             Margin="0,0,0,10">
@@ -446,7 +448,6 @@
                                                 <!-- [TILT] [UP] -->
                                                 <Button Grid.Row="0"
                                                         Grid.Column="1"
-                                                        Margin="5"
                                                         Content="▲"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="TiltUp_MouseDown"
@@ -456,7 +457,6 @@
                                                 <!-- [PAN] [LEFT] -->
                                                 <Button Grid.Row="1"
                                                         Grid.Column="0"
-                                                        Margin="5"
                                                         Content="◀"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanLeft_MouseDown"
@@ -466,7 +466,7 @@
                                                 <!-- [STOP] -->
                                                 <Border Grid.Row="1"
                                                         Grid.Column="1"
-                                                        Margin="3"
+                                                        Margin="5"
                                                         Background="#3F454B"
                                                         BorderBrush="#8B949E"
                                                         BorderThickness="1">
@@ -479,7 +479,6 @@
                                                 <!-- [PAN] [RIGHT] -->
                                                 <Button Grid.Row="1"
                                                         Grid.Column="2"
-                                                        Margin="5"
                                                         Content="▶"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanRight_MouseDown"
@@ -489,7 +488,6 @@
                                                 <!-- [TILT] [DOWN] -->
                                                 <Button Grid.Row="2"
                                                         Grid.Column="1"
-                                                        Margin="5"
                                                         Content="▼"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="TiltDown_MouseDown"
@@ -676,7 +674,7 @@
                                                         Margin="0,0,0,10">
 
                                                 <!-- [IR] [Digital Zoom] 확대 -->
-                                                <Button Content="D-ZOOM +"
+                                                <Button Content=" D-ZOOM +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -769,7 +767,7 @@
                 BorderBrush="#4F6773"
                 BorderThickness="2"
                 CornerRadius="5"
-                Padding="8">
+                Padding="10">
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -787,10 +785,14 @@
 
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
+                        <!-- AI Agent -->
                         <ColumnDefinition Width="1.1*"/>
-                        <ColumnDefinition Width="2.5*"/>
+                        <!-- RTSP Setting -->
+                        <ColumnDefinition Width="2.1*"/>
+                        <!-- Mapping Setting -->
                         <ColumnDefinition Width="1.6*"/>
-                        <ColumnDefinition Width="1.2*"/>
+                        <!-- Display -->
+                        <ColumnDefinition Width="1.6*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- [1] AI Agent 연결 설정 -->
@@ -845,6 +847,7 @@
                                     Background="#1F4F4A"
                                     Command="{Binding ConnectAiAgentCommand}"/>
                         </Grid>
+
                     </GroupBox>
 
                     <!-- [2] RTSP 주소 설정 -->
@@ -899,6 +902,7 @@
                                     Background="#263B4A"
                                     Command="{Binding ApplyAiRtspCommand}"/>
                         </Grid>
+
                     </GroupBox>
 
                     <!-- [3] Mapping 설정 -->
@@ -1012,6 +1016,7 @@
                                     Background="#34505F"
                                     Command="{Binding ApplyAiMappingCommand}"/>
                         </Grid>
+
                     </GroupBox>
 
                     <!-- [4] 표시 / 조회 설정 -->
@@ -1077,7 +1082,6 @@
 
                             <TabControl Grid.Row="3"
                                         Grid.ColumnSpan="3"
-                                        Height="78"
                                         FontSize="11">
 
                                 <TabItem Header="RTSP">
@@ -1128,6 +1132,7 @@
                                         </ListBox.ItemTemplate>
                                     </ListBox>
                                 </TabItem>
+
                             </TabControl>
 
                         </Grid>

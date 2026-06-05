@@ -23,7 +23,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
     /// 
     /// 메인 클래스 역할:
     /// 1. [VD] / [EO RTSP] / [IR RTSP] 영상 출력 제어
-    /// 2. [LA]_(Local Agent) [TCP] 통신 서비스 초기화
+    /// 2. [LA] ([Local Agent]) [TCP] 통신 서비스 초기화
     /// 3. [TORUSS] 제어 명령 서비스 관리
     /// 4. [XAML] 바인딩용 [Image] / [StatusText] 갱신
     /// </summary>
@@ -32,7 +32,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Enum Type]
 
         /// <summary>
-        /// 현재 진행 중인 연속 제어 종류
+        /// 현재 진행 중인 [연속 제어] 종류
         /// </summary>
         private enum ContinuousMoveType
         {
@@ -52,7 +52,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Video State Fields]
 
         /// <summary>
-        /// 영상 모드 => [Index]
+        /// [영상 모드] => [Index]
         /// 
         /// 0 : [VD] 영상
         /// 1 : [EO] 영상
@@ -112,7 +112,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private bool _isEoFrameDisplayed;
 
         /// <summary>
-        /// [EO] 영상 첫 Frame 화면 표시 여부
+        /// [IR] 영상 첫 [Frame] 화면 표시 여부
         /// 
         /// true : [IR] 영상 표시 중
         /// false: 검은 화면 또는 미연결 상태
@@ -134,7 +134,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI] [Detector] [Packet Parser]
         /// 
-        /// [AI] [Detector Agent]에서 => 수신한 [Packet]을
+        /// [AI] [Detector Agent]에서 수신한 [Packet]을
         /// [CMD] / [SIZE] / [Payload] / [Checksum] 기준으로 해석한다.
         /// </summary>
         private readonly AiDetectorPacketParser _aiDetectorPacketParser;
@@ -176,7 +176,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private double _currentTilt;
 
         /// <summary>
-        /// 현재 어떤 연속 제어가 동작 중인지
+        /// 현재 어떤 [연속 제어]가 동작 중인지
         /// </summary>
         private ContinuousMoveType _currentMoveType = ContinuousMoveType.None;
 
@@ -283,7 +283,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 마지막 [AI Detector] 탐지 로그 출력 시간
         /// 
         /// [AI Detector] 탐지 [Packet]은 매우 빠르게 들어오므로,
-        /// [Console] 도배 방지 목적
+        /// [Console] 도배 방지 목적으로 사용한다.
         /// </summary>
         private DateTime _lastAiDetectorLogTime = DateTime.MinValue;
 
@@ -297,12 +297,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [AI Detector Setting Fields]
 
         /// <summary>
-        /// [AI Detector Agent] 연결 IP
+        /// [AI Detector Agent] 연결 [IP]
         /// </summary>
         private string _aiAgentIp = "192.168.20.160";
 
         /// <summary>
-        /// [AI Detector Agent] 연결 Port
+        /// [AI Detector Agent] 연결 [Port]
         /// </summary>
         private int _aiAgentPort = 5055;
 
@@ -331,17 +331,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private int _aiRtsp1OnnxIndex = 2;
 
         /// <summary>
-        /// [AI Detector] Mapping Confidence 기준값
+        /// [AI Detector] [Mapping Confidence] 기준값
         /// </summary>
         private double _aiMappingConfidence = 0.10;
 
         /// <summary>
-        /// [AI Detector] Mapping IOU 기준값
+        /// [AI Detector] [Mapping IOU] 기준값
         /// </summary>
         private double _aiMappingIou = 0.45;
 
         /// <summary>
-        /// 화면에 표시할 [Bounding Box] 최소 신뢰도 기준값
+        /// 화면에 표시할 [Bounding Box] 최소 [Confidence] 기준값
         /// </summary>
         private double _aiDisplayConfidenceThreshold = 0.40;
 
@@ -403,17 +403,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Image Binding Fields]
 
         /// <summary>
-        /// 오른쪽 하단 [VD] 파일 영상 출력용 이미지
+        /// 오른쪽 하단 [VD] 파일 영상 출력용 [Image]
         /// </summary>
         private BitmapSource _vdCameraImage;
 
         /// <summary>
-        /// 왼쪽 상하단 [EO] 주간 영상 출력용 이미지
+        /// 왼쪽 상하단 [EO] 주간 영상 출력용 [Image]
         /// </summary>
         private BitmapSource _eoCameraImage;
 
         /// <summary>
-        /// 오른쪽 상단 [IR] 열상 영상 출력용 이미지
+        /// 오른쪽 상단 [IR] 열상 영상 출력용 [Image]
         /// </summary>
         private BitmapSource _irCameraImage;
 
@@ -437,7 +437,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private string _irStatusText = "Disconnected";
 
         /// <summary>
-        /// 현재 영상 연결 진행 중 여부
+        /// 현재 영상 [Connect] 진행 중 여부
         ///
         /// true  : [Connect] 수행 중
         /// false : 연결 완료 또는 종료 상태
@@ -585,8 +585,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             #region [AI Detector Setting Command Binding]
 
-            #region [AI Detector Setting Command Binding]
-
             /// <summary>
             /// [AI Detector Agent] 수동 연결
             /// 
@@ -667,7 +665,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             #endregion
 
-            #endregion
 
             #region [Pan / Tilt Command Binding]
 
@@ -823,6 +820,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _controlCommandService.ReadOnceLrfValue();
             });
 
+            #endregion
+
             #region [STOP Command Binding]
 
             /// <summary>
@@ -840,8 +839,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 StopContinuousMove();
             });
-
-            #endregion
 
             #endregion
 
@@ -891,7 +888,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             /// <summary>
             /// [AI Detector Agent] 요청 [Packet] 생성
-            /// <summary>
+            /// </summary>
             _aiPacketBuilder = new AiDetectorPacketBuilder();
 
             /// <summary>
@@ -1084,7 +1081,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [AI Detector Setting Properties]
 
         /// <summary>
-        /// [AI Detector Agent] 연결 IP
+        /// [AI Detector Agent] 연결 [IP]
         /// </summary>
         public string AiAgentIp
         {
@@ -1102,7 +1099,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [AI Detector Agent] 연결 Port
+        /// [AI Detector Agent] 연결 [Port]
         /// </summary>
         public int AiAgentPort
         {
@@ -1192,7 +1189,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [AI Detector] Mapping Confidence 기준값
+        /// [AI Detector] [Mapping Confidence] 기준값
         /// </summary>
         public double AiMappingConfidence
         {
@@ -1217,7 +1214,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiMappingConfidence.ToString("0.00");
 
         /// <summary>
-        /// [AI Detector] Mapping IOU 기준값
+        /// [AI Detector] [Mapping IOU] 기준값
         /// </summary>
         public double AiMappingIou
         {
@@ -1929,7 +1926,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public async void Connect()
         {
             /// <summary>
-            /// 현재 연결 시도 중이면
+            /// 현재 [Connect] 시도 중이면
             /// 중복 [Connect] 입력 무시
             /// </summary>
             if (_isVideoConnecting)
@@ -2087,7 +2084,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// <summary>
                 /// [VD] 연결 성공 시
                 /// 별도 [Thread]에서 영상 출력 시작
-                /// <summary>
+                /// </summary>
                 if (vdResult.VdResult)
                 {
                     _ = Task.Run(() =>
@@ -2157,7 +2154,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine();
 
             /// <summary>
-            /// 현재 연결 시도 중이면,
+            /// 현재 [Connect] 시도 중이면,
             /// [Disconnect] 입력 무시
             /// </summary>
             if (_isVideoConnecting)
@@ -2169,7 +2166,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            // 1. 먼저 루프 종료 요청
+            // 1. 먼저 [Loop] 종료 요청
             _cts?.Cancel();
 
             /// <summary>
@@ -2182,7 +2179,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _isIrFrameDisplayed = false;
 
-            // 3. [Service / Decoder] 객체 종료
+            // 3. [Service] / [Decoder] 객체 종료
             _vdDecoder.Release();
 
             _eoDecoder.Close();
@@ -2206,7 +2203,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 EoStatusText = "Disconnected";
                 IrStatusText = "Disconnected";
             });
-            // 5. [VIDEO] 연결 해제 완료 로그 출력
+            // 5. [VIDEO] 연결 해제 완료 [Log] 출력
             Console.WriteLine("[VIDEO] Disconnect Complete.");
             ConsoleLogHelper.PrintLine();
         }
@@ -3257,6 +3254,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     default:
                         Console.WriteLine(
                             $"[AI DETECT] Unknown RTSP Index : {result.RtspIndex}");
+
                         break;
                 }
 

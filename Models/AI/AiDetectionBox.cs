@@ -13,8 +13,9 @@
         /// <summary>
         /// [AI Detector] 클래스 인덱스
         /// 
-        /// 0 = [드론]
+        /// 0 = [Drone]
         /// 1 = [ONNX]
+        /// 2 = [ClassIndex]
         /// </summary>
         public int ClassIndex { get; set; }
 

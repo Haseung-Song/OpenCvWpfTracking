@@ -24,9 +24,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
     ///
     /// [Payload] 내부 파라미터 구분자:
     /// 
-    /// [US] [Unit Separator] : 
-    /// 1) [Space]
-    /// 2) [US] [Unit Separator] [0x1F]
+    /// 현재 [US] [Unit Separator] [0x1F] 기준으로 구분한다.
     /// </summary>
     public class AiDetectorPacketParser
     {
@@ -287,10 +285,10 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         }
 
         /// <summary>
-        /// [CMD 54 / 56] [RTSP] / [ONNX] Mapping [Payload] 파싱
+        /// [CMD 54 / 56] [RTSP] / [ONNX] [Mapping] [Payload] 파싱
         /// 
         /// [Payload] 예:
-        /// 0:1^0.10^0.45 [US] 1:0^0.10^0.45,1^0.10^0.45
+        /// 0:1^0.10^0.45[US]1:0^0.10^0.45,1^0.10^0.45
         /// </summary>
         public List<AiMappingInfo> ParseMappingPayload(string payload)
         {
@@ -367,6 +365,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                             Confidence = confidence,
                             Iou = iou
                         });
+
                 }
 
             }
@@ -374,13 +373,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         }
 
         #endregion
-
-
-
-
-
-
-
 
         #region [Common Packet Parse]
 
@@ -550,7 +542,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [ObjectId] [ClassIndex] [Confidence] [Left] [Top] [Right] [Bottom] ...
         ///
         /// [Payload] 내부 파라미터는
-        /// [Space] 또는
         /// [US] [Unit Separator] [0x1F]
         /// 기준으로 구분된다.
         ///
@@ -571,16 +562,14 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             /// <summary>
             /// [Payload] 내부 파라미터 분리
             /// 
-            /// [구버전] [AI Detector Agent]는 [Space],
-            /// [신버전] [AI Detector Agent]는
-            /// [US] [Unit Separator] [0x1F]를 사용하므로
-            /// 두 구분자를 모두 지원한다.
+            /// [AI Detector Agent] [Payload]는
+            /// [US] [Unit Separator] [0x1F] 기준으로 구분한다.
             /// </summary>
             string[] tokens = payload.Split(
                 new[] { PayloadSeparator },
                 StringSplitOptions.RemoveEmptyEntries);
 
-            // 최소 4개는 있어야 함:
+            // 최소 [4]개는 있어야 한다.
             // [FrameTime] / [InferenceMs] / [RtspIndex] / [DetectionCount]
             if (tokens.Length < 4)
             {
@@ -614,7 +603,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
                 return false;
             }
 
-            // 객체 1개당 7개 필드
+            // 객체 [1]개당 [7]개 필드
             int expectedTokenCount = 4 + detectionCount * 7;
 
             if (tokens.Length < expectedTokenCount)

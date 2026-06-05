@@ -10,7 +10,7 @@ namespace OpenCvWpfTracking
     public partial class MainWindow : Window
     {
         /// <summary>
-        /// [Main] 화면 -> [ViewModel]: [XAML]의 [Binding] 연결!
+        /// [Main] 화면 -> [ViewModel] : [XAML]의 [Binding] 연결
         /// </summary>
         private readonly MainViewModel vm = new MainViewModel();
 

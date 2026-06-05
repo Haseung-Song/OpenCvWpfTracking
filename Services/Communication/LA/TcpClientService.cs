@@ -112,6 +112,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 Console.WriteLine("[TCP] Connect Success.");
                 ConsoleLogHelper.PrintLine();
+
                 return true;
             }
             catch (Exception ex)
@@ -120,6 +121,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 ConsoleLogHelper.PrintLine();
 
                 Disconnect();
+
                 return false;
             }
 
@@ -154,11 +156,13 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 // 송신 [Packet] [HEX] [Log] 출력
                 PrintHexData("[TCP SEND]", data);
+
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[TCP ERROR] Send Failed : " + ex.Message);
+
                 return false;
             }
 
