@@ -132,7 +132,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             }
             catch (Exception ex)
             {
-                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI TCP ERROR] Connect Failed : " + ex.Message);
                 ConsoleLogHelper.PrintLine();
 
@@ -345,6 +344,7 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// [CMD 52]
         /// [CMD 53]
         /// [CMD 54]
+        /// 
         /// 조회 요청에 사용한다.
         /// </summary>
         public async Task<bool> SendAsync(

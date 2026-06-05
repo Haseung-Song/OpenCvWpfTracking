@@ -6,8 +6,7 @@
         xmlns:local="clr-namespace:OpenCvWpfTracking"    
         mc:Ignorable="d"
         Title="TORUSS [EO/IR] DEMO VIEWER"
-        Width="1920"
-        Height="1080">
+        Width="1920" Height="1080">
     <Window.Resources>
         <!-- [AI Detector] 설정 패널 공통 버튼 스타일 -->
         <Style x:Key="AiSettingButtonStyle"
@@ -144,8 +143,7 @@
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
-        <Grid Grid.Row="0"
-              Margin="0,0,0,5">
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2.3*" />
                 <ColumnDefinition Width="1.1*" />
@@ -154,7 +152,7 @@
 
             <!-- [좌측] 큰 영상 -->
             <Border Grid.Column="0"
-                    Margin="0,0,15,0"
+                    Margin="5,5,10,0"
                     Background="Black"
                     BorderBrush="#5A5A5A"
                     BorderThickness="2">
@@ -237,7 +235,7 @@
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
-                        Margin="0,0,10,0"
+                        Margin="0,5,5,0"
                         Background="Black"
                         BorderBrush="#5A5A5A"
                         BorderThickness="2">
@@ -301,7 +299,7 @@
 
                         <!-- 안내 문자 (오른쪽 상단에 보이게) -->
                         <TextBlock Text="{Binding IrStatusText}"
-                                   Margin="0,0,8,2"
+                                   Margin="0,0,8,0"
                                    Foreground="#C4B5FD"
                                    FontSize="14.5"
                                    FontWeight="Bold"
@@ -312,7 +310,7 @@
                 </Border>
 
                 <Border Grid.Row="1"
-                        Margin="0,0,10,0"
+                        Margin="0,5,5,0"
                         Background="Black"
                         BorderBrush="#5A5A5A"
                         BorderThickness="2">
@@ -323,7 +321,7 @@
 
                         <!-- 안내 문자 (오른쪽 하단에 보이게) -->
                         <TextBlock Text="{Binding VdStatusText}"
-                                   Margin="0,0,8,2"
+                                   Margin="0,0,8,0"
                                    Foreground="#5EC8C8"
                                    FontSize="14.5"
                                    FontWeight="Bold"
@@ -336,9 +334,11 @@
 
             <!-- 우측 제어 패널 -->
             <Border Grid.Column="2"
+                    Margin="0,5,5,0"
                     Background="#646A71"
                     BorderBrush="#8B949E"
                     BorderThickness="2"
+                    CornerRadius="5"
                     Padding="10">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -370,7 +370,7 @@
                             Background="#5F666D"
                             BorderBrush="#95A5B0"
                             BorderThickness="1.5"
-                            Padding="6">
+                            Padding="3">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <!-- 제목 -->
@@ -674,7 +674,7 @@
                                                         Margin="0,0,0,10">
 
                                                 <!-- [IR] [Digital Zoom] 확대 -->
-                                                <Button Content=" D-ZOOM +"
+                                                <Button Content="D-ZOOM +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -762,7 +762,7 @@
 
         <!-- [AI Detector] 설정 패널 -->
         <Border Grid.Row="1"
-                Margin="0,5,0,5"
+                Margin="5,5,5,5"
                 Background="#20262D"
                 BorderBrush="#4F6773"
                 BorderThickness="2"
@@ -781,7 +781,7 @@
                            Foreground="#00B8D4"
                            FontSize="15"
                            FontWeight="Bold"
-                           Margin="0,0,0,6"/>
+                           Margin="0,0,0,5"/>
 
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>

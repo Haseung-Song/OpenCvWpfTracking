@@ -73,12 +73,15 @@
                 switch (ClassIndex)
                 {
                     case 0:
+                        // [Drone] 탐지 클래스
                         return "드론";
 
                     case 1:
+                        // [ONNX] 기본 탐지 클래스
                         return "ONNX";
 
                     default:
+                        // 미정의 탐지 클래스
                         return $"Class {ClassIndex}";
                 }
 

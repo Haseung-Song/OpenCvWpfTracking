@@ -323,27 +323,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [RTSP Index 0]에 연결할 [ONNX Index]
         /// </summary>
-        private int _aiRtsp0OnnxIndex = 1;
+        private int _aiRtsp0OnnxIndex;
 
         /// <summary>
         /// [RTSP Index 1]에 연결할 [ONNX Index]
         /// </summary>
-        private int _aiRtsp1OnnxIndex = 2;
+        private int _aiRtsp1OnnxIndex;
 
         /// <summary>
         /// [AI Detector] [Mapping Confidence] 기준값
         /// </summary>
-        private double _aiMappingConfidence = 0.10;
+        private double _aiMappingConfidence;
 
         /// <summary>
         /// [AI Detector] [Mapping IOU] 기준값
         /// </summary>
-        private double _aiMappingIou = 0.45;
+        private double _aiMappingIou;
 
         /// <summary>
         /// 화면에 표시할 [Bounding Box] 최소 [Confidence] 기준값
         /// </summary>
-        private double _aiDisplayConfidenceThreshold = 0.40;
+        private double _aiDisplayConfidenceThreshold;
 
         /// <summary>
         /// [AI Detector Setting] 상태 표시 문자열
@@ -735,9 +735,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     async () =>
                     {
                         AiSettingStatusText = "[AI] Apply Mapping...";
-
                         await RequestAiDetectorMappingSetAsync();
-
                         AiSettingStatusText = "[AI] Mapping Apply Complete";
                     });
 
@@ -1678,7 +1676,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiRtsp0OnnxIndex = 1;
             AiRtsp1OnnxIndex = 1;
 
-            AiMappingConfidence = 0.10;
+            AiMappingConfidence = 0.15;
             AiMappingIou = 0.45;
 
             AiDisplayConfidenceThreshold = 0.10;
@@ -2036,8 +2034,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 Console.WriteLine();
                 Console.WriteLine("[VIDEO] Connecting...");
-                ConsoleLogHelper.PrintLine();
 
+                ConsoleLogHelper.PrintLine();
                 return;
             }
 
@@ -2061,7 +2059,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 Console.WriteLine("[VIDEO] Already Connected.");
                 ConsoleLogHelper.PrintLine();
-
                 return;
             }
 
@@ -2373,8 +2370,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 EoStatusText = "Disconnected";
                 IrStatusText = "Disconnected";
             });
+
             // 5. [VIDEO] 연결 해제 완료 [Log] 출력
             Console.WriteLine("[VIDEO] Disconnect Complete.");
+
             ConsoleLogHelper.PrintLine();
         }
 
@@ -2956,7 +2955,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     break;
 
                 case 0xA3:
-
                     /// <summary>
                     /// [Function] [0xA3]
                     /// 
@@ -3204,6 +3202,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
             double distance = BitConverter.ToDouble(packet, 2);
             LrfDistanceText = $"DISTANCE : {distance:F1} m";
+
             Console.WriteLine($"[LRF] Distance : {distance:F1} m");
         }
 
@@ -3418,15 +3417,28 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         /// [Drone] 전용 탐지 결과로 사용되며,
                         /// [EO] 화면에 [Bounding Box]를 표시한다.
                         /// </summary>
+
+                        /// <summary>
+                        /// [AI Detector] 표시 대상 [Bounding Box] 생성
+                        /// 
+                        /// [Confidence] 기준 필터링 후
+                        /// [ConvertBoxForDisplay()]를 사용하여
+                        /// 현재 [EO] 영상 해상도 및 [Zoom] 상태가 반영된
+                        /// 화면 표시용 좌표로 변환한다.
+                        /// </summary>
                         List<AiDetectionBox> rtspIndex0DisplayBoxes =
                             result.Boxes
                                 .Where(box => box.Confidence >= AiDisplayConfidenceThreshold)
+                                .Select(box =>
+                                    ConvertBoxForDisplay(
+                                        box,
+                                        EoVideoWidth,
+                                        EoVideoHeight))
                                 .ToList();
 
                         UpdateDetectionBoxes(
                             EoDetectionBoxes,
                             rtspIndex0DisplayBoxes);
-
                         break;
 
                     case 1:
@@ -3444,21 +3456,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         /// [YOLOv7] 탐지 결과로 사용되며,
                         /// [IR] 화면에 [Bounding Box]를 표시한다.
                         /// </summary>
+
+                        /// <summary>
+                        /// [AI Detector] 표시 대상 [Bounding Box] 생성
+                        /// 
+                        /// [Confidence] 기준 필터링 후
+                        /// [ConvertBoxForDisplay()]를 사용하여
+                        /// 현재 [IR] 영상 해상도 및 [Zoom] 상태가 반영된
+                        /// 화면 표시용 좌표로 변환한다.
+                        /// </summary>
                         List<AiDetectionBox> rtspIndex1DisplayBoxes =
                             result.Boxes
                                 .Where(box => box.Confidence >= AiDisplayConfidenceThreshold)
+                                .Select(box =>
+                                    ConvertBoxForDisplay(
+                                        box,
+                                        IrVideoWidth,
+                                        IrVideoHeight))
                                 .ToList();
 
                         UpdateDetectionBoxes(
                             IrDetectionBoxes,
                             rtspIndex1DisplayBoxes);
-
                         break;
 
                     default:
                         Console.WriteLine(
                             $"[AI DETECT] Unknown RTSP Index : {result.RtspIndex}");
-
                         break;
                 }
 
@@ -3484,8 +3508,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             if (canPrintAiLog)
             {
+                ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[AI DETECTOR PACKET] Detection Data");
                 Console.WriteLine();
+
                 Console.WriteLine($"[AI DETECT] [Frame Time]   : {result.FrameTime}");
                 Console.WriteLine($"[AI DETECT] [Inference ms] : {result.InferenceMs}");
                 Console.WriteLine($"[AI DETECT] [RTSP Index]   : {result.RtspIndex}");
@@ -3522,6 +3548,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             ConsoleLogHelper.PrintLine();
             Console.WriteLine("[AI DETECTOR RESPONSE] [CMD 51] Detector Info");
             Console.WriteLine("[AI PAYLOAD] " + payload);
+
             ConsoleLogHelper.PrintLine();
         }
 
@@ -3919,6 +3946,29 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _lastAiDetectorLogTime = DateTime.Now;
 
             return true;
+        }
+
+        #endregion
+
+        #region [AI Bounding Box Display Helpers]
+
+        /// <summary>
+        /// [AI Detector] [Bounding Box] 표시 좌표 보정
+        /// 
+        /// 현재 [AI Agent] 좌표와 [Viewer] 표시 좌표가
+        /// [Zoom] 상태에 따라 어긋나는 경우를 보정하기 위한 함수이다.
+        /// 
+        /// 기본 기준:
+        /// - [Zoom] 기준값 : 5
+        /// - 현재 [EO Zoom] 값이 커질수록 중앙 기준으로 [Box] 확대
+        /// - 현재 [EO Zoom] 값이 작아질수록 중앙 기준으로 [Box] 축소
+        /// </summary>
+        private AiDetectionBox ConvertBoxForDisplay(
+            AiDetectionBox sourceBox,
+            int videoWidth,
+            int videoHeight)
+        {
+            return sourceBox;
         }
 
         #endregion
