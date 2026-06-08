@@ -61,7 +61,6 @@
         ///
         /// 현재 기준:
         /// [ClassIndex 0] => Drone
-        /// [ClassIndex 1] => ONNX
         ///
         /// [ClassIndex 1]은 [Drone + best.onnx] 통합 탐지 결과로
         /// 실제 객체 종류(배, 차량 등)는 추가 매핑 확인이 필요하다.
@@ -74,14 +73,10 @@
                 {
                     case 0:
                         // [Drone] 탐지 클래스
-                        return "드론";
-
-                    case 1:
-                        // [ONNX] 기본 탐지 클래스
-                        return "ONNX";
+                        return "Drone";
 
                     default:
-                        // 미정의 탐지 클래스
+                        // [Index] 탐지 클래스
                         return $"Class {ClassIndex}";
                 }
 

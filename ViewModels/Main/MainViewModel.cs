@@ -1679,7 +1679,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiMappingConfidence = 0.15;
             AiMappingIou = 0.45;
 
-            AiDisplayConfidenceThreshold = 0.10;
+            AiDisplayConfidenceThreshold = 0.45;
         }
 
         #endregion
