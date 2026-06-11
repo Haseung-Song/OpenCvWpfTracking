@@ -94,6 +94,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 ConsoleLogHelper.PrintLine();
                 Console.WriteLine("[TCP] Connect Try...");
                 Console.WriteLine($"[TCP] Target : {ip}:{port}");
+                ConsoleLogHelper.PrintLine();
 
                 // [TCP] [Client] 객체 생성
                 _tcpClient = new TcpClient();
