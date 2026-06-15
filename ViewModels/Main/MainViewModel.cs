@@ -388,6 +388,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        /// <summary>
+        /// [AI Tracking] 자동 추적 사용 여부
+        /// </summary>
+        private bool _isAutoTrackingEnabled;
+
         #region [Video Runtime Fields]
 
         /// <summary>
@@ -1383,6 +1388,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         #endregion
+
+        /// <summary>
+        /// [AI Tracking] 자동 추적 사용 여부
+        /// </summary>
+        public bool IsAutoTrackingEnabled
+        {
+            get => _isAutoTrackingEnabled;
+            set
+            {
+                if (_isAutoTrackingEnabled != value)
+                {
+                    _isAutoTrackingEnabled = value;
+                    OnPropertyChanged();
+                }
+
+            }
+
+        }
 
         #region [Video Mode Properties]
 
