@@ -1633,12 +1633,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            EoSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 4-1. 옥상 [GOP] 주간(EO) 카메라
             //EoSourceAddress =
@@ -1649,13 +1649,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-2. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            //IrSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            IrSourceAddress =
+                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-2. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
             // [ID], [PW] 및 [PORT] 맞는지 Config 확인 완료
-            IrSourceAddress =
-                "rtsp://admin:admin@192.168.0.101:554/hdmi";
+            //IrSourceAddress =
+            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 4-2. 옥상 [GOP] 열상(IR) 카메라
             //IrSourceAddress =
@@ -1679,7 +1679,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             AiMappingConfidence = 0.15;
             AiMappingIou = 0.45;
 
-            AiDisplayConfidenceThreshold = 0.45;
+            AiDisplayConfidenceThreshold = 0.15;
         }
 
         #endregion
