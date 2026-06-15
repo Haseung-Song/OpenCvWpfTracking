@@ -2831,7 +2831,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     // 5001 (옥상 카메라 제어)
                     // 5005 (연구 개발실 제어)
                     // 5001 (일층 생산팀 제어)
-                    5001);
+                    5005);
 
             Console.WriteLine(
                 "[LA CONNECT RESULT] "
