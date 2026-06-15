@@ -353,6 +353,8 @@ namespace OpenCvWpfTracking.Services.Communication.AI
             if (_tcpClient == null ||
                 !_tcpClient.Connected)
             {
+                ConsoleLogHelper.PrintLine();
+
                 Console.WriteLine(
                     "[AI TCP] Send Failed : Not Connected");
 

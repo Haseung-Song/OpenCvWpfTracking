@@ -753,6 +753,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 new AsyncRelayCommand(
                     async () =>
                     {
+                        if (!_aiDetectorClientService.IsConnected)
+                        {
+                            AiSettingStatusText =
+                                "[AI] Not Connected";
+
+                            ConsoleLogHelper.PrintLine();
+
+                            Console.WriteLine(
+                                "[AI TCP] Refresh Failed : Not Connected");
+
+                            ConsoleLogHelper.PrintLine();
+
+                            return;
+                        }
+
                         AiSettingStatusText = "[AI] Refresh Setting...";
 
                         await RequestAiDetectorInfoAsync();
