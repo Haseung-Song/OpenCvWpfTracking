@@ -168,13 +168,7 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Services\Coordinate\" />
-    <Folder Include="Services\Logging\" />
-    <Folder Include="Views\Menu\" />
-    <Folder Include="Views\Panorama\" />
-    <Folder Include="Views\Video\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Content Include="FFmpeg\avcodec-62.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
