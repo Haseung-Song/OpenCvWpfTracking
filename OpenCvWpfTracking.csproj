@@ -133,6 +133,7 @@
     <Compile Include="Services\Communication\LA\LAPacketParser.cs" />
     <Compile Include="Services\Communication\LA\LaResponsePacket.cs" />
     <Compile Include="Services\Communication\LA\TcpClientService.cs" />
+    <Compile Include="Services\Communication\LA\WebAgentPelcoClientService.cs" />
     <Compile Include="Services\Video\FFmpegDecoderService.cs" />
     <Compile Include="Services\Video\VideoCaptureService.cs" />
     <Compile Include="ViewModels\Main\MainViewModel.cs" />

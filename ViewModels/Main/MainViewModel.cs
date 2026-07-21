@@ -104,6 +104,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private readonly ControlCommandService _controlCommandService;
 
         /// <summary>
+        /// [EO] 주간 카메라 [Web Agent] [TCP Socket] 제어 서비스
+        ///
+        /// [MR500 환경부 과제] 장비 기준으로
+        /// 기존 [Pelco-D] 7 Byte 명령을 [192.168.0.100:9000]으로 송신한다.
+        /// [Web Agent]가 수신한 명령을 실제 카메라 제어 통신으로 우회 처리한다.
+        /// </summary>
+        private readonly WebAgentPelcoClientService _eoWebAgentControlService;
+
+        /// <summary>
         /// [EO] 영상 첫 Frame 화면 표시 여부
         /// 
         /// true : [EO] 영상 표시 중
@@ -870,7 +879,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoZoomGoPosition(targetZoom);
+                _eoWebAgentControlService.MoveZoomPosition(targetZoom);
             });
 
             /// <summary>
@@ -886,7 +895,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] ZOOM -{ZoomMoveStep} => Target : {targetZoom}");
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoZoomGoPosition(targetZoom);
+                _eoWebAgentControlService.MoveZoomPosition(targetZoom);
             });
 
             /// <summary>
@@ -902,7 +911,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoFocusGoPosition(targetFocus);
+                _eoWebAgentControlService.MoveFocusPosition(targetFocus);
             });
 
             /// <summary>
@@ -918,7 +927,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoFocusGoPosition(targetFocus);
+                _eoWebAgentControlService.MoveFocusPosition(targetFocus);
             });
 
             #endregion
@@ -983,6 +992,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [TORUSS] 제어 명령 서비스 생성
             /// </summary>
             _controlCommandService = new ControlCommandService(_laTcpService);
+
+            /// <summary>
+            /// [EO] 주간 카메라 [Web Agent] 제어 서비스 생성
+            ///
+            /// [MR500 환경부 과제] 프로그램 스펙 기준:
+            /// - EO Camera / Agent IP : 192.168.20.161
+            /// - TCP Control Port     : 5005
+            /// </summary>
+            _eoWebAgentControlService =
+                new WebAgentPelcoClientService(
+                    "192.168.20.161",
+                    5005);
 
             /// <summary>
             /// [LA] 수신 [Packet Parser] 생성
@@ -1671,24 +1692,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            EoSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            //EoSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
             //EoSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 4-1. 옥상 [GOP] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://root:rmffhqjf1!@192.168.1.3:554/AVStream1_1";
+            EoSourceAddress =
+                "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
 
             // 1-2. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
             //IrSourceAddress =
             //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
 
             // 2-2. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            IrSourceAddress =
-                "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
+            //IrSourceAddress =
+            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
 
             // 3-2. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
             // [ID], [PW] 및 [PORT] 맞는지 Config 확인 완료
@@ -1696,8 +1717,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 4-2. 옥상 [GOP] 열상(IR) 카메라
-            //IrSourceAddress =
-            //    "rtsp://admin:Cg600ip100m@192.168.1.30:554/stream1";
+            IrSourceAddress =
+                "rtsp://root:rmffhqjf1!@192.168.0.121:554/cam0_0";
         }
 
         /// <summary>
@@ -1809,7 +1830,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO ZOOM TELE START");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartEoZoomTele();
+            _eoWebAgentControlService
+                .StartZoomTele();
         }
 
         /// <summary>
@@ -1823,7 +1845,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO ZOOM WIDE START");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartEoZoomWide();
+            _eoWebAgentControlService
+                .StartZoomWide();
         }
 
         /// <summary>
@@ -1837,7 +1860,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO FOCUS NEAR START");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartEoFocusNear();
+            _eoWebAgentControlService
+                .StartFocusNear();
         }
 
         /// <summary>
@@ -1851,7 +1875,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO FOCUS FAR START");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartEoFocusFar();
+            _eoWebAgentControlService
+                .StartFocusFar();
+        }
+
+        /// <summary>
+        /// [EO] 주간 카메라 [One Push Focus] 요청
+        /// </summary>
+        public void StartEoAutoFocusMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine("[CONTROL] EO ONE PUSH FOCUS REQUEST");
+            ConsoleLogHelper.PrintLine();
+
+            _eoWebAgentControlService
+                .StartAutoFocus();
         }
 
         #endregion
@@ -2015,13 +2053,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 case ContinuousMoveType.PanTilt:
 
+                    // [Pan / Tilt] 기존 [Pelco-D] 연속 제어 정지
+                    _controlCommandService
+                        .StopMove();
+                    break;
+
                 case ContinuousMoveType.EoZoom:
+
+                    // [EO] 주간 카메라 [Web Agent / Pelco-D] 연속 제어 정지
+                    _eoWebAgentControlService
+                        .StopMove();
+                    break;
 
                 case ContinuousMoveType.EoFocus:
 
-                    // [Pelco-D] 기본 연속 제어 정지
-                    // [Pan] / [Tilt] / [EO Zoom] / [EO Focus] 정지에 사용
-                    _controlCommandService.StopMove();
+                    // [EO] 주간 카메라 [Web Agent / Pelco-D] 연속 제어 정지
+                    _eoWebAgentControlService
+                        .StopMove();
                     break;
 
                 case ContinuousMoveType.IrZoom:
@@ -2824,7 +2872,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [LA] 연결 시작
         /// 
-        /// 1. 옥상 카메라 제어 [Port]: 5001
+        /// 1. 옥상 카메라 제어 [Port]: 5002
         /// 2. 연구 개발실 제어 [Port]: 5005
         /// 3. 일층 생산팀 제어 [Port]: 5001
         /// 
@@ -2843,10 +2891,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             bool result =
                 await _laTcpService.ConnectAsync(
                     "127.0.0.1",
-                    // 5001 (옥상 카메라 제어)
+                    // 5002 (옥상 카메라 제어)
                     // 5005 (연구 개발실 제어)
                     // 5001 (일층 생산팀 제어)
-                    5005);
+                    5002);
 
             Console.WriteLine(
                 "[LA CONNECT RESULT] "

@@ -519,6 +519,7 @@
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
 
                                             <!-- 제목 -->
@@ -583,6 +584,16 @@
                                                         MouseLeave="MoveStop_MouseUp"/>
 
                                             </StackPanel>
+
+                                            <!-- [EO] [One Push Focus] 제어 -->
+                                            <Button Grid.Row="3"
+                                                    Content="AUTO FOCUS"
+                                                    Width="180"
+                                                    Margin="5,5,5,0"
+                                                    HorizontalAlignment="Center"
+                                                    Focusable="False"
+                                                    Style="{StaticResource EoControlButtonStyle}"
+                                                    PreviewMouseDown="EoAutoFocus_MouseDown"/>
 
                                         </Grid>
                                     </Border>

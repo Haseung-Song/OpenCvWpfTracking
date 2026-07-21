@@ -90,6 +90,14 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
+        /// [EO] [One Push Focus] 버튼 [MouseDown]
+        /// </summary>
+        private void EoAutoFocus_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            vm?.StartEoAutoFocusMove();
+        }
+
+        /// <summary>
         /// [IR] [ZOOM] 확대 버튼 [MouseDown]
         /// </summary>
         private void IrZoomIn_MouseDown(object sender, MouseButtonEventArgs e)
