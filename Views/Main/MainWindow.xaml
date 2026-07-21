@@ -678,34 +678,6 @@
 
                                             </StackPanel>
 
-                                            <!-- [IR] [Digital Zoom] 제어 -->
-                                            <StackPanel Grid.Row="3"
-                                                        Orientation="Horizontal"
-                                                        HorizontalAlignment="Center"
-                                                        Margin="0,0,0,10">
-
-                                                <!-- [IR] [Digital Zoom] 확대 -->
-                                                <Button Content="D-ZOOM +"
-                                                        Width="85"
-                                                        Margin="5"
-                                                        Focusable="False"
-                                                        Style="{StaticResource IrControlButtonStyle}"
-                                                        PreviewMouseDown="IrDigitalZoomIn_MouseDown"
-                                                        PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
-
-                                                <!-- [IR] [Digital Zoom] 축소 -->
-                                                <Button Content="D-ZOOM -"
-                                                        Width="85"
-                                                        Margin="5"
-                                                        Focusable="False"
-                                                        Style="{StaticResource IrControlButtonStyle}"
-                                                        PreviewMouseDown="IrDigitalZoomOut_MouseDown"
-                                                        PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
-
-                                            </StackPanel>
-
                                             <!-- [IR] [Auto Focus] 제어 -->
                                             <Button Grid.Row="4"
                                                     Content="AUTO FOCUS"
@@ -719,7 +691,7 @@
                                     </Border>
 
                                     <!-- [LRF] 제어 -->
-                                    <Border Grid.Row="2"
+                                    <!--<Border Grid.Row="2"
                                             Margin="0,10,10,0"
                                             Background="#5F666D"
                                             BorderBrush="#95A5B0"
@@ -733,14 +705,14 @@
                                                 <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
 
-                                            <!-- 제목 -->
+                                            --><!-- 제목 --><!--
                                             <TextBlock Text="LRF CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
 
-                                            <!-- [LRF] [1회] 거리 측정 -->
+                                            --><!-- [LRF] [1회] 거리 측정 --><!--
                                             <Button Grid.Row="1"
                                                     Content="MEASURE"
                                                     Width="180"
@@ -749,7 +721,7 @@
                                                     Style="{StaticResource LrfControlButtonStyle}"
                                                     Command="{Binding LrfMeasureCommand}"/>
 
-                                            <!-- 추후 거리값 표시 영역 -->
+                                            --><!-- 추후 거리값 표시 영역 --><!--
                                             <TextBlock Grid.Row="2"
                                                        Text="{Binding LrfDistanceText}"
                                                        Foreground="#D0D7DE"
@@ -758,7 +730,7 @@
                                                        HorizontalAlignment="Center"
                                                        Margin="0,10,0,0"/>
                                         </Grid>
-                                    </Border>
+                                    </Border>-->
 
                                 </StackPanel>
                             </ScrollViewer>

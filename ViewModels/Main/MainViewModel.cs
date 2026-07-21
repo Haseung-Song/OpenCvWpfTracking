@@ -202,7 +202,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 이후 [Slider] 또는 [ComboBox] 등 [UI] 조작으로 값이 변경될 수 있으며,
         /// 실제 연속 이동 제어 시 해당 값을 사용한다.
         /// </summary>
-        private byte _panTiltSpeedLevel = 30;
+        private byte _panTiltSpeedLevel = 15;
 
         /// <summary>
         /// [ZOOM] 버튼 1회 클릭 시 이동할 값
