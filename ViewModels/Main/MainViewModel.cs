@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace OpenCvWpfTracking.ViewModels.Main
 {
@@ -43,6 +44,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
             IrZoom,
             IrFocus,
             IrDigitalZoom
+        }
+
+        /// <summary>
+        /// 현재 키보드 방향키 조합으로 수행 중인
+        /// Pan / Tilt 이동 방향
+        /// </summary>
+        private enum KeyboardPanTiltDirection
+        {
+            None,
+
+            PanLeft,
+            PanRight,
+
+            TiltUp,
+            TiltDown,
+
+            PanLeftTiltUp,
+            PanRightTiltUp,
+
+            PanLeftTiltDown,
+            PanRightTiltDown
         }
 
         #endregion
@@ -122,6 +144,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private bool _isIrFrameDisplayed;
 
+        /// <summary>
+        /// [EO] Frame UI 반영 예약 상태
+        ///
+        /// 0 : Dispatcher 등록 없음
+        /// 1 : 이전 EO Frame이 Dispatcher에서 처리 대기/처리 중
+        ///
+        /// EO는 1920 x 1080 고해상도이므로
+        /// UI Queue에 Frame이 누적되지 않도록 별도로 관리한다.
+        /// </summary>
+        private int _isEoFrameDispatchPending;
+
+        /// <summary>
+        /// [IR] Frame UI 반영 예약 상태
+        ///
+        /// 0 : Dispatcher 등록 없음
+        /// 1 : 이전 IR Frame이 Dispatcher에서 처리 대기/처리 중
+        /// </summary>
+        private int _isIrFrameDispatchPending;
+
         #endregion
 
         #region [AI Detector Communication Fields]
@@ -183,6 +224,37 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private ContinuousMoveType _currentMoveType = ContinuousMoveType.None;
 
+        /// <summary>
+        /// Keyboard Pan Left 입력 상태
+        /// </summary>
+        private bool _isKeyboardPanLeftPressed;
+
+        /// <summary>
+        /// Keyboard Pan Right 입력 상태
+        /// </summary>
+        private bool _isKeyboardPanRightPressed;
+
+        /// <summary>
+        /// Keyboard Tilt Up 입력 상태
+        /// </summary>
+        private bool _isKeyboardTiltUpPressed;
+
+        /// <summary>
+        /// Keyboard Tilt Down 입력 상태
+        /// </summary>
+        private bool _isKeyboardTiltDownPressed;
+
+        /// <summary>
+        /// 현재 키보드 입력으로 실행 중인
+        /// Pan / Tilt 이동 방향
+        ///
+        /// KeyDown 자동 반복으로 동일 패킷이 계속 송신되는 것을
+        /// 방지하기 위해 마지막 적용 방향을 저장한다.
+        /// </summary>
+        private KeyboardPanTiltDirection
+            _currentKeyboardPanTiltDirection =
+                KeyboardPanTiltDirection.None;
+
         #endregion
 
         #region [Control Properties]
@@ -191,12 +263,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [PAN / TILT] 속도제어 현재 속도 [Level]
         /// 
         /// 문서 기준 [0 ~ 63] 범위를 사용한다.
-        /// 현재 기본값은 [30]으로 설정한다.
+        /// 현재 기본값은 [25]으로 설정한다.
         /// 
         /// 이후 [Slider] 또는 [ComboBox] 등 [UI] 조작으로 값이 변경될 수 있으며,
         /// 실제 연속 이동 제어 시 해당 값을 사용한다.
         /// </summary>
         private byte _panTiltSpeedLevel = 30;
+
+        /// <summary>
+        /// [EO] Focus 연속 제어 속도 Level
+        ///
+        /// 문서 기준 범위:
+        /// 0 ~ 3
+        ///
+        /// 현재는 Focus 이동이 지나치게 빠르므로
+        /// 최소 속도 Level 0을 기본값으로 사용한다.
+        /// </summary>
+        private const byte EoFocusSpeedLevel = 0;
 
         /// <summary>
         /// [ZOOM] 버튼 1회 클릭 시 이동할 값
@@ -212,7 +295,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 문서 기준 Focus 위치값은
         /// [0 = Focus Far] ~ [1000 = Focus Near] 범위를 사용한다.
         /// </summary>
-        private const short FocusMoveStep = 5;
+        private const short FocusMoveStep = 10;
 
         /// <summary>
         /// [LA Status Packet]에서 수신한 [EO] [Zoom] 현재 값
@@ -238,6 +321,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [LRF] 최근 거리측정 값 표시 문자열
         /// </summary>
         private string _lrfDistanceText = "DISTANCE : - m";
+
+        /// <summary>
+        /// [LA Status Packet]에서 수신한 장비 전원 상태값
+        /// </summary>
+        private byte _currentPowerStatus;
+
+        /// <summary>
+        /// [IR] 상태 Packet에서 수신한 Zoom 현재 값
+        ///
+        /// 실제 필드 의미가 확정되기 전까지
+        /// 수신 Raw 값을 기준으로 관리한다.
+        /// </summary>
+        private ushort _currentIrZoom;
+
+        /// <summary>
+        /// [IR] 상태 Packet에서 수신한 Focus 현재 값
+        ///
+        /// 실제 필드 의미가 확정되기 전까지
+        /// 수신 Raw 값을 기준으로 관리한다.
+        /// </summary>
+        private ushort _currentIrFocus;
 
         #endregion
 
@@ -353,6 +457,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private string _aiSettingStatusText = "AI Setting Ready";
 
+        /// <summary>
+        /// [AI Tracking] 자동 추적 사용 여부
+        /// </summary>
+        private bool _isAutoTrackingEnabled;
+
         #endregion
 
         #region [AI Overlay Size Binding Fields]
@@ -391,11 +500,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
-        /// <summary>
-        /// [AI Tracking] 자동 추적 사용 여부
-        /// </summary>
-        private bool _isAutoTrackingEnabled;
-
         #region [Video Runtime Fields]
 
         /// <summary>
@@ -405,6 +509,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [Disconnect] 시 [Cancel / Dispose] 처리한다.
         /// </summary>
         private CancellationTokenSource _cts;
+
+        /// <summary>
+        /// [Web Agent] 제어 TCP 자동 재연결 Loop 종료 Token
+        /// </summary>
+        private CancellationTokenSource _webAgentReconnectCts;
+
+        /// <summary>
+        /// [EO / IR] RTSP 자동 재연결 Loop 종료 Token
+        /// </summary>
+        private CancellationTokenSource _videoReconnectCts;
+
+        /// <summary>
+        /// 사용자가 장비 연결 상태를 유지하도록 요청한 상태
+        ///
+        /// 서버 또는 RTSP가 아직 준비되지 않았더라도
+        /// 연결 해제 버튼을 누르기 전까지 자동 재연결을 유지한다.
+        /// </summary>
+        private bool _isDeviceConnectionRequested;
 
         #endregion
 
@@ -893,35 +1015,63 @@ namespace OpenCvWpfTracking.ViewModels.Main
             });
 
             /// <summary>
-            /// [FOCUS] [Far] 상대 이동 테스트
-            /// 
-            /// 현재 [FOCUS] 값에서 [5] 증가한 값을 목표 위치로 송신한다.
+            /// EO Focus Far 단계 이동
+            ///
+            /// Focus 규격:
+            /// 0    = Far
+            /// 1000 = Near
             /// </summary>
             FocusFarCommand = new RelayCommand(() =>
             {
-                short targetFocus = (short)(_currentEoFocus + FocusMoveStep);
+                int targetFocus =
+                    _currentEoFocus -
+                    FocusMoveStep;
+
+                targetFocus =
+                    Math.Max(
+                        0,
+                        targetFocus);
 
                 Console.WriteLine();
-                Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
+                Console.WriteLine(
+                    $"[CONTROL] EO FOCUS FAR STEP : " +
+                    $"{_currentEoFocus} -> {targetFocus}");
+
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoFocusGoPosition(targetFocus);
+                _controlCommandService
+                    .EoFocusGoPosition(
+                        (short)targetFocus);
             });
 
             /// <summary>
-            /// [FOCUS] [Near] 상대 이동 테스트
-            /// 
-            /// 현재 [FOCUS] 값에서 [5] 감소한 값을 목표 위치로 송신한다.
+            /// EO Focus Near 단계 이동
+            ///
+            /// Focus 규격:
+            /// 0    = Far
+            /// 1000 = Near
             /// </summary>
             FocusNearCommand = new RelayCommand(() =>
             {
-                short targetFocus = (short)(_currentEoFocus - FocusMoveStep);
+                int targetFocus =
+                    _currentEoFocus +
+                    FocusMoveStep;
+
+                targetFocus =
+                    Math.Min(
+                        1000,
+                        targetFocus);
 
                 Console.WriteLine();
-                Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
+                Console.WriteLine(
+                    $"[CONTROL] EO FOCUS NEAR STEP : " +
+                    $"{_currentEoFocus} -> {targetFocus}");
+
                 ConsoleLogHelper.PrintLine();
 
-                _controlCommandService.EoFocusGoPosition(targetFocus);
+                _controlCommandService
+                    .EoFocusGoPosition(
+                        (short)targetFocus);
             });
 
             #endregion
@@ -999,6 +1149,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [OnLaMessageReceived] 함수가 호출된다.
             /// </summary>
             _laTcpService.MessageReceived += OnLaMessageReceived;
+
+            /// <summary>
+            /// [Web Agent] 서버가 연결을 종료한 경우
+            /// 장비 연결 요청 상태가 유지되어 있으면 자동 재연결을 시작한다.
+            /// </summary>
+            _laTcpService.ConnectionClosed += OnWebAgentConnectionClosed;
 
             /// <summary>
             /// [AI Detector] 통신 서비스 생성
@@ -1580,6 +1736,52 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #region [Current Device Status Properties]
+
+        /// <summary>
+        /// 현재 Pan 위치 표시 문자열
+        /// </summary>
+        public string CurrentPanText =>
+            $"{_currentPan:F2}°";
+
+        /// <summary>
+        /// 현재 Tilt 위치 표시 문자열
+        /// </summary>
+        public string CurrentTiltText =>
+            $"{_currentTilt:F2}°";
+
+        /// <summary>
+        /// 현재 EO Zoom 상태 표시 문자열
+        /// </summary>
+        public string CurrentEoZoomText =>
+            _currentEoZoom.ToString();
+
+        /// <summary>
+        /// 현재 EO Focus 상태 표시 문자열
+        /// </summary>
+        public string CurrentEoFocusText =>
+            _currentEoFocus.ToString();
+
+        /// <summary>
+        /// 현재 IR Zoom 상태 표시 문자열
+        /// </summary>
+        public string CurrentIrZoomText =>
+            _currentIrZoom.ToString();
+
+        /// <summary>
+        /// 현재 IR Focus 상태 표시 문자열
+        /// </summary>
+        public string CurrentIrFocusText =>
+            _currentIrFocus.ToString();
+
+        /// <summary>
+        /// 현재 장비 전원 상태 표시 문자열
+        /// </summary>
+        public string CurrentPowerText =>
+            $"0x{_currentPowerStatus:X2}";
+
+        #endregion
+
         #endregion
 
         #endregion
@@ -1665,9 +1867,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void InitializeDefaultSourceAddress()
         {
-            // 0. [VD]: 테스트용 로컬 영상
-            VdSourceAddress =
-                @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
+            /*
+             * [VD] 로컬 테스트 영상 주소
+             *
+             * 현재 실제 [EO / IR] 영상만 사용하므로
+             * 로컬 MP4 영상 주소 초기화를 비활성화한다.
+             */
+
+            // VdSourceAddress =
+            //     @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
 
             // 1-1. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
             //EoSourceAddress =
@@ -1682,8 +1890,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
 
             // 4-1. 옥상 [GOP] 주간(EO) 카메라
+            //EoSourceAddress =
+            //    "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
+
+            // 5-1. 4층 개발팀 환경부 주간(EO) PTZ(회전형) 카메라
             EoSourceAddress =
-                "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
+                "rtsp://root:rmffhqjf1!@192.168.0.100:554/AVStream1_1";
 
             // 1-2. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
             //IrSourceAddress =
@@ -1699,8 +1911,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
 
             // 4-2. 옥상 [GOP] 열상(IR) 카메라
+            //IrSourceAddress =
+            //    "rtsp://root:rmffhqjf1!@192.168.0.121:554/cam0_0";
+
+            // 5-1. 4층 개발팀 환경부 열상(IR) PTZ(회전형) 카메라
             IrSourceAddress =
-                "rtsp://root:rmffhqjf1!@192.168.0.121:554/cam0_0";
+                "rtsp://root:rmffhqjf1!@10.20.30.40:554/cam0_0";
         }
 
         /// <summary>
@@ -1726,6 +1942,361 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #endregion
 
         #region [Continuous Move Control Methods]
+
+        #region [Keyboard Pan / Tilt Control Methods]
+
+        /// <summary>
+        /// Keyboard 방향키 KeyDown 처리
+        ///
+        /// 방향키 눌림 상태를 저장한 뒤,
+        /// 현재 눌린 전체 방향키 조합에 따라
+        /// 단일 방향 또는 대각선 이동 명령을 송신한다.
+        /// </summary>
+        public void HandlePanTiltKeyDown(
+            Key key)
+        {
+            if (!IsPanTiltKeyboardKey(
+                    key))
+            {
+                return;
+            }
+
+            /*
+             * EO / IR Zoom 또는 Focus가 동작 중일 때
+             * Keyboard Pan / Tilt 입력이 들어오면
+             * 공통 Stop 명령과 충돌할 수 있으므로 무시한다.
+             */
+            if (_currentMoveType !=
+                    ContinuousMoveType.None &&
+                _currentMoveType !=
+                    ContinuousMoveType.PanTilt)
+            {
+                return;
+            }
+
+            SetKeyboardPanTiltPressedState(
+                key,
+                true);
+
+            UpdateKeyboardPanTiltMove();
+        }
+
+        /// <summary>
+        /// Keyboard 방향키 KeyUp 처리
+        ///
+        /// 해제된 방향키 상태를 제거한 뒤,
+        /// 아직 누르고 있는 나머지 방향키 기준으로
+        /// 이동 방향을 다시 계산한다.
+        /// </summary>
+        public void HandlePanTiltKeyUp(
+            Key key)
+        {
+            if (!IsPanTiltKeyboardKey(
+                    key))
+            {
+                return;
+            }
+
+            SetKeyboardPanTiltPressedState(
+                key,
+                false);
+
+            UpdateKeyboardPanTiltMove();
+        }
+
+        /// <summary>
+        /// Keyboard Pan / Tilt 상태 초기화
+        ///
+        /// Window Focus 이탈로 KeyUp 이벤트가 누락될 경우
+        /// 모든 방향키 상태를 초기화하고
+        /// 현재 키보드 Pan / Tilt 이동을 정지한다.
+        /// </summary>
+        public void ResetKeyboardPanTiltState()
+        {
+            bool wasKeyboardMoveActive =
+                _currentKeyboardPanTiltDirection !=
+                KeyboardPanTiltDirection.None;
+
+            ClearKeyboardPanTiltPressedState();
+
+            _currentKeyboardPanTiltDirection =
+                KeyboardPanTiltDirection.None;
+
+            if (!wasKeyboardMoveActive)
+            {
+                return;
+            }
+
+            if (_currentMoveType !=
+                ContinuousMoveType.PanTilt)
+            {
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[CONTROL] KEYBOARD PAN / TILT RESET");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StopMove();
+
+            _currentMoveType =
+                ContinuousMoveType.None;
+        }
+
+        /// <summary>
+        /// Pan / Tilt Keyboard 제어 키 여부 확인
+        /// </summary>
+        private bool IsPanTiltKeyboardKey(
+            Key key)
+        {
+            return key == Key.Left ||
+                   key == Key.Right ||
+                   key == Key.Up ||
+                   key == Key.Down;
+        }
+
+        /// <summary>
+        /// Keyboard 방향키 입력 상태 반영
+        /// </summary>
+        private void SetKeyboardPanTiltPressedState(
+            Key key,
+            bool isPressed)
+        {
+            switch (key)
+            {
+                case Key.Left:
+
+                    _isKeyboardPanLeftPressed =
+                        isPressed;
+
+                    break;
+
+                case Key.Right:
+
+                    _isKeyboardPanRightPressed =
+                        isPressed;
+
+                    break;
+
+                case Key.Up:
+
+                    _isKeyboardTiltUpPressed =
+                        isPressed;
+
+                    break;
+
+                case Key.Down:
+
+                    _isKeyboardTiltDownPressed =
+                        isPressed;
+
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Keyboard 방향키 입력 상태 초기화
+        /// </summary>
+        private void ClearKeyboardPanTiltPressedState()
+        {
+            _isKeyboardPanLeftPressed =
+                false;
+
+            _isKeyboardPanRightPressed =
+                false;
+
+            _isKeyboardTiltUpPressed =
+                false;
+
+            _isKeyboardTiltDownPressed =
+                false;
+        }
+
+        /// <summary>
+        /// 현재 Keyboard 입력 조합에 맞춰
+        /// Pan / Tilt 이동 방향 갱신
+        ///
+        /// 동일 방향이 유지되는 경우에는
+        /// KeyDown 자동 반복으로 인한 중복 패킷을 송신하지 않는다.
+        /// </summary>
+        private void UpdateKeyboardPanTiltMove()
+        {
+            KeyboardPanTiltDirection targetDirection =
+                GetKeyboardPanTiltDirection();
+
+            if (_currentKeyboardPanTiltDirection ==
+                targetDirection)
+            {
+                return;
+            }
+
+            _currentKeyboardPanTiltDirection =
+                targetDirection;
+
+            switch (targetDirection)
+            {
+                case KeyboardPanTiltDirection.PanLeft:
+
+                    StartPanLeftMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.PanRight:
+
+                    StartPanRightMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.TiltUp:
+
+                    StartTiltUpMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.TiltDown:
+
+                    StartTiltDownMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.PanLeftTiltUp:
+
+                    StartPanLeftTiltUpMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.PanRightTiltUp:
+
+                    StartPanRightTiltUpMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.PanLeftTiltDown:
+
+                    StartPanLeftTiltDownMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.PanRightTiltDown:
+
+                    StartPanRightTiltDownMove();
+
+                    break;
+
+                case KeyboardPanTiltDirection.None:
+
+                    StopKeyboardPanTiltMove();
+
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 현재 눌린 방향키 조합을
+        /// Pan / Tilt 이동 방향으로 변환
+        /// </summary>
+        private KeyboardPanTiltDirection
+            GetKeyboardPanTiltDirection()
+        {
+            bool moveLeft =
+                _isKeyboardPanLeftPressed &&
+                !_isKeyboardPanRightPressed;
+
+            bool moveRight =
+                _isKeyboardPanRightPressed &&
+                !_isKeyboardPanLeftPressed;
+
+            bool moveUp =
+                _isKeyboardTiltUpPressed &&
+                !_isKeyboardTiltDownPressed;
+
+            bool moveDown =
+                _isKeyboardTiltDownPressed &&
+                !_isKeyboardTiltUpPressed;
+
+            if (moveLeft &&
+                moveUp)
+            {
+                return KeyboardPanTiltDirection
+                    .PanLeftTiltUp;
+            }
+
+            if (moveRight &&
+                moveUp)
+            {
+                return KeyboardPanTiltDirection
+                    .PanRightTiltUp;
+            }
+
+            if (moveLeft &&
+                moveDown)
+            {
+                return KeyboardPanTiltDirection
+                    .PanLeftTiltDown;
+            }
+
+            if (moveRight &&
+                moveDown)
+            {
+                return KeyboardPanTiltDirection
+                    .PanRightTiltDown;
+            }
+
+            if (moveLeft)
+            {
+                return KeyboardPanTiltDirection
+                    .PanLeft;
+            }
+
+            if (moveRight)
+            {
+                return KeyboardPanTiltDirection
+                    .PanRight;
+            }
+
+            if (moveUp)
+            {
+                return KeyboardPanTiltDirection
+                    .TiltUp;
+            }
+
+            if (moveDown)
+            {
+                return KeyboardPanTiltDirection
+                    .TiltDown;
+            }
+
+            return KeyboardPanTiltDirection.None;
+        }
+
+        /// <summary>
+        /// Keyboard Pan / Tilt 이동 정지
+        /// </summary>
+        private void StopKeyboardPanTiltMove()
+        {
+            if (_currentMoveType !=
+                ContinuousMoveType.PanTilt)
+            {
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[CONTROL] KEYBOARD PAN / TILT STOP");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StopMove();
+
+            _currentMoveType =
+                ContinuousMoveType.None;
+        }
+
+        #endregion
 
         #region [EO/IR] [Pan / Tilt Continuous Move]
 
@@ -1797,6 +2368,86 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
         }
 
+        /// <summary>
+        /// [EO/IR] 좌측 상단 대각선 연속 이동 시작
+        /// </summary>
+        public void StartPanLeftTiltUpMove()
+        {
+            _currentMoveType =
+                ContinuousMoveType.PanTilt;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN LEFT + TILT UP START / SPEED : {PanTiltSpeedLevel}");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StartPanLeftTiltUp(
+                    PanTiltSpeedLevel,
+                    PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [EO/IR] 우측 상단 대각선 연속 이동 시작
+        /// </summary>
+        public void StartPanRightTiltUpMove()
+        {
+            _currentMoveType =
+                ContinuousMoveType.PanTilt;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN RIGHT + TILT UP START / SPEED : {PanTiltSpeedLevel}");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StartPanRightTiltUp(
+                    PanTiltSpeedLevel,
+                    PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [EO/IR] 좌측 하단 대각선 연속 이동 시작
+        /// </summary>
+        public void StartPanLeftTiltDownMove()
+        {
+            _currentMoveType =
+                ContinuousMoveType.PanTilt;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN LEFT + TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StartPanLeftTiltDown(
+                    PanTiltSpeedLevel,
+                    PanTiltSpeedLevel);
+        }
+
+        /// <summary>
+        /// [EO/IR] 우측 하단 대각선 연속 이동 시작
+        /// </summary>
+        public void StartPanRightTiltDownMove()
+        {
+            _currentMoveType =
+                ContinuousMoveType.PanTilt;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN RIGHT + TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .StartPanRightTiltDown(
+                    PanTiltSpeedLevel,
+                    PanTiltSpeedLevel);
+        }
+
         #endregion
 
         #region [EO] [Zoom / Focus Continuous Move]
@@ -1833,14 +2484,37 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [EO] 주간 카메라 [FOCUS] [Near] 연속 이동 시작
+        ///
+        /// Focus 속도 설정 후
+        /// Near 방향 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartEoFocusNearMove()
         {
-            _currentMoveType = ContinuousMoveType.EoFocus;
+            _currentMoveType =
+                ContinuousMoveType.EoFocus;
 
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] EO FOCUS NEAR START");
+            Console.WriteLine(
+                $"[CONTROL] EO FOCUS NEAR START / SPEED : " +
+                $"{EoFocusSpeedLevel}");
+
             ConsoleLogHelper.PrintLine();
+
+            bool speedSetResult =
+                _controlCommandService
+                    .SetEoFocusSpeed(
+                        EoFocusSpeedLevel);
+
+            if (!speedSetResult)
+            {
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS SPEED SET FAILED");
+
+                _currentMoveType =
+                    ContinuousMoveType.None;
+
+                return;
+            }
 
             _controlCommandService
                 .StartEoFocusNear();
@@ -1848,14 +2522,37 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [EO] 주간 카메라 [FOCUS] [Far] 연속 이동 시작
+        ///
+        /// Focus 속도 설정 후
+        /// Far 방향 연속 이동 명령을 송신한다.
         /// </summary>
         public void StartEoFocusFarMove()
         {
-            _currentMoveType = ContinuousMoveType.EoFocus;
+            _currentMoveType =
+                ContinuousMoveType.EoFocus;
 
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] EO FOCUS FAR START");
+            Console.WriteLine(
+                $"[CONTROL] EO FOCUS FAR START / SPEED : " +
+                $"{EoFocusSpeedLevel}");
+
             ConsoleLogHelper.PrintLine();
+
+            bool speedSetResult =
+                _controlCommandService
+                    .SetEoFocusSpeed(
+                        EoFocusSpeedLevel);
+
+            if (!speedSetResult)
+            {
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS SPEED SET FAILED");
+
+                _currentMoveType =
+                    ContinuousMoveType.None;
+
+                return;
+            }
 
             _controlCommandService
                 .StartEoFocusFar();
@@ -2121,18 +2818,37 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             if (IsAllVideoConnected())
             {
-                VdStatusText = "Already Connected...";
-                EoStatusText = "Already Connected...";
-                IrStatusText = "Already Connected...";
+                /*
+                 * [VD] 로컬 테스트 영상 상태 비활성화
+                 */
 
-                Console.WriteLine("[VIDEO] Already Connected.");
+                // VdStatusText =
+                //     "Already Connected...";
+
+                EoStatusText =
+                    "Already Connected...";
+
+                IrStatusText =
+                    "Already Connected...";
+
+                Console.WriteLine(
+                    "[VIDEO] EO / IR Already Connected.");
+
                 ConsoleLogHelper.PrintLine();
                 return;
             }
 
             _isVideoConnecting = true; // 연결 시도 중 상태 설정
 
-            VdStatusText = "[VD] Connecting...";
+            /*
+             * [VD] 로컬 테스트 영상 연결 기능 임시 비활성화
+             *
+             * 현재 실제 [EO / IR] RTSP 영상만 사용하므로
+             * VD 연결 상태는 갱신하지 않는다.
+             */
+
+            // VdStatusText = "[VD] Connecting...";
+
             EoStatusText = "[EO] Connecting...";
             IrStatusText = "[IR] Connecting...";
 
@@ -2148,7 +2864,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// </summary>
                 //_ = ConnectAiDetectorAsync();
 
-                _ = ConnectLaAsync(); // [Web Agent] 제어 TCP 연결 [192.168.0.100:9000]
+                _isDeviceConnectionRequested =
+                    true;
+
+                /// <summary>
+                /// [Web Agent] 최초 연결을 바로 시도한다.
+                ///
+                /// 최초 연결에 실패하더라도 내부 Auto Reconnect Loop가
+                /// 일정 간격으로 연결을 다시 시도한다.
+                /// </summary>
+                await ConnectLaAsync();
 
                 /// <summary>
                 /// [AI Detector Agent] 자동 재연결 시작은
@@ -2270,72 +2995,90 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 //        "[AI] Connect / Setting Incomplete";
                 //}
 
+                /*
+                 * [VD] 로컬 테스트 영상 연결 기능 임시 비활성화
+                 *
+                 * 기존에는 [VideoCaptureService]를 통해
+                 * 로컬 MP4 테스트 영상을 연결하고
+                 * 별도 CaptureLoop에서 화면에 출력했다.
+                 *
+                 * 현재 TORUSS DEMO VIEWER에서는
+                 * 실제 [EO / IR] RTSP 영상만 사용하므로
+                 * VD 연결 / 상태 출력 / CaptureLoop 시작을 모두 비활성화한다.
+                 */
+
+                // VideoConnectResult vdResult =
+                //     await Task.Run(() =>
+                //     {
+                //         /// <summary>
+                //         /// [VD] 연결 시도 전 대기
+                //         /// [UI]에서 [연결중] 상태 확인용
+                //         /// </summary>
+                //         Thread.Sleep(150);
+                //
+                //         /// <summary>
+                //         /// [VD] 로컬 영상 연결
+                //         /// </summary>
+                //         bool rvsResult =
+                //             _vdDecoder.Open(
+                //                 VdSourceAddress);
+                //
+                //         return new VideoConnectResult
+                //         {
+                //             VdResult = rvsResult
+                //         };
+                //
+                //     });
+                //
+                // Console.WriteLine(
+                //     "[VD] " +
+                //     (vdResult.VdResult
+                //         ? "Connect Success"
+                //         : "Connect Failure"));
+                //
+                // Console.WriteLine();
+                //
+                // VdStatusText =
+                //     vdResult.VdResult
+                //         ? "[VD] Connected"
+                //         : "[VD] Connect Failed";
+                //
+                // if (vdResult.VdResult)
+                // {
+                //     _ = Task.Run(() =>
+                //         CaptureLoop(
+                //             _vdDecoder,
+                //             bitmap => VDCameraImage = bitmap,
+                //             _cts.Token));
+                // }
+
                 /// <summary>
-                /// [VD]도 [EO / IR]처럼 연결 시도 자체를 백그라운드에서 처리
-                /// 
-                /// 로컬 [VD]는 연결이 너무 빠르므로,
-                /// [Open] 전 짧은 대기를 주어, [연결중] 상태가 보이도록 한다.
+                /// [EO / IR] 실제 RTSP 연결 시작 전
+                /// 화면에 연결 중 상태를 잠시 표시한다.
+                ///
+                /// 이 지연은 RTSP Timeout과 관계없는
+                /// UI 표시 목적의 의도적인 대기시간이다.
                 /// </summary>
-                VideoConnectResult vdResult =
-                    await Task.Run(() =>
-                    {
-                        /// <summary>
-                        /// [VD] 연결 시도 전 대기
-                        /// [UI]에서 [연결중] 상태 확인용
-                        /// </summary>
-                        Thread.Sleep(1200);
+                await Task.Delay(500);
 
-                        /// <summary>
-                        /// [VD]는 로컬[VD] 영상이므로
-                        /// [EO/IR] [RTSP] 연결 대기와 분리하여 먼저 연결 및 출력 처리
-                        /// </summary>
-                        bool rvsResult =
-                            _vdDecoder.Open(
-                                VdSourceAddress);
+                VideoConnectResult result =
+                    await OpenVideoSourcesAsync();
 
-                        return new VideoConnectResult
-                        {
-                            VdResult = rvsResult
-                        };
+                /*
+                 * [VD] 로컬 영상 연결 결과 반영 비활성화
+                 */
 
-                    });
+                // result.VdResult =
+                //     vdResult.VdResult;
 
-                /// <summary>
-                /// [VD] 연결 결과 [Console] 출력
-                /// </summary>
-                Console.WriteLine("[VD] " +
-                    (vdResult.VdResult
-                    ? "Connect Success"
-                    : "Connect Failure"));
-
-                Console.WriteLine();
-
-                /// [개별 연결 상태 표시]
-                VdStatusText =
-                    vdResult.VdResult
-                    ? "[VD] Connected"
-                    : "[VD] Connect Failed";
-
-                /// <summary>
-                /// [VD] 연결 성공 시
-                /// 별도 [Thread]에서 영상 출력 시작
-                /// </summary>
-                if (vdResult.VdResult)
+                if (!_isDeviceConnectionRequested ||
+                    _cts == null ||
+                    _cts.IsCancellationRequested)
                 {
-                    _ = Task.Run(() =>
-                        CaptureLoop(
-                            _vdDecoder,
-                            bitmap => VDCameraImage = bitmap,
-                            _cts.Token));
+                    _eoDecoder.Close();
+                    _irDecoder.Close();
+                    return;
                 }
-
-                VideoConnectResult result = await Task.Run(OpenVideoSources);
-
-                /// <summary>
-                /// [VD] 연결 결과를 통합하여
-                /// [VD / EO / IR] 전체 연결 상태 판단에 사용
-                /// </summary>
-                result.VdResult = vdResult.VdResult;
 
                 // [EO / IR] 개별 상태 [Console Log] 출력
                 WriteVideoConnectLog(result);
@@ -2343,16 +3086,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 // [EO / IR] 개별 상태 [Status text] 출력
                 UpdateVideoStatusText(result);
 
-                /// 전부 다 실패한 경우
-                if (!result.VdResult &&
-                    !result.EoResult &&
+                /// <summary>
+                /// [EO / IR] 영상이 모두 연결되지 않은 경우
+                /// 영상 출력 Loop를 시작하지 않는다.
+                /// </summary>
+                if (!result.EoResult &&
                     !result.IrResult)
                 {
-                    Console.WriteLine("[VIDEO] All Connect Failed.");
+                    Console.WriteLine(
+                        "[VIDEO] EO / IR All Connect Failed.");
+
                     ConsoleLogHelper.PrintLine();
                     return;
                 }
+
                 StartVideoLoops(result);
+
+                /// <summary>
+                /// [EO / IR] 최초 RTSP 연결에 실패한 Stream은
+                /// 장비가 Ready 상태가 될 때까지 백그라운드에서 재연결한다.
+                /// </summary>
+                StartVideoReconnectLoops(result);
 
                 /// <summary>
                 /// [AI Detector] 다중 객체 [Bounding Box] 표시 테스트
@@ -2389,20 +3143,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine();
 
             /// <summary>
-            /// 현재 [Connect] 시도 중이면,
-            /// [Disconnect] 입력 무시
+            /// 연결 시도 / 자동 재연결 진행 중에도
+            /// 사용자가 즉시 연결 해제할 수 있도록 모든 Token을 먼저 종료한다.
             /// </summary>
-            if (_isVideoConnecting)
-            {
-                Console.WriteLine();
-                Console.WriteLine("[VIDEO] Connecting...");
-                ConsoleLogHelper.PrintLine();
+            _isDeviceConnectionRequested =
+                false;
 
-                return;
-            }
+            _webAgentReconnectCts?.Cancel();
+            _videoReconnectCts?.Cancel();
 
             // 1. 먼저 [Loop] 종료 요청
             _cts?.Cancel();
+
+            Interlocked.Exchange(
+                ref _isEoFrameDispatchPending,
+                0);
+
+            Interlocked.Exchange(
+                ref _isIrFrameDispatchPending,
+                0);
 
             /// <summary>
             /// 2-1. [EO] 영상 표시 상태 초기화
@@ -2414,11 +3173,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _isIrFrameDisplayed = false;
 
-            // 3. [Service] / [Decoder] 객체 종료
-            _vdDecoder.Release();
+            /*
+             * [VD] 로컬 테스트 영상 연결 기능 비활성화
+             *
+             * 현재 VD Decoder를 Open하지 않으므로
+             * Release 처리도 함께 비활성화한다.
+             */
+
+            // _vdDecoder.Release();
 
             _eoDecoder.Close();
             _irDecoder.Close();
+
+            /// <summary>
+            /// [Web Agent] 제어 TCP 연결 해제
+            /// </summary>
+            _laTcpService.Disconnect();
 
             // 4. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
             App.Current.Dispatcher.Invoke(() =>
@@ -2434,7 +3204,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 EoDetectionBoxes.Clear();
                 IrDetectionBoxes.Clear();
 
-                VdStatusText = "Disconnected";
+                // VdStatusText = "Disconnected";
                 EoStatusText = "Disconnected";
                 IrStatusText = "Disconnected";
             });
@@ -2505,8 +3275,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             App.Current.Dispatcher.Invoke(() =>
             {
-                VDCameraImage =
-                    blackBitmap;
+                //VDCameraImage =
+                //    blackBitmap;
 
                 EOCameraImage =
                     blackBitmap;
@@ -2522,12 +3292,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Video State Helpers]
 
         /// <summary>
-        /// 현재 영상 연결 여부 확인
+        /// [EO / IR] 전체 영상 연결 여부 확인
+        ///
+        /// [VD] 로컬 테스트 영상은 현재 사용하지 않으므로
+        /// 연결 상태 판단 대상에서 제외한다.
         /// </summary>
         private bool IsAllVideoConnected()
         {
-            return _vdDecoder.IsConnected &&
-                   _eoDecoder.IsOpened &&
+            return _eoDecoder.IsOpened &&
                    _irDecoder.IsOpened;
         }
 
@@ -2554,32 +3326,50 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 이 함수는 [Task.Run] 함수 내부에서 호출되어,
         /// [RTSP Open]으로 인한 [UI] 프리징을 방지한다.
         /// </summary>
-        private VideoConnectResult OpenVideoSources()
+        private async Task<VideoConnectResult> OpenVideoSourcesAsync()
         {
+            /// <summary>
+            /// [EO / IR] RTSP 연결을 순차 처리하면
+            /// 한쪽 Timeout 이후에 다른 Stream 연결을 시작하게 된다.
+            ///
+            /// 두 Stream을 동시에 연결하여 초기 화면 표시 시간을 단축한다.
+            /// </summary>
+            Task<bool> eoOpenTask =
+                Task.Run(() =>
+                    _eoDecoder.Open(
+                        EoSourceAddress));
+
+            Task<bool> irOpenTask =
+                Task.Run(() =>
+                    _irDecoder.Open(
+                        IrSourceAddress));
+
+            await Task.WhenAll(
+                eoOpenTask,
+                irOpenTask);
+
             bool eoResult =
-                _eoDecoder.Open(EoSourceAddress);
+                eoOpenTask.Result;
 
             bool irResult =
-                _irDecoder.Open(IrSourceAddress);
+                irOpenTask.Result;
 
-            /// <summary>
-            /// [EO] [RTSP] => 연결 성공 시
-            /// [FFmpeg]에서 읽은 원본 해상도 저장
-            /// </summary>
             if (eoResult)
             {
-                EoVideoWidth = _eoDecoder.VideoWidth;
-                EoVideoHeight = _eoDecoder.VideoHeight;
+                EoVideoWidth =
+                    _eoDecoder.VideoWidth;
+
+                EoVideoHeight =
+                    _eoDecoder.VideoHeight;
             }
 
-            /// <summary>
-            /// [IR] [RTSP] => 연결 성공 시
-            /// [FFmpeg]에서 읽은 원본 해상도 저장
-            /// </summary>
             if (irResult)
             {
-                IrVideoWidth = _irDecoder.VideoWidth;
-                IrVideoHeight = _irDecoder.VideoHeight;
+                IrVideoWidth =
+                    _irDecoder.VideoWidth;
+
+                IrVideoHeight =
+                    _irDecoder.VideoHeight;
             }
 
             return new VideoConnectResult
@@ -2587,6 +3377,154 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 EoResult = eoResult,
                 IrResult = irResult
             };
+
+        }
+
+        /// <summary>
+        /// [EO / IR] 최초 연결 실패 Stream 자동 재연결 시작
+        ///
+        /// VertiportNexus의 RTSP Reconnect 흐름과 동일하게,
+        /// 장비 전원 인가 직후 Camera가 아직 Ready 상태가 아닌 경우에도
+        /// 연결 해제 요청 전까지 일정 간격으로 재시도한다.
+        /// </summary>
+        private void StartVideoReconnectLoops(
+            VideoConnectResult result)
+        {
+            _videoReconnectCts?.Cancel();
+            _videoReconnectCts?.Dispose();
+
+            _videoReconnectCts =
+                new CancellationTokenSource();
+
+            CancellationToken token =
+                _videoReconnectCts.Token;
+
+            if (!result.EoResult)
+            {
+                _ = ReconnectVideoAsync(
+                    _eoDecoder,
+                    EoSourceAddress,
+                    "EO",
+                    bitmap =>
+                    {
+                        EOCameraImage = bitmap;
+                        _isEoFrameDisplayed = true;
+                    },
+                    token);
+            }
+
+            if (!result.IrResult)
+            {
+                _ = ReconnectVideoAsync(
+                    _irDecoder,
+                    IrSourceAddress,
+                    "IR",
+                    bitmap =>
+                    {
+                        IRCameraImage = bitmap;
+                        _isIrFrameDisplayed = true;
+                    },
+                    token);
+            }
+
+        }
+
+        /// <summary>
+        /// 개별 RTSP Stream 재연결 Loop
+        /// </summary>
+        private async Task ReconnectVideoAsync(
+            FFmpegDecoderService decoder,
+            string sourceAddress,
+            string streamName,
+            Action<BitmapSource> setImageAction,
+            CancellationToken token)
+        {
+            const int reconnectDelayMs =
+                1500;
+
+            int retryCount =
+                0;
+
+            while (_isDeviceConnectionRequested &&
+                   !token.IsCancellationRequested &&
+                   !decoder.IsOpened)
+            {
+                retryCount++;
+
+                App.Current.Dispatcher.Invoke(() =>
+                {
+                    if (streamName == "EO")
+                    {
+                        EoStatusText =
+                            $"[EO] Reconnecting... ({retryCount})";
+                    }
+                    else
+                    {
+                        IrStatusText =
+                            $"[IR] Reconnecting... ({retryCount})";
+                    }
+
+                });
+
+                Console.WriteLine(
+                    $"[{streamName}] RTSP Reconnect Try : {retryCount}");
+
+                bool connected =
+                    await Task.Run(() =>
+                        decoder.Open(
+                            sourceAddress));
+
+                if (connected)
+                {
+                    App.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (streamName == "EO")
+                        {
+                            EoVideoWidth = decoder.VideoWidth;
+                            EoVideoHeight = decoder.VideoHeight;
+                            EoStatusText = "[EO] Connected";
+                        }
+                        else
+                        {
+                            IrVideoWidth = decoder.VideoWidth;
+                            IrVideoHeight = decoder.VideoHeight;
+                            IrStatusText = "[IR] Connected";
+                        }
+
+                    });
+
+                    if (_cts != null &&
+                        !token.IsCancellationRequested)
+                    {
+                        CancellationToken captureToken =
+                            _cts.Token;
+
+                        _ = Task.Run(() =>
+                            FFmpegCaptureLoop(
+                                decoder,
+                                streamName,
+                                setImageAction,
+                                captureToken));
+                    }
+
+                    Console.WriteLine(
+                        $"[{streamName}] RTSP Reconnect Success");
+
+                    return;
+                }
+
+                try
+                {
+                    await Task.Delay(
+                        reconnectDelayMs,
+                        token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+            }
 
         }
 
@@ -2642,32 +3580,41 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Video Loop Start]
 
         /// <summary>
-        /// 연결 성공한 [EO/IR] 영상만 [FFmpegCaptureLoop] 실행
+        /// 연결 성공한 EO / IR 영상에 대해
+        /// FFmpeg Frame 수신 Loop를 시작한다.
         /// </summary>
-        private void StartVideoLoops(VideoConnectResult result)
+        private void StartVideoLoops(
+            VideoConnectResult result)
         {
             if (_cts == null)
+            {
                 return;
+            }
+
+            CancellationToken token =
+                _cts.Token;
 
             if (result.EoResult)
             {
                 _ = Task.Run(() =>
                     FFmpegCaptureLoop(
                         _eoDecoder,
+                        "EO",
                         bitmap =>
                         {
-                            EOCameraImage = bitmap;
+                            EOCameraImage =
+                                bitmap;
 
                             /// <summary>
                             /// [EO] 첫 Frame 화면 표시 완료
-                            /// 
-                            /// [EO] 영상이 실제 화면에 표시된 이후에만
-                            /// [AI Detector] [Bounding Box]를 반영한다.
+                            ///
+                            /// EO 영상이 실제 화면에 표시된 이후에만
+                            /// AI Bounding Box를 반영한다.
                             /// </summary>
-                            _isEoFrameDisplayed = true;
+                            _isEoFrameDisplayed =
+                                true;
                         },
-                        _cts.Token));
-
+                        token));
             }
 
             if (result.IrResult)
@@ -2675,20 +3622,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _ = Task.Run(() =>
                     FFmpegCaptureLoop(
                         _irDecoder,
+                        "IR",
                         bitmap =>
                         {
-                            IRCameraImage = bitmap;
+                            IRCameraImage =
+                                bitmap;
 
                             /// <summary>
                             /// [IR] 첫 Frame 화면 표시 완료
-                            /// 
-                            /// [IR] 영상이 실제 화면에 표시된 이후에만
-                            /// [AI Detector] [Bounding Box]를 반영한다.
+                            ///
+                            /// IR 영상이 실제 화면에 표시된 이후에만
+                            /// AI Bounding Box를 반영한다.
                             /// </summary>
-                            _isIrFrameDisplayed = true;
+                            _isIrFrameDisplayed =
+                                true;
                         },
-                        _cts.Token));
-
+                        token));
             }
 
         }
@@ -2796,51 +3745,303 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [FFmpeg Capture Loop]
 
         /// <summary>
-        /// [FFmpeg] 기반 [RTSP] 프레임 수신 루프
-        /// 
-        /// [FFmpegRtspDecoderService]에서 [Mat]프레임을 읽고,
-        /// [WPF Image]에 출력할 [BitmapSource]로 변환한다.
+        /// 해당 Stream의 Frame을 Dispatcher에 등록할 수 있는지 확인한다.
+        ///
+        /// 이미 이전 Frame이 UI 처리 대기 중이면 false를 반환하여
+        /// 현재 Frame을 버린다.
+        ///
+        /// 이를 통해 Dispatcher Queue에 과거 Frame이 누적되어
+        /// 영상이 늦게 따라오는 현상을 방지한다.
         /// </summary>
+        private bool TryReserveFrameDispatch(
+            string streamName)
+        {
+            if (streamName == "EO")
+            {
+                return Interlocked.CompareExchange(
+                    ref _isEoFrameDispatchPending,
+                    1,
+                    0) == 0;
+            }
+
+            if (streamName == "IR")
+            {
+                return Interlocked.CompareExchange(
+                    ref _isIrFrameDispatchPending,
+                    1,
+                    0) == 0;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 해당 Stream의 Dispatcher 예약 상태를 해제한다.
+        /// </summary>
+        private void ReleaseFrameDispatch(
+            string streamName)
+        {
+            if (streamName == "EO")
+            {
+                Interlocked.Exchange(
+                    ref _isEoFrameDispatchPending,
+                    0);
+
+                return;
+            }
+
+            if (streamName == "IR")
+            {
+                Interlocked.Exchange(
+                    ref _isIrFrameDispatchPending,
+                    0);
+            }
+
+        }
+
+        /// <summary>
+        /// Stream별 UI 반영 우선순위를 반환한다.
+        ///
+        /// EO 영상은 1920 x 1080이며 메인 화면에서 크게 표시되므로
+        /// IR보다 높은 Render 우선순위를 적용한다.
+        /// </summary>
+        private DispatcherPriority GetFrameDispatcherPriority(
+            string streamName)
+        {
+            if (streamName == "EO")
+            {
+                return DispatcherPriority.Render;
+            }
+
+            return DispatcherPriority.Background;
+        }
+
+        /// <summary>
+        /// [FFmpeg] 기반 [RTSP] Frame 수신 Loop
+        ///
+        /// 처리 순서:
+        /// 1. Decoder에서 Frame 획득
+        /// 2. 해당 Stream의 UI Frame 등록 가능 여부 확인
+        /// 3. Mat을 BitmapSource로 변환
+        /// 4. BitmapSource Freeze
+        /// 5. Dispatcher.BeginInvoke로 UI 반영 예약
+        ///
+        /// 기존 Dispatcher.Invoke는 UI 반영이 끝날 때까지
+        /// Decode Thread를 정지시켰다.
+        ///
+        /// 현재 구조는 BeginInvoke를 사용하고,
+        /// 이전 Frame이 UI 처리 중이면 중간 Frame을 버려
+        /// 실시간성과 화면 부드러움을 우선한다.
+        /// </summary>
+        /// <param name="decoder">
+        /// EO 또는 IR FFmpeg Decoder
+        /// </param>
+        /// <param name="streamName">
+        /// EO / IR Stream 구분
+        /// </param>
+        /// <param name="setImageAction">
+        /// EOCameraImage 또는 IRCameraImage 설정 함수
+        /// </param>
+        /// <param name="cancellationToken">
+        /// 영상 수신 중지 Token
+        /// </param>
         private void FFmpegCaptureLoop(
             FFmpegDecoderService decoder,
+            string streamName,
             Action<BitmapSource> setImageAction,
             CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                using (Mat frame = decoder.ReadFrame())
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
+                Mat frame = null;
 
+                try
+                {
+                    /// <summary>
+                    /// FFmpeg Decoder에서 다음 Frame 획득
+                    /// </summary>
+                    frame =
+                        decoder.ReadFrame();
+
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    /// <summary>
+                    /// Frame 수신 실패 시 짧게 대기 후 재시도
+                    /// </summary>
                     if (frame == null ||
                         frame.Empty())
                     {
-                        Thread.Sleep(10);
+                        Thread.Sleep(5);
+
                         continue;
                     }
 
-                    BitmapSource bitmap =
-                        MatToBitmapSourceConverter.Convert(frame);
-
-                    bitmap?.Freeze();
-
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
-
-                    App.Current.Dispatcher.Invoke(() =>
+                    /*
+                     * 이전 Frame이 아직 UI Dispatcher에서 처리 중이면
+                     * 현재 Frame은 변환조차 하지 않고 버린다.
+                     *
+                     * 특히 EO 1920 x 1080 Frame의 Bitmap 변환 비용이 크므로,
+                     * 불필요한 변환 작업을 줄이는 효과도 있다.
+                     */
+                    if (!TryReserveFrameDispatch(
+                            streamName))
                     {
-                        if (!cancellationToken.IsCancellationRequested)
+                        continue;
+                    }
+
+                    bool dispatchQueued =
+                        false;
+
+                    try
+                    {
+                        /// <summary>
+                        /// OpenCV Mat → WPF BitmapSource 변환
+                        /// </summary>
+                        BitmapSource bitmap =
+                            MatToBitmapSourceConverter
+                                .Convert(frame);
+
+                        if (bitmap == null)
                         {
-                            setImageAction(bitmap);
+                            continue;
                         }
 
-                    });
+                        /*
+                         * BitmapSource는 Worker Thread에서 생성된다.
+                         *
+                         * Freeze 처리하면 변경 불가능한 객체가 되어
+                         * UI Thread에서 안전하게 참조할 수 있다.
+                         */
+                        if (bitmap.CanFreeze &&
+                            !bitmap.IsFrozen)
+                        {
+                            bitmap.Freeze();
+                        }
 
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
+                        Dispatcher dispatcher =
+                            App.Current?.Dispatcher;
+
+                        if (dispatcher == null ||
+                            dispatcher.HasShutdownStarted ||
+                            dispatcher.HasShutdownFinished)
+                        {
+                            break;
+                        }
+
+                        /*
+                         * EO:
+                         * DispatcherPriority.Render
+                         *
+                         * IR:
+                         * DispatcherPriority.Background
+                         *
+                         * 메인 고해상도 EO 영상의 화면 반영을
+                         * 우선적으로 처리한다.
+                         */
+                        DispatcherPriority priority =
+                            GetFrameDispatcherPriority(
+                                streamName);
+
+                        dispatcher.BeginInvoke(
+                            priority,
+                            new Action(() =>
+                            {
+                                try
+                                {
+                                    if (cancellationToken
+                                        .IsCancellationRequested)
+                                    {
+                                        return;
+                                    }
+
+                                    if (dispatcher
+                                            .HasShutdownStarted ||
+                                        dispatcher
+                                            .HasShutdownFinished)
+                                    {
+                                        return;
+                                    }
+
+                                    /// <summary>
+                                    /// Binding 대상 영상 Property 갱신
+                                    /// </summary>
+                                    setImageAction(
+                                        bitmap);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine(
+                                        $"[{streamName}] " +
+                                        $"[UI FRAME UPDATE ERROR] " +
+                                        ex.Message);
+                                }
+                                finally
+                                {
+                                    /*
+                                     * UI 반영이 완료되었으므로
+                                     * 다음 Frame의 Dispatcher 등록을 허용한다.
+                                     */
+                                    ReleaseFrameDispatch(
+                                        streamName);
+                                }
+
+                            }));
+
+                        dispatchQueued =
+                            true;
+                    }
+                    finally
+                    {
+                        /*
+                         * BeginInvoke 등록 전에 예외, 취소 또는 종료가 발생하면
+                         * Dispatcher Callback이 실행되지 않으므로
+                         * 여기에서 예약 상태를 직접 해제한다.
+                         */
+                        if (!dispatchQueued)
+                        {
+                            ReleaseFrameDispatch(
+                                streamName);
+                        }
+
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    if (!cancellationToken
+                        .IsCancellationRequested)
+                    {
+                        Console.WriteLine(
+                            $"[{streamName}] " +
+                            $"[FFmpeg Capture Error] " +
+                            ex.Message);
+                    }
+
+                    break;
+                }
+                finally
+                {
+                    frame?.Dispose();
                 }
 
             }
 
+            /*
+             * Loop 종료 시 예약값이 남아 있지 않도록 초기화한다.
+             */
+            ReleaseFrameDispatch(
+                streamName);
+
+            Console.WriteLine(
+                $"[{streamName}] FFmpeg Capture Loop End");
         }
 
         #endregion
@@ -2852,34 +4053,184 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Connect]
 
         /// <summary>
-        /// [Web Agent] 제어 통신 연결 시작
-        /// 
-        /// 기존 고흥 건에서 사용한
-        /// [TcpClientService] / [ControlCommandService] /
-        /// [Pelco-D] 7 Byte 제어 구조는 그대로 유지한다.
-        /// 
-        /// [MR500 환경부 과제] 제어 접속 정보:
-        /// - IP   : 192.168.0.100
-        /// - Port : 9000
-        /// 
-        /// 연결 성공 이후 [Pan] / [Tilt] /
-        /// [EO Zoom] / [EO Focus] 명령은
-        /// 동일한 TCP 연결을 통해 송신한다.
+        /// [Web Agent / LA] 제어 TCP 연결
+        ///
+        /// 기존 고흥 제어 구조는 유지하며,
+        /// 운용 환경에 따라 연결 대상 IP / Port만 변경하여 사용한다.
+        ///
+        /// 현재:
+        /// - [Web Agent] 연결 활성화
+        ///
+        /// 필요 시:
+        /// - [Web Agent] 주소를 주석 처리
+        /// - 기존 [LA] 주소의 주석을 해제
         /// </summary>
-        public async Task ConnectLaAsync()
+        private async Task<bool> ConnectLaAsync()
         {
-            Console.WriteLine("[WEB AGENT] Connect Start");
+            ConsoleLogHelper.PrintLine();
+
+            Console.WriteLine(
+                "[CONTROL TCP] Connect Start");
+
+            ConsoleLogHelper.PrintLine();
+
+            /*
+             * ============================================================
+             * [제어 TCP 연결 대상 설정]
+             * ============================================================
+             *
+             * 현재 운용 환경에 맞는 연결 대상 하나만 활성화한다.
+             *
+             * [Web Agent]
+             * - MR500 / Web Agent 제어용
+             * - Pelco-D 7Byte 제어 Packet 송신
+             *
+             * [기존 LA]
+             * - 고흥 Local Agent 제어용
+             * - 기존 Pelco-D 제어 구조 확인 및 테스트용
+             *
+             * 두 주소를 동시에 활성화하지 않는다.
+             * ============================================================
+             */
+
+            // [Web Agent] 현재 사용
+            const string targetIp =
+                "192.168.20.161";
+
+            const int targetPort =
+                5005;
+
+            // [기존 LA] 사용 시 위 Web Agent 주소를 주석 처리하고
+            // 아래 주소의 주석을 해제한다.
+            //
+            //const string targetIp =
+            //    "127.0.0.1";
+
+            //const int targetPort =
+            //    5001;
 
             bool result =
                 await _laTcpService.ConnectAsync(
-                    "192.168.0.100",
-                    9000);
+                    targetIp,
+                    targetPort);
 
             Console.WriteLine(
-                "[WEB AGENT CONNECT RESULT] "
-                + result);
+                $"[CONTROL TCP CONNECT RESULT] {result}");
+
+            Console.WriteLine(
+                $"[CONTROL TCP TARGET] {targetIp}:{targetPort}");
 
             ConsoleLogHelper.PrintLine();
+
+            if (!result &&
+                _isDeviceConnectionRequested)
+            {
+                /// <summary>
+                /// 최초 연결에 실패한 경우
+                /// 백그라운드 자동 재연결 Loop를 시작한다.
+                /// </summary>
+                StartWebAgentReconnect(
+                    targetIp,
+                    targetPort);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// [Web Agent] 비정상 연결 종료 처리
+        /// </summary>
+        private void OnWebAgentConnectionClosed()
+        {
+            if (!_isDeviceConnectionRequested)
+            {
+                return;
+            }
+
+            StartWebAgentReconnect(
+                "192.168.20.161",
+                5005);
+        }
+
+        /// <summary>
+        /// [Web Agent] 자동 재연결 Loop 시작
+        ///
+        /// 최초 연결 실패 또는 운용 중 연결 종료 시
+        /// 연결 해제 요청 전까지 일정 간격으로 재연결한다.
+        /// </summary>
+        private void StartWebAgentReconnect(
+            string ipAddress,
+            int port)
+        {
+            if (_webAgentReconnectCts != null &&
+                !_webAgentReconnectCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _webAgentReconnectCts?.Dispose();
+
+            _webAgentReconnectCts =
+                new CancellationTokenSource();
+
+            CancellationToken token =
+                _webAgentReconnectCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                const int reconnectDelayMs =
+                    1500;
+
+                int retryCount =
+                    0;
+
+                try
+                {
+                    while (_isDeviceConnectionRequested &&
+                           !token.IsCancellationRequested &&
+                           !_laTcpService.IsConnected)
+                    {
+                        retryCount++;
+
+                        Console.WriteLine(
+                            "[WEB AGENT] Reconnect Try : " +
+                            retryCount);
+
+                        bool connected =
+                            await _laTcpService.ConnectAsync(
+                                ipAddress,
+                                port);
+
+                        if (connected)
+                        {
+                            Console.WriteLine(
+                                "[WEB AGENT] Reconnect Success");
+
+                            return;
+                        }
+
+                        await Task.Delay(
+                            reconnectDelayMs,
+                            token);
+                    }
+
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                finally
+                {
+                    if (_webAgentReconnectCts != null &&
+                        _webAgentReconnectCts.Token == token)
+                    {
+                        _webAgentReconnectCts.Dispose();
+                        _webAgentReconnectCts = null;
+                    }
+
+                }
+
+            });
+
         }
 
         #endregion
@@ -2997,26 +4348,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     break;
 
                 case 0xA1:
+
                     /// <summary>
-                    /// [Function] [0xA1]
-                    /// 
-                    /// [Extended Status] Packet.
-                    /// 
-                    /// 현재 수신은 정상 확인되었으나,
-                    /// [LA] 프로그램의 열화상 [Zoom] / [Focus] 표시값과
-                    /// 직접 일치하지 않아 정확한 필드 의미는 미확정 상태이다.
-                    /// 
-                    /// 따라서 현재는 원시 상태값 확인용으로만 출력한다.
+                    /// 상태값은 모든 Packet마다 파싱하고,
+                    /// Console 로그만 설정된 주기로 제한한다.
                     /// </summary>
-                    if (!canPrintExtendedStatusLog)
-                        break;
+                    ParseLaExtendedStatusPacket(
+                        packet.RawData,
+                        canPrintExtendedStatusLog);
 
-                    ConsoleLogHelper.PrintLine();
-                    Console.WriteLine("[LA PACKET] [IR] Extended Status Packet");
-                    Console.WriteLine();
-                    ParseLaExtendedStatusPacket(packet.RawData);
-
-                    ConsoleLogHelper.PrintLine();
                     break;
 
                 case 0xA3:
@@ -3124,127 +4464,269 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [LA] [Status Packet] 파싱
-        /// 
+        ///
         /// [Function] [0x01]:
-        /// [Pan] / [Tilt] / [Zoom] / [Focus] / [Power] 상태 정보
-        /// 
-        /// 주의: 응답 [Packet]의 [2byte] 이상 데이터 => [Little Endian] 방식
+        /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus] / [Power] 상태 정보
+        ///
+        /// 응답 Packet의 2Byte 이상 값은
+        /// Little Endian 방식으로 처리한다.
         /// </summary>
-        private void ParseLaStatusPacket(byte[] packet, bool printLog)
+        private void ParseLaStatusPacket(
+            byte[] packet,
+            bool printLog)
         {
-            // [Pan] 위치 [Raw]값
-            // [packet[2] ~ packet[3]]
-            // [Little Endian short]
+            const int requiredLength =
+                12;
+
+            if (packet == null ||
+                packet.Length < requiredLength)
+            {
+                if (printLog)
+                {
+                    Console.WriteLine(
+                        "[LA STATUS] Invalid Packet Length : " +
+                        (packet?.Length ?? 0));
+                }
+
+                return;
+            }
+
             short panRaw =
-                BitConverter.ToInt16(packet, 2);
+                BitConverter.ToInt16(
+                    packet,
+                    2);
 
-            // [Tilt] 위치 [Raw]값
-            // [packet[4] ~ packet[5]]
-            // [Little Endian short]
             short tiltRaw =
-                BitConverter.ToInt16(packet, 4);
+                BitConverter.ToInt16(
+                    packet,
+                    4);
 
-            // [Zoom] 위치 [Raw] 값
-            // [packet[6] ~ packet[7]]
-            // [Little Endian short]
             short zoomRaw =
-                BitConverter.ToInt16(packet, 6);
+                BitConverter.ToInt16(
+                    packet,
+                    6);
 
-            // [Focus] 위치 [Raw] 값
-            // [packet[8] ~ packet[9]]
-            // [Little Endian short]
             short focusRaw =
-                BitConverter.ToInt16(packet, 8);
+                BitConverter.ToInt16(
+                    packet,
+                    8);
 
-            // 전원 상태 [bit] 정보
-            // [packet[10]]
-            byte powerStatus = packet[10];
+            byte powerStatus =
+                packet[10];
 
-            // [Pan] / [Tilt]는 [각도 * 100]값으로 수신되므로
-            // 실제 각도는 [각도 / 100] 처리
-            double panDegree = panRaw / 100.0;
-            double tiltDegree = tiltRaw / 100.0;
+            double panDegree =
+                panRaw / 100.0;
 
-            /// <summary>
-            /// 현재 [PAN] / [TILT] 값 저장
-            /// 
-            /// 버튼 클릭 시
-            /// 현재 위치 기준 [상대 이동 계산]에 사용한다.
-            /// </summary>
-            _currentPan = panDegree;
-            _currentTilt = tiltDegree;
+            double tiltDegree =
+                tiltRaw / 100.0;
 
-            /// <summary>
-            /// [LA Status Packet] 기준
-            /// [EO] [Zoom] / [EO] [Focus] 상태값 저장
-            /// 
-            /// 현재 일반 상태 [Packet]에서는
-            /// [IR] [Zoom] / [IR] [Focus] 값이 아닌
-            /// [EO] 기준 [Zoom] / [Focus] 값이 수신된다.
-            /// </summary>
-            _currentEoZoom = zoomRaw;
-            _currentEoFocus = focusRaw;
+            /*
+             * 모든 0x01 패킷에서 상태값 갱신
+             */
+            _currentPan =
+                panDegree;
 
-            /// <summary>
-            /// [Console] 로그 출력 주기 제한
-            /// 
-            /// 1초 이내 중복 상태 로그는 출력하지 않는다.
-            /// </summary>
+            _currentTilt =
+                tiltDegree;
+
+            _currentEoZoom =
+                zoomRaw;
+
+            _currentEoFocus =
+                focusRaw;
+
+            _currentPowerStatus =
+                powerStatus;
+
+            /*
+             * UI Binding 갱신
+             * 반드시 printLog 검사 전에 호출
+             */
+            NotifyEoCurrentStatusChanged();
+
+            /*
+             * 아래부터 Console 로그만 1초 간격으로 제한
+             */
             if (!printLog)
             {
                 return;
             }
 
             Console.WriteLine(
-                $"[LA STATUS] [Pan]   : {panDegree:F2}");
+                $"[LA PT RAW] " +
+                $"PAN BYTE={packet[2]:X2} {packet[3]:X2}, " +
+                $"TILT BYTE={packet[4]:X2} {packet[5]:X2}");
 
             Console.WriteLine(
-                $"[LA STATUS] [Tilt]  : {tiltDegree:F2}");
+                $"[LA PT PARSED] " +
+                $"PAN RAW={panRaw}, PAN={panDegree:F2}°, " +
+                $"TILT RAW={tiltRaw}, TILT={tiltDegree:F2}°");
 
             Console.WriteLine(
-                $"[LA STATUS] [EO Zoom] : {_currentEoZoom}");
+                $"[LA STATUS] [EO Zoom]  : {_currentEoZoom}");
 
             Console.WriteLine(
                 $"[LA STATUS] [EO Focus] : {_currentEoFocus}");
 
             Console.WriteLine(
-                $"[LA STATUS] [Power] : 0x{powerStatus:X2}");
+                $"[LA STATUS] [Power]    : 0x{_currentPowerStatus:X2}");
         }
 
         /// <summary>
-        /// [LA] [Extended Status] [Packet] 파싱
-        /// 
-        /// [Function] [0xA1]
-        /// 
-        /// 문서상 [열영상 카메라] 상태 정보 응답.
-        /// 
-        /// 현재 수신 패턴상 [Byte 2~3], [Byte 4~5] 값이
-        /// 열영상 카메라 상태에 따라 변화하는 것은 확인되었으나,
-        /// 실제 [Zoom] / [Focus] 표시값과 직접 일치하지 않아
-        /// 원시 상태값(Raw Value)으로 출력한다.
-        /// 
-        /// 추후 문서 확인 또는 실장비 검증 후
-        /// 정확한 의미를 반영할 예정이다.
+        /// Pan / Tilt / EO Zoom / EO Focus / Power
+        /// CURRENT STATUS UI 갱신
+        ///
+        /// LA TCP 수신 이벤트는 Receive Thread에서 호출되므로
+        /// WPF Dispatcher를 통해 UI Binding 갱신을 수행한다.
         /// </summary>
-        private void ParseLaExtendedStatusPacket(byte[] packet)
+        private void NotifyEoCurrentStatusChanged()
         {
+            Dispatcher dispatcher =
+                System.Windows.Application
+                    .Current?
+                    .Dispatcher;
+
+            if (dispatcher == null)
+            {
+                return;
+            }
+
+            void Notify()
+            {
+                OnPropertyChanged(
+                    nameof(CurrentPanText));
+
+                OnPropertyChanged(
+                    nameof(CurrentTiltText));
+
+                OnPropertyChanged(
+                    nameof(CurrentEoZoomText));
+
+                OnPropertyChanged(
+                    nameof(CurrentEoFocusText));
+
+                OnPropertyChanged(
+                    nameof(CurrentPowerText));
+            }
+
+            if (dispatcher.CheckAccess())
+            {
+                Notify();
+                return;
+            }
+
+            dispatcher.BeginInvoke(
+                new Action(Notify));
+        }
+
+        /// <summary>
+        /// IR Zoom / IR Focus
+        /// CURRENT STATUS UI 갱신
+        /// </summary>
+        private void NotifyIrCurrentStatusChanged()
+        {
+            Dispatcher dispatcher =
+                System.Windows.Application
+                    .Current?
+                    .Dispatcher;
+
+            if (dispatcher == null)
+            {
+                return;
+            }
+
+            void Notify()
+            {
+                OnPropertyChanged(
+                    nameof(CurrentIrZoomText));
+
+                OnPropertyChanged(
+                    nameof(CurrentIrFocusText));
+            }
+
+            if (dispatcher.CheckAccess())
+            {
+                Notify();
+                return;
+            }
+
+            dispatcher.BeginInvoke(
+                new Action(Notify));
+        }
+
+        /// <summary>
+        /// [LA] [Extended Status] Packet 파싱
+        ///
+        /// Function 0xA1
+        ///
+        /// Value1 / Value2의 정확한 의미가 확정되기 전까지
+        /// IR Zoom / Focus 후보 Raw 값으로 표시한다.
+        /// </summary>
+        private void ParseLaExtendedStatusPacket(
+            byte[] packet,
+            bool printLog)
+        {
+            const int requiredLength =
+                12;
+
+            if (packet == null ||
+                packet.Length < requiredLength)
+            {
+                if (printLog)
+                {
+                    Console.WriteLine(
+                        "[LA EXT STATUS] Invalid Packet Length : " +
+                        (packet?.Length ?? 0));
+                }
+
+                return;
+            }
+
             ushort irValue1 =
-                BitConverter.ToUInt16(packet, 2);
+                BitConverter.ToUInt16(
+                    packet,
+                    2);
 
             ushort irValue2 =
-                BitConverter.ToUInt16(packet, 4);
+                BitConverter.ToUInt16(
+                    packet,
+                    4);
+
+            _currentIrZoom =
+                irValue1;
+
+            _currentIrFocus =
+                irValue2;
+
+            NotifyIrCurrentStatusChanged();
+
+            if (!printLog)
+            {
+                return;
+            }
+
+            ConsoleLogHelper.PrintLine();
 
             Console.WriteLine(
-                $"[LA EXT STATUS] [Value1] : {irValue1}");
+                "[LA PACKET] [IR] Extended Status Packet");
+
+            Console.WriteLine();
 
             Console.WriteLine(
-                $"[LA EXT STATUS] [Value2] : {irValue2}");
+                $"[LA EXT STATUS] [IR Zoom Raw]  : {_currentIrZoom}");
+
+            Console.WriteLine(
+                $"[LA EXT STATUS] [IR Focus Raw] : {_currentIrFocus}");
 
             Console.WriteLine();
 
             Console.WriteLine(
                 "[LA EXT STATUS RAW] " +
-                BitConverter.ToString(packet));
+                BitConverter
+                    .ToString(packet)
+                    .Replace("-", " "));
+
+            ConsoleLogHelper.PrintLine();
         }
 
         /// <summary>

@@ -5,8 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenCvWpfTracking"    
         mc:Ignorable="d"
-        Title="TORUSS [EO/IR] DEMO VIEWER"
-        Width="1920" Height="1080">
+        Title="MOE [EO/IR] TEST VIEWER"
+        Width="1920"
+        Height="1080"
+        Focusable="True"
+        Loaded="Window_Loaded"
+        Deactivated="Window_Deactivated"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewKeyUp="Window_PreviewKeyUp">
     <Window.Resources>
         <!-- [AI Detector] 설정 패널 공통 버튼 스타일 -->
         <Style x:Key="AiSettingButtonStyle"
@@ -136,16 +142,17 @@
     <!-- 메인 화면 전체 레이아웃 -->
     <Grid Margin="10"
           Background="#2C313A">
+
         <Grid.RowDefinitions>
             <RowDefinition Height="3*"/>
-            <RowDefinition Height="1.2*"/>
+            <RowDefinition Height="1.4*"/>
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <!-- [EO] 영상 영역 -->
-                <ColumnDefinition Width="1.7*" />
+                <ColumnDefinition Width="1.6*" />
 
                 <!-- [IR] 영상 영역 -->
                 <ColumnDefinition Width="1*" />
@@ -164,10 +171,14 @@
 
                     <!-- [EO] 영상 -->
                     <Image Source="{Binding EOCameraImage}"
-                           Stretch="Uniform"/>
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="LowQuality"
+                           SnapsToDevicePixels="True"
+                           UseLayoutRounding="True"/>
 
                     <!-- [AI] [Bounding Box] [Overlay] -->
                     <Viewbox Stretch="Uniform"
+                             Visibility="Visible"
                              IsHitTestVisible="False">
 
                         <ItemsControl ItemsSource="{Binding EoDetectionBoxes}"
@@ -328,10 +339,20 @@
                     Padding="10">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="50" />
-                        <RowDefinition Height="20" />
-                        <RowDefinition Height="*" />
+                        <!-- 연결 해제 -->
+                        <RowDefinition Height="Auto"/>
+
+                        <!-- 장비 연결 -->
+                        <RowDefinition Height="50"/>
+
+                        <!-- 여백 -->
+                        <RowDefinition Height="20"/>
+
+                        <!-- 장비 제어 -->
+                        <RowDefinition Height="*"/>
+
+                        <!-- 현재 장비 상태 -->
+                        <RowDefinition Height="175"/>
                     </Grid.RowDefinitions>
 
                     <!-- 연결 해제 -->
@@ -431,6 +452,15 @@
                                                     <ColumnDefinition/>
                                                 </Grid.ColumnDefinitions>
 
+                                                <!-- [PAN LEFT + TILT UP] 좌측 상단 대각선 -->
+                                                <!--<Button Grid.Row="0"
+                                                        Grid.Column="0"
+                                                        Content="↖"
+                                                        Style="{StaticResource PanTiltDirectionButtonStyle}"
+                                                        PreviewMouseDown="PanLeftTiltUp_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+
                                                 <!-- [TILT] [UP] -->
                                                 <Button Grid.Row="0"
                                                         Grid.Column="1"
@@ -438,7 +468,16 @@
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="TiltUp_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
+                                                        MouseLeave="MoveStop_MouseLeave"/>
+
+                                                <!-- [PAN RIGHT + TILT UP] 우측 상단 대각선 -->
+                                                <!--<Button Grid.Row="0"
+                                                        Grid.Column="2"
+                                                        Content="↗"
+                                                        Style="{StaticResource PanTiltDirectionButtonStyle}"
+                                                        PreviewMouseDown="PanRightTiltUp_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseLeave"/>-->
 
                                                 <!-- [PAN] [LEFT] -->
                                                 <Button Grid.Row="1"
@@ -447,7 +486,7 @@
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanLeft_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
+                                                        MouseLeave="MoveStop_MouseLeave"/>
 
                                                 <!-- [STOP] -->
                                                 <Border Grid.Row="1"
@@ -469,7 +508,16 @@
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanRight_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
+                                                        MouseLeave="MoveStop_MouseLeave"/>
+
+                                                <!-- [PAN LEFT + TILT DOWN] 좌측 하단 대각선 -->
+                                                <!--<Button Grid.Row="2"
+                                                        Grid.Column="0"
+                                                        Content="↙"
+                                                        Style="{StaticResource PanTiltDirectionButtonStyle}"
+                                                        PreviewMouseDown="PanLeftTiltDown_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseLeave"/>-->
 
                                                 <!-- [TILT] [DOWN] -->
                                                 <Button Grid.Row="2"
@@ -478,7 +526,17 @@
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="TiltDown_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
+                                                        MouseLeave="MoveStop_MouseLeave"/>
+
+                                                <!-- [PAN RIGHT + TILT DOWN] 우측 하단 대각선 -->
+                                                <!--<Button Grid.Row="2"
+                                                        Grid.Column="2"
+                                                        Content="↘"
+                                                        Style="{StaticResource PanTiltDirectionButtonStyle}"
+                                                        PreviewMouseDown="PanRightTiltDown_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+
                                             </Grid>
 
                                             <!-- 이동 단위 표시 -->
@@ -727,6 +785,173 @@
                                 </StackPanel>
                             </ScrollViewer>
 
+                        </Grid>
+                    </Border>
+
+                    <!-- 현재 장비 상태 -->
+                    <Border Grid.Row="4"
+        Margin="0,10,0,0"
+        Background="#4E555C"
+        BorderBrush="#95A5B0"
+        BorderThickness="1.5"
+        Padding="10">
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 제목 -->
+                            <TextBlock Grid.Row="0"
+                   Text="CURRENT STATUS"
+                   Foreground="White"
+                   FontSize="13"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,8"/>
+
+                            <!-- 상태값 -->
+                            <Grid Grid.Row="1">
+
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="75"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="26"/>
+                                    <RowDefinition Height="26"/>
+                                    <RowDefinition Height="26"/>
+                                    <RowDefinition Height="26"/>
+                                    <RowDefinition Height="26"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- PAN -->
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
+                                           Text="Pan"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentPanText}"
+                                           Foreground="White"/>
+
+                                <!-- TILT -->
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="0"
+                                           Text="Tilt"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentTiltText}"
+                                           Foreground="White"/>
+
+                                <!-- EO ZOOM -->
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="0"
+                                           Text="EO Zoom"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentEoZoomText}"
+                                           Foreground="White"/>
+
+                                <!-- EO FOCUS -->
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="0"
+                                           Text="EO Focus"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentEoFocusText}"
+                                           Foreground="White"/>
+
+                                <!-- IR ZOOM -->
+                                <!--
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="0"
+                                           Text="IR Zoom"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentIrZoomText}"
+                                           Foreground="White"/>
+
+                                -->
+                                <!-- IR FOCUS -->
+                                <!--
+                                <TextBlock Grid.Row="5"
+                                           Grid.Column="0"
+                                           Text="IR Focus"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="5"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="5"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentIrFocusText}"
+                                           Foreground="White"/>-->
+
+                                <!-- POWER -->
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="0"
+                                           Text="Power"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="1"
+                                           Text=":"
+                                           Foreground="White"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="2"
+                                           Text="{Binding CurrentPowerText}"
+                                           Foreground="#9FE870"
+                                           FontWeight="Bold"/>
+
+                            </Grid>
                         </Grid>
                     </Border>
 

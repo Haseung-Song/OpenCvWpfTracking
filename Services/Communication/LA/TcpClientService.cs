@@ -7,109 +7,175 @@ using System.Threading.Tasks;
 namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
-    /// [LA](Local Agent) 프로그램과 [TCP] [Client] 방식으로 통신하는 서비스
-    /// 
+    /// [Web Agent / LA] 프로그램과 [TCP Client] 방식으로 통신하는 서비스
+    ///
     /// 역할:
-    /// 1. [LA] 프로그램에 [TCP] 연결
-    /// 2. [LA] -> byte[] [Packet] 송신
-    /// 3. [LA]에서 수신되는 데이터 처리 및 [Console] [Log] 출력
-    /// 4. [Disconnect] 시, [Socket] / [Stream] / [Token] 리소스 정리
+    /// 1. 제어 서버에 TCP 연결
+    /// 2. Pelco-D 7Byte Packet 송신
+    /// 3. 서버 응답 Packet 수신
+    /// 4. 연결 종료 감지 및 상위 계층 재연결 요청
+    /// 5. Disconnect 시 Socket / Stream / Token 리소스 정리
     /// </summary>
     public class TcpClientService
     {
+        #region [Constants]
+
+        /// <summary>
+        /// [TCP] 연결 제한 시간 [ms]
+        ///
+        /// 장비 미기동 상태에서 UI가 오래 멈추지 않도록
+        /// 기존 기본 Socket 대기 시간보다 짧게 제한한다.
+        /// </summary>
+        private const int CONNECT_TIMEOUT_MS =
+            1500;
+
+        /// <summary>
+        /// [TCP] 송신 제한 시간 [ms]
+        /// </summary>
+        private const int SEND_TIMEOUT_MS =
+            1500;
+
+        #endregion
+
         #region [Fields]
 
-        /// <summary>
-        /// [TCP] [Client] 객체
-        /// 
-        /// [LA] 프로그램에 접속하는 실제 [Socket] 객체
-        /// </summary>
         private TcpClient _tcpClient;
-
-        /// <summary>
-        /// [TCP] 송수신 [Stream]
-        /// 
-        /// [Send] / [Receive] 모두 이 [Stream]을 통해 처리
-        /// </summary>
         private NetworkStream _networkStream;
-
-        /// <summary>
-        /// 수신 루프 종료 제어용 [Token]
-        /// 
-        /// [Disconnect] 시 [Cancel] 처리
-        /// </summary>
         private CancellationTokenSource _cts;
 
         /// <summary>
-        /// 마지막 수신 [Log] 출력 시간 저장
-        /// 
-        /// [LA]에서 상태 [Packet]이 [10Hz] 이상으로 계속 들어오므로
-        /// [Console] 도배 방지를 위해 일정 시간 간격으로만
-        /// [Log] 출력할 때 사용
+        /// [TCP] 연결 / 송신 / 해제 동기화 객체
         /// </summary>
-        private DateTime _lastRecvLogTime = DateTime.MinValue;
+        private readonly object _socketLock =
+            new object();
+
+        /// <summary>
+        /// 마지막 수신 Log 출력 시간
+        /// </summary>
+        private DateTime _lastRecvLogTime =
+            DateTime.MinValue;
+
+        /// <summary>
+        /// 사용자가 직접 연결 해제를 요청했는지 여부
+        ///
+        /// 수신 Loop 종료 시 자동 재연결 이벤트가
+        /// 잘못 발생하지 않도록 구분한다.
+        /// </summary>
+        private bool _isManualDisconnect;
 
         #endregion
 
         #region [Events]
 
-        /// <summary>
-        /// 수신 데이터 전달 이벤트
-        /// 
-        /// [ViewModel]에서 수신 [Packet]을 받고 싶을 때 사용
-        /// </summary>
         public event Action<byte[], DateTime> MessageReceived;
+
+        /// <summary>
+        /// 서버 연결이 비정상적으로 종료된 경우 발생
+        ///
+        /// MainViewModel에서 일정 간격으로 재연결을 시도할 때 사용한다.
+        /// </summary>
+        public event Action ConnectionClosed;
 
         #endregion
 
         #region [Properties]
 
-        /// <summary>
-        /// [TCP] 연결 상태
-        /// </summary>
-        public bool IsConnected =>
-            _tcpClient != null &&
-            _tcpClient.Connected;
+        public bool IsConnected
+        {
+            get
+            {
+                lock (_socketLock)
+                {
+                    return _tcpClient != null &&
+                           _tcpClient.Connected &&
+                           _networkStream != null;
+                }
+
+            }
+
+        }
 
         #endregion
 
         #region [Connect]
 
         /// <summary>
-        /// [LA] 프로그램에 [TCP] [Client]로 접속
-        /// 
-        /// 연결 성공 시 [NetworkStream]을 생성하고,
-        /// 백그라운드 [ReceiveLoop]를 시작한다.
+        /// [Web Agent / LA] TCP Server 연결
+        ///
+        /// 연결 제한 시간을 적용하여 서버가 준비되지 않은 경우에도
+        /// 장비 연결 UI가 장시간 대기하지 않도록 한다.
         /// </summary>
-        public async Task<bool> ConnectAsync(string ip, int port)
+        public async Task<bool> ConnectAsync(
+            string ip,
+            int port)
         {
+            if (IsConnected)
+            {
+                Console.WriteLine("[TCP] Already Connected.");
+                return true;
+            }
+
+            ConsoleLogHelper.PrintLine();
+            Console.WriteLine("[TCP] Connect Try...");
+            Console.WriteLine($"[TCP] Target : {ip}:{port}");
+            ConsoleLogHelper.PrintLine();
+
+            TcpClient newClient =
+                new TcpClient
+                {
+                    NoDelay =
+                    true,
+
+                    SendTimeout =
+                    SEND_TIMEOUT_MS
+                };
+
             try
             {
-                if (IsConnected)
+                Task connectTask =
+                    newClient.ConnectAsync(
+                        ip,
+                        port);
+
+                Task completedTask =
+                    await Task.WhenAny(
+                        connectTask,
+                        Task.Delay(CONNECT_TIMEOUT_MS));
+
+                if (completedTask != connectTask)
                 {
-                    Console.WriteLine("[TCP] Already Connected.");
-                    return true;
+                    Console.WriteLine(
+                        "[TCP ERROR] Connect Failed : Timeout");
+
+                    newClient.Close();
+                    newClient.Dispose();
+
+                    ConsoleLogHelper.PrintLine();
+                    return false;
                 }
 
-                ConsoleLogHelper.PrintLine();
-                Console.WriteLine("[TCP] Connect Try...");
-                Console.WriteLine($"[TCP] Target : {ip}:{port}");
-                ConsoleLogHelper.PrintLine();
+                await connectTask;
 
-                // [TCP] [Client] 객체 생성
-                _tcpClient = new TcpClient();
+                lock (_socketLock)
+                {
+                    CleanupSocketInternal();
 
-                // [LA] 프로그램으로 [TCP] 연결 시도
-                await _tcpClient.ConnectAsync(ip, port);
+                    _tcpClient =
+                        newClient;
 
-                // 연결 성공 후 송수신 [Stream] 가져오기
-                _networkStream = _tcpClient.GetStream();
+                    _networkStream =
+                        _tcpClient.GetStream();
 
-                // 수신 루프 종료 제어용 [Token] 생성
-                _cts = new CancellationTokenSource();
+                    _cts =
+                        new CancellationTokenSource();
 
-                // 수신 루프는 연결 중 계속 돌아야 하므로 백그라운드 [Task]로 실행
-                _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
+                    _isManualDisconnect =
+                        false;
+                }
+
+                _ = Task.Run(() =>
+                    ReceiveLoopAsync(
+                        _cts.Token));
 
                 Console.WriteLine("[TCP] Connect Success.");
                 ConsoleLogHelper.PrintLine();
@@ -118,10 +184,14 @@ namespace OpenCvWpfTracking.Services.Communication
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[TCP ERROR] Connect Failed : " + ex.Message);
-                ConsoleLogHelper.PrintLine();
+                newClient.Close();
+                newClient.Dispose();
 
-                Disconnect();
+                Console.WriteLine(
+                    "[TCP ERROR] Connect Failed : " +
+                    ex.Message);
+
+                ConsoleLogHelper.PrintLine();
 
                 return false;
             }
@@ -132,49 +202,60 @@ namespace OpenCvWpfTracking.Services.Communication
 
         #region [Send]
 
-        /// <summary>
-        /// [LA] 프로그램으로 byte[] [Packet] 송신
-        /// 
-        /// [ControlCommandService]에서 생성한 [TORUSS] 제어 [Packet]을
-        /// [NetworkStream]을 통해 [LA]로 전송한다.
-        /// </summary>
-        public bool Send(byte[] data)
+        public bool Send(
+            byte[] data)
         {
-            try
+            if (data == null ||
+                data.Length == 0)
             {
-                // 연결 상태 및 [Stream] 쓰기 가능 여부 확인
-                if (!CanSend())
-                {
-                    Console.WriteLine("[TCP SEND] Not Connected.");
-                    return false;
-                }
-
-                // [Packet] 송신
-                _networkStream.Write(data, 0, data.Length);
-
-                // 남은 버퍼 즉시 전송
-                _networkStream.Flush();
-
-                // 송신 [Packet] [HEX] [Log] 출력
-                PrintHexData("[TCP SEND]", data);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("[TCP ERROR] Send Failed : " + ex.Message);
+                Console.WriteLine(
+                    "[TCP SEND] Invalid Packet.");
 
                 return false;
             }
 
+            lock (_socketLock)
+            {
+                try
+                {
+                    if (!CanSend())
+                    {
+                        Console.WriteLine(
+                            "[TCP SEND] Not Connected.");
+
+                        return false;
+                    }
+
+                    _networkStream.Write(
+                        data,
+                        0,
+                        data.Length);
+
+                    _networkStream.Flush();
+
+                    PrintHexData(
+                        "[TCP SEND]",
+                        data);
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        "[TCP ERROR] Send Failed : " +
+                        ex.Message);
+
+                    return false;
+                }
+
+            }
+
         }
 
-        /// <summary>
-        /// 송신 가능 상태 확인
-        /// </summary>
         private bool CanSend()
         {
-            return IsConnected &&
+            return _tcpClient != null &&
+                   _tcpClient.Connected &&
                    _networkStream != null &&
                    _networkStream.CanWrite;
         }
@@ -183,69 +264,108 @@ namespace OpenCvWpfTracking.Services.Communication
 
         #region [Receive]
 
-        /// <summary>
-        /// [LA] 프로그램에서 들어오는 데이터 수신 루프
-        /// 
-        /// [Disconnect] 요청 전까지 계속 [ReadAsync]를 수행하며,
-        /// 수신된 데이터는 [Console] [Log] 및
-        /// [MessageReceived] 이벤트로 전달한다.
-        /// </summary>
-        private async Task ReceiveLoopAsync(CancellationToken token)
+        private async Task ReceiveLoopAsync(
+            CancellationToken token)
         {
-            // [C++][TCP_Client] 기준 [BUFSIZE 2048]과 동일하게 설정
-            byte[] buffer = new byte[2048];
+            byte[] buffer =
+                new byte[2048];
+
+            bool shouldNotifyConnectionClosed =
+                false;
 
             try
             {
-                while (!token.IsCancellationRequested &&
-                       IsConnected &&
-                       _networkStream != null)
+                while (!token.IsCancellationRequested)
                 {
-                    // [TCP] 데이터 수신 대기
-                    int readSize =
-                        await _networkStream.ReadAsync(
-                            buffer,
-                            0,
-                            buffer.Length);
+                    NetworkStream stream;
 
-                    // [readSize]가 0이면 상대방이 연결 종료한 상태
-                    if (readSize <= 0)
+                    lock (_socketLock)
                     {
-                        Console.WriteLine("[TCP] Server Disconnected.");
+                        stream =
+                            _networkStream;
+                    }
+
+                    if (stream == null)
+                    {
                         break;
                     }
 
-                    // buffer 전체가 아니라 실제 수신 데이터만 복사
-                    byte[] receivedData = CopyReceivedData(buffer, readSize);
+                    int readSize =
+                        await stream.ReadAsync(
+                            buffer,
+                            0,
+                            buffer.Length,
+                            token);
 
-                    // 수신 [Log]는 [Console] 도배 방지를 위해
-                    // [1초 간격]으로만 출력
-                    PrintReceiveLogIfNeeded(receivedData);
+                    if (readSize <= 0)
+                    {
+                        Console.WriteLine(
+                            "[TCP] Server Disconnected.");
 
-                    // [ViewModel] 쪽으로 수신 데이터 전달
-                    RaiseMessageReceived(receivedData);
+                        shouldNotifyConnectionClosed =
+                            true;
+
+                        break;
+                    }
+
+                    byte[] receivedData =
+                        CopyReceivedData(
+                            buffer,
+                            readSize);
+
+                    PrintReceiveLogIfNeeded(
+                        receivedData);
+
+                    RaiseMessageReceived(
+                        receivedData);
                 }
 
             }
+            catch (OperationCanceledException)
+            {
+                // 사용자가 연결 해제를 요청한 정상 종료 흐름
+            }
             catch (ObjectDisposedException)
             {
-                // [Disconnect] 중 [Stream]이 닫히면서 발생할 수 있으므로
-                // 정상 종료 흐름으로 처리
-                Console.WriteLine("[TCP] Receive Loop Closed.");
+                // Disconnect 중 Stream 종료로 발생할 수 있는 정상 흐름
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[TCP ERROR] Receive Failed : " + ex.Message);
+                Console.WriteLine(
+                    "[TCP ERROR] Receive Failed : " +
+                    ex.Message);
+
+                shouldNotifyConnectionClosed =
+                    true;
             }
-            Disconnect(); // 수신 루프 종료 시 연결 정리
+            finally
+            {
+                bool isManualDisconnect;
+
+                lock (_socketLock)
+                {
+                    isManualDisconnect =
+                        _isManualDisconnect;
+
+                    CleanupSocketInternal();
+                }
+
+                if (shouldNotifyConnectionClosed &&
+                    !isManualDisconnect)
+                {
+                    ConnectionClosed?.Invoke();
+                }
+
+            }
+
         }
 
-        /// <summary>
-        /// [수신 버퍼]에서 실제로 [수신된 크기]만큼만 복사
-        /// </summary>
-        private byte[] CopyReceivedData(byte[] buffer, int readSize)
+        private byte[] CopyReceivedData(
+            byte[] buffer,
+            int readSize)
         {
-            byte[] receivedData = new byte[readSize];
+            byte[] receivedData =
+                new byte[readSize];
 
             Array.Copy(
                 buffer,
@@ -255,76 +375,71 @@ namespace OpenCvWpfTracking.Services.Communication
             return receivedData;
         }
 
-        /// <summary>
-        /// 마지막 [Log] 출력 이후 1초 이상 지났을 경우,
-        /// 수신 [Log]를 출력
-        /// 
-        /// [TCP]는 [Packet] 단위가 아니라 [Stream] 단위이므로,
-        /// [12byte] 응답 [Packet] 여러 개가
-        /// 한 번에 붙어서 들어올 수 있다.
-        /// 
-        /// 현재는 [TORUSS] 응답 [Packet] 길이인
-        /// [12byte] 기준으로 분리 출력한다.
-        /// 
-        /// [TODO]:
-        /// 추후 [0xFF] [Header] / [CheckSum] 기반 [Parser]로 분리 예정
-        /// </summary>
-        private void PrintReceiveLogIfNeeded(byte[] receivedData)
+        private void PrintReceiveLogIfNeeded(
+            byte[] receivedData)
         {
             if ((DateTime.Now - _lastRecvLogTime).TotalSeconds < 1)
+            {
                 return;
+            }
 
-            PrintReceivePackets(receivedData);
+            PrintReceivePackets(
+                receivedData);
 
-            // 현재 시간을 마지막 출력 시간으로 저장
-            _lastRecvLogTime = DateTime.Now;
+            _lastRecvLogTime =
+                DateTime.Now;
         }
 
-        /// <summary>
-        /// 수신 데이터를 [TORUSS] 응답 [Packet] 길이인
-        /// [12byte] 단위로 분리하여 출력
-        /// </summary>
-        private void PrintReceivePackets(byte[] receivedData)
+        private void PrintReceivePackets(
+            byte[] receivedData)
         {
-            const int responsePacketSize = 12;
+            const int responsePacketSize =
+                12;
 
             for (int i = 0;
                  i + responsePacketSize - 1 < receivedData.Length;
                  i += responsePacketSize)
             {
-                string packet = "";
+                string packet =
+                    string.Empty;
 
-                for (int j = 0; j < responsePacketSize; j++)
+                for (int j = 0;
+                     j < responsePacketSize;
+                     j++)
                 {
-                    packet += $"{receivedData[i + j]:X2} ";
+                    packet +=
+                        $"{receivedData[i + j]:X2} ";
                 }
-                Console.WriteLine($"[TCP RECV PACKET] {packet}");
+
+                Console.WriteLine(
+                    $"[TCP RECV PACKET] {packet}");
             }
 
         }
 
-        /// <summary>
-        /// [ViewModel] 또는 외부 구독자에게 수신 데이터 전달
-        /// </summary>
-        private void RaiseMessageReceived(byte[] receivedData)
+        private void RaiseMessageReceived(
+            byte[] receivedData)
         {
-            MessageReceived?.Invoke(receivedData, DateTime.Now);
+            MessageReceived?.Invoke(
+                receivedData,
+                DateTime.Now);
         }
 
         #endregion
 
         #region [Log]
 
-        /// <summary>
-        /// [byte] 배열을 [HEX] 문자열 형태로 [Console] 출력
-        /// </summary>
-        private void PrintHexData(string prefix, byte[] data)
+        private void PrintHexData(
+            string prefix,
+            byte[] data)
         {
-            Console.Write(prefix + " ");
+            Console.Write(
+                prefix + " ");
 
-            foreach (byte b in data)
+            foreach (byte value in data)
             {
-                Console.Write($"{b:X2} ");
+                Console.Write(
+                    $"{value:X2} ");
             }
             Console.WriteLine();
         }
@@ -334,31 +449,69 @@ namespace OpenCvWpfTracking.Services.Communication
         #region [Disconnect]
 
         /// <summary>
-        /// [TCP] 연결 해제 및 리소스 정리
-        /// 
-        /// 수신 루프 종료 요청 후,
-        /// [NetworkStream] / [TcpClient] /
-        /// [CancellationTokenSource]를 안전하게 정리한다.
+        /// [TCP] 수동 연결 해제
+        ///
+        /// 수동 해제 시에는 자동 재연결 이벤트를 발생시키지 않는다.
         /// </summary>
         public void Disconnect()
         {
-            // 수신 루프 종료 요청.
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = null;
+            lock (_socketLock)
+            {
+                _isManualDisconnect =
+                    true;
 
-            // [NetworkStream] 정리
-            _networkStream?.Close();
-            _networkStream?.Dispose();
-            _networkStream = null;
+                CleanupSocketInternal();
+            }
 
-            // [TCP] [Client] [Socket] 정리
-            _tcpClient?.Close();
-            _tcpClient?.Dispose();
-            _tcpClient = null;
+            Console.WriteLine(
+                "[TCP] Disconnected.");
 
-            Console.WriteLine("[TCP] Disconnected.");
             Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Socket / Stream / Token 내부 리소스 정리
+        ///
+        /// 호출 위치에서 [_socketLock]을 확보한 상태로 사용한다.
+        /// </summary>
+        private void CleanupSocketInternal()
+        {
+            try
+            {
+                _cts?.Cancel();
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _networkStream?.Close();
+                _networkStream?.Dispose();
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _tcpClient?.Close();
+                _tcpClient?.Dispose();
+            }
+            catch
+            {
+            }
+
+            _cts?.Dispose();
+
+            _cts =
+                null;
+
+            _networkStream =
+                null;
+
+            _tcpClient =
+                null;
         }
         #endregion
     }

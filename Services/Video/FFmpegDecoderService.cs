@@ -203,30 +203,194 @@ namespace OpenCvWpfTracking.Services.Video
         }
 
         /// <summary>
-        /// [RTSP] 연결 옵션 생성
+        /// [RTSP] 연결 및 저지연 영상 출력을 위한
+        /// [FFmpeg] 입력 옵션 생성
         ///
-        /// [rtsp_transport=tcp]:
-        /// 
-        /// [C++] [FFmpeg] 구조에서 [TCP] 기반으로 열었던 것과 동일하게 [TCP] 강제
+        /// 주요 설정:
         ///
-        /// [timeout=3000000]:
-        /// [RTSP] 연결 [Timeout] 설정
-        /// 단위는 [microsecond], 3000000 = 3초
+        /// 1. [rtsp_transport = tcp]
+        ///    RTSP 영상 전송 방식을 [TCP]로 고정한다.
+        ///    UDP 대비 Packet 손실에 강하며,
+        ///    장비 네트워크 환경에서 안정적인 영상 수신을 목적으로 사용한다.
+        ///
+        /// 2. [timeout / stimeout / rw_timeout]
+        ///    RTSP 연결 및 데이터 읽기 제한 시간을 설정한다.
+        ///    단위는 [microsecond]이며,
+        ///    현재 [5000000 = 5초]로 설정한다.
+        ///
+        ///    해당 값은 항상 5초 동안 대기하는 시간이 아니라,
+        ///    연결 또는 데이터 수신이 지연될 경우
+        ///    최대 5초까지만 기다리도록 제한하는 값이다.
+        ///
+        ///    장비가 정상 응답하면 제한 시간과 관계없이
+        ///    즉시 다음 연결 절차를 진행한다.
+        ///
+        /// 3. [max_delay]
+        ///    RTSP Packet 수신 시 허용할 최대 지연 시간을 설정한다.
+        ///    현재 [500000 = 0.5초]로 설정한다.
+        ///
+        ///    값을 지나치게 줄이면 네트워크 상태에 따라
+        ///    Frame 손실이나 영상 끊김이 발생할 수 있다.
+        ///
+        /// 4. [analyzeduration]
+        ///    FFmpeg가 입력 Stream 정보를 분석하는 최대 시간을 설정한다.
+        ///    현재 [1000000 = 1초]로 설정한다.
+        ///
+        ///    Stream 분석 시간을 제한하여 초기 연결 시간을 줄이되,
+        ///    Video Stream 및 Codec 정보를 탐색할 시간을 확보한다.
+        ///
+        /// 5. [probesize]
+        ///    Stream 정보 탐색에 사용할 최대 데이터 크기를 설정한다.
+        ///    현재 [65536 Byte]로 설정한다.
+        ///
+        ///    값을 지나치게 줄이면 Video Stream 또는 Codec 정보를
+        ///    정상적으로 찾지 못할 수 있다.
+        ///
+        /// 6. [fflags = nobuffer]
+        ///    FFmpeg 내부 입력 Buffer 사용을 최소화하여
+        ///    실시간 영상 출력 지연을 줄인다.
+        ///
+        /// 7. [flags = low_delay]
+        ///    Decoder를 낮은 지연 방식으로 동작하도록 설정한다.
+        ///
+        /// 주의:
+        /// [timeout]은 영상 표시를 의도적으로 늦추는 설정이 아니다.
+        /// 정상 RTSP Server가 즉시 응답하면 영상 연결도 바로 진행된다.
+        ///
+        /// 연결 전에 일정 시간 동안 [Connecting] 상태를 표시하려면
+        /// [MainViewModel]에서 [OpenVideoSourcesAsync()] 호출 전에
+        /// 별도의 [Task.Delay()]를 적용해야 한다.
+        ///
+        /// Timeout / Analyze Duration / Probe Size 값을 지나치게 작게 설정하면
+        /// 장비 상태 또는 네트워크 환경에 따라
+        /// [avformat_open_input] 또는 [avformat_find_stream_info]가
+        /// 실패할 수 있으므로 실장비 시험 결과에 따라 조정한다.
         /// </summary>
+        /// <returns>
+        /// [FFmpeg] RTSP 입력 연결에 사용할 옵션 Dictionary
+        /// </returns>
         private AVDictionary* CreateRtspOptions()
         {
-            AVDictionary* options = null;
+            AVDictionary* options =
+                null;
 
+            /// <summary>
+            /// [RTSP] 전송 방식을 [TCP]로 고정
+            ///
+            /// UDP Packet 손실보다
+            /// 영상 연결 안정성을 우선한다.
+            /// </summary>
             ffmpeg.av_dict_set(
                 &options,
                 "rtsp_transport",
                 "tcp",
                 0);
 
+            /// <summary>
+            /// [RTSP] 일반 입출력 Timeout
+            ///
+            /// 단위:
+            /// microsecond
+            ///
+            /// 5000000 = 5초
+            ///
+            /// 입력 또는 출력 처리가 지연되는 경우
+            /// 최대 5초까지만 대기한다.
+            /// </summary>
             ffmpeg.av_dict_set(
                 &options,
                 "timeout",
-                "3000000",
+                "5000000",
+                0);
+
+            /// <summary>
+            /// [RTSP] Socket 연결 및 수신 Timeout
+            ///
+            /// 5000000 = 5초
+            ///
+            /// RTSP Server가 응답하지 않을 경우
+            /// 최대 대기시간을 제한한다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "stimeout",
+                "5000000",
+                0);
+
+            /// <summary>
+            /// [RTSP] 데이터 읽기 / 쓰기 Timeout
+            ///
+            /// 5000000 = 5초
+            ///
+            /// 연결 이후 영상 데이터가 일정 시간 동안 수신되지 않으면
+            /// 현재 읽기 동작을 실패 처리할 수 있도록 제한한다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "rw_timeout",
+                "5000000",
+                0);
+
+            /// <summary>
+            /// [RTSP] Packet 최대 지연 허용 시간
+            ///
+            /// 500000 = 0.5초
+            ///
+            /// Packet 지연 누적을 제한하여
+            /// 실시간 영상 출력 지연을 줄인다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "max_delay",
+                "500000",
+                0);
+
+            /// <summary>
+            /// [FFmpeg] 입력 Stream 분석 최대 시간
+            ///
+            /// 1000000 = 1초
+            ///
+            /// Video Stream 및 Codec 정보를 탐색할 시간을 확보하면서
+            /// 초기 연결이 과도하게 지연되지 않도록 제한한다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "analyzeduration",
+                "1000000",
+                0);
+
+            /// <summary>
+            /// [FFmpeg] Stream 탐색 최대 데이터 크기
+            ///
+            /// 65536 Byte
+            ///
+            /// 초기 Stream 정보 탐색에 사용할 데이터 크기를 제한한다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "probesize",
+                "65536",
+                0);
+
+            /// <summary>
+            /// [FFmpeg] 내부 입력 Buffer 최소화
+            ///
+            /// Buffer에 Frame이 과도하게 누적되어
+            /// 실시간 화면이 늦게 표시되는 현상을 줄인다.
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "fflags",
+                "nobuffer",
+                0);
+
+            /// <summary>
+            /// [FFmpeg] 낮은 지연 Decode 모드 적용
+            /// </summary>
+            ffmpeg.av_dict_set(
+                &options,
+                "flags",
+                "low_delay",
                 0);
 
             return options;

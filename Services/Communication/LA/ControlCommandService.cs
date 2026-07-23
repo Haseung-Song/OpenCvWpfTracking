@@ -1,4 +1,7 @@
-﻿namespace OpenCvWpfTracking.Services.Communication
+﻿using OpenCvWpfTracking.Common;
+using System;
+
+namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
     /// [TORUSS] 감시장비 제어 명령 [Packet] 생성 / 송신 서비스
@@ -184,18 +187,119 @@
         }
 
         /// <summary>
-        /// 전체 속도제어 정지
-        /// 
-        /// [Command1] / [Command2] / [Data1] / [Data2]를 모두 0으로 송신하여
-        /// [PAN] / [TILT] / [ZOOM] / [FOCUS] 연속 동작을 정지한다.
+        /// [PAN LEFT + TILT UP] 좌측 상단 대각선 연속 이동 시작
+        ///
+        /// [Command2]
+        /// Pan Left : 0x04
+        /// Tilt Up  : 0x08
+        /// 결합값   : 0x0C
+        ///
+        /// [Data1] = Pan Speed
+        /// [Data2] = Tilt Speed
         /// </summary>
-        public bool StopMove()
+        public bool StartPanLeftTiltUp(
+            byte panSpeed = 20,
+            byte tiltSpeed = 20)
         {
             return SendCommand(
                 0x00,
+                0x0C,
+                panSpeed,
+                tiltSpeed);
+        }
+
+        /// <summary>
+        /// [PAN RIGHT + TILT UP] 우측 상단 대각선 연속 이동 시작
+        ///
+        /// [Command2]
+        /// Pan Right : 0x02
+        /// Tilt Up   : 0x08
+        /// 결합값    : 0x0A
+        ///
+        /// [Data1] = Pan Speed
+        /// [Data2] = Tilt Speed
+        /// </summary>
+        public bool StartPanRightTiltUp(
+            byte panSpeed = 20,
+            byte tiltSpeed = 20)
+        {
+            return SendCommand(
                 0x00,
+                0x0A,
+                panSpeed,
+                tiltSpeed);
+        }
+
+        /// <summary>
+        /// [PAN LEFT + TILT DOWN] 좌측 하단 대각선 연속 이동 시작
+        ///
+        /// [Command2]
+        /// Pan Left  : 0x04
+        /// Tilt Down : 0x10
+        /// 결합값    : 0x14
+        ///
+        /// [Data1] = Pan Speed
+        /// [Data2] = Tilt Speed
+        /// </summary>
+        public bool StartPanLeftTiltDown(
+            byte panSpeed = 20,
+            byte tiltSpeed = 20)
+        {
+            return SendCommand(
                 0x00,
-                0x00);
+                0x14,
+                panSpeed,
+                tiltSpeed);
+        }
+
+        /// <summary>
+        /// [PAN RIGHT + TILT DOWN] 우측 하단 대각선 연속 이동 시작
+        ///
+        /// [Command2]
+        /// Pan Right : 0x02
+        /// Tilt Down : 0x10
+        /// 결합값    : 0x12
+        ///
+        /// [Data1] = Pan Speed
+        /// [Data2] = Tilt Speed
+        /// </summary>
+        public bool StartPanRightTiltDown(
+            byte panSpeed = 20,
+            byte tiltSpeed = 20)
+        {
+            return SendCommand(
+                0x00,
+                0x12,
+                panSpeed,
+                tiltSpeed);
+        }
+
+        /// <summary>
+        /// 전체 속도제어 정지
+        /// </summary>
+        public bool StopMove()
+        {
+            Console.WriteLine();
+            Console.WriteLine(
+                "[CONTROL] STOP MOVE");
+
+            Console.WriteLine(
+                "[CONTROL] STOP COMMAND PARAMETER : " +
+                "CMD1=0x00, CMD2=0x00, DATA1=0x00, DATA2=0x00");
+
+            bool result =
+                SendCommand(
+                    0x00,
+                    0x00,
+                    0x00,
+                    0x00);
+
+            Console.WriteLine(
+                $"[CONTROL] STOP SEND RESULT : {result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            return result;
         }
 
         /// <summary>
@@ -266,6 +370,34 @@
                 0x39,
                 data1,
                 data2);
+        }
+
+        /// <summary>
+        /// [EO] 주간 카메라 Focus 연속 제어 속도 설정
+        ///
+        /// Command2 = 0x27
+        /// Data2    = Speed [0 ~ 3]
+        ///
+        /// 우선 최소 속도 Level 0을 사용한다.
+        /// 장비 반응 확인 후 1 ~ 3 범위에서 조정한다.
+        /// </summary>
+        public bool SetEoFocusSpeed(
+            byte speed)
+        {
+            if (speed > 3)
+            {
+                speed = 3;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CONTROL] EO FOCUS SPEED SET : {speed}");
+
+            return SendCommand(
+                0x00,
+                0x27,
+                0x00,
+                speed);
         }
 
         /// <summary>
