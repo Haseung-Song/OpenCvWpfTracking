@@ -92,7 +92,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Communication Fields]
 
         /// <summary>
-        /// [LA](Local Agent) [TCP] 통신 서비스 객체
+        /// [Web Agent / LA] 제어 [TCP] 통신 서비스 객체
+        ///
+        /// 기존 고흥 건의 통신 구조를 유지하며,
+        /// 접속 IP / Port만 MR500 환경에 맞춰 사용한다.
         /// </summary>
         private readonly TcpClientService _laTcpService;
 
@@ -102,15 +105,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
         /// </summary>
         private readonly ControlCommandService _controlCommandService;
-
-        /// <summary>
-        /// [EO] 주간 카메라 [Web Agent] [TCP Socket] 제어 서비스
-        ///
-        /// [MR500 환경부 과제] 장비 기준으로
-        /// 기존 [Pelco-D] 7 Byte 명령을 [192.168.0.100:9000]으로 송신한다.
-        /// [Web Agent]가 수신한 명령을 실제 카메라 제어 통신으로 우회 처리한다.
-        /// </summary>
-        private readonly WebAgentPelcoClientService _eoWebAgentControlService;
 
         /// <summary>
         /// [EO] 영상 첫 Frame 화면 표시 여부
@@ -202,7 +196,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 이후 [Slider] 또는 [ComboBox] 등 [UI] 조작으로 값이 변경될 수 있으며,
         /// 실제 연속 이동 제어 시 해당 값을 사용한다.
         /// </summary>
-        private byte _panTiltSpeedLevel = 15;
+        private byte _panTiltSpeedLevel = 30;
 
         /// <summary>
         /// [ZOOM] 버튼 1회 클릭 시 이동할 값
@@ -879,7 +873,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] ZOOM +{ZoomMoveStep} => Target : {targetZoom}");
                 ConsoleLogHelper.PrintLine();
 
-                _eoWebAgentControlService.MoveZoomPosition(targetZoom);
+                _controlCommandService.EoZoomGoPosition(targetZoom);
             });
 
             /// <summary>
@@ -895,7 +889,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] ZOOM -{ZoomMoveStep} => Target : {targetZoom}");
                 ConsoleLogHelper.PrintLine();
 
-                _eoWebAgentControlService.MoveZoomPosition(targetZoom);
+                _controlCommandService.EoZoomGoPosition(targetZoom);
             });
 
             /// <summary>
@@ -911,7 +905,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] FOCUS +{FocusMoveStep} => Target : {targetFocus}");
                 ConsoleLogHelper.PrintLine();
 
-                _eoWebAgentControlService.MoveFocusPosition(targetFocus);
+                _controlCommandService.EoFocusGoPosition(targetFocus);
             });
 
             /// <summary>
@@ -927,7 +921,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 Console.WriteLine($"[CONTROL] FOCUS -{FocusMoveStep} => Target : {targetFocus}");
                 ConsoleLogHelper.PrintLine();
 
-                _eoWebAgentControlService.MoveFocusPosition(targetFocus);
+                _controlCommandService.EoFocusGoPosition(targetFocus);
             });
 
             #endregion
@@ -992,18 +986,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [TORUSS] 제어 명령 서비스 생성
             /// </summary>
             _controlCommandService = new ControlCommandService(_laTcpService);
-
-            /// <summary>
-            /// [EO] 주간 카메라 [Web Agent] 제어 서비스 생성
-            ///
-            /// [MR500 환경부 과제] 프로그램 스펙 기준:
-            /// - EO Camera / Agent IP : 192.168.20.161
-            /// - TCP Control Port     : 5005
-            /// </summary>
-            _eoWebAgentControlService =
-                new WebAgentPelcoClientService(
-                    "192.168.20.161",
-                    5005);
 
             /// <summary>
             /// [LA] 수신 [Packet Parser] 생성
@@ -1830,8 +1812,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO ZOOM TELE START");
             ConsoleLogHelper.PrintLine();
 
-            _eoWebAgentControlService
-                .StartZoomTele();
+            _controlCommandService
+                .StartEoZoomTele();
         }
 
         /// <summary>
@@ -1845,8 +1827,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO ZOOM WIDE START");
             ConsoleLogHelper.PrintLine();
 
-            _eoWebAgentControlService
-                .StartZoomWide();
+            _controlCommandService
+                .StartEoZoomWide();
         }
 
         /// <summary>
@@ -1860,8 +1842,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO FOCUS NEAR START");
             ConsoleLogHelper.PrintLine();
 
-            _eoWebAgentControlService
-                .StartFocusNear();
+            _controlCommandService
+                .StartEoFocusNear();
         }
 
         /// <summary>
@@ -1875,8 +1857,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO FOCUS FAR START");
             ConsoleLogHelper.PrintLine();
 
-            _eoWebAgentControlService
-                .StartFocusFar();
+            _controlCommandService
+                .StartEoFocusFar();
         }
 
         /// <summary>
@@ -1888,8 +1870,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine("[CONTROL] EO ONE PUSH FOCUS REQUEST");
             ConsoleLogHelper.PrintLine();
 
-            _eoWebAgentControlService
-                .StartAutoFocus();
+            _controlCommandService
+                .StartEoAutoFocus();
         }
 
         #endregion
@@ -2060,15 +2042,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 case ContinuousMoveType.EoZoom:
 
-                    // [EO] 주간 카메라 [Web Agent / Pelco-D] 연속 제어 정지
-                    _eoWebAgentControlService
+                    // [EO] 주간 카메라 [Pelco-D] Zoom 연속 제어 정지
+                    _controlCommandService
                         .StopMove();
                     break;
 
                 case ContinuousMoveType.EoFocus:
 
-                    // [EO] 주간 카메라 [Web Agent / Pelco-D] 연속 제어 정지
-                    _eoWebAgentControlService
+                    // [EO] 주간 카메라 [Pelco-D] Focus 연속 제어 정지
+                    _controlCommandService
                         .StopMove();
                     break;
 
@@ -2166,7 +2148,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// </summary>
                 //_ = ConnectAiDetectorAsync();
 
-                _ = ConnectLaAsync(); // [LA] 연결 테스트 (실제 LA 프로그램이 켜져 있어야 성공)
+                _ = ConnectLaAsync(); // [Web Agent] 제어 TCP 연결 [192.168.0.100:9000]
 
                 /// <summary>
                 /// [AI Detector Agent] 자동 재연결 시작은
@@ -2870,34 +2852,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Connect]
 
         /// <summary>
-        /// [LA] 연결 시작
+        /// [Web Agent] 제어 통신 연결 시작
         /// 
-        /// 1. 옥상 카메라 제어 [Port]: 5002
-        /// 2. 연구 개발실 제어 [Port]: 5005
-        /// 3. 일층 생산팀 제어 [Port]: 5001
+        /// 기존 고흥 건에서 사용한
+        /// [TcpClientService] / [ControlCommandService] /
+        /// [Pelco-D] 7 Byte 제어 구조는 그대로 유지한다.
         /// 
-        /// [TCP] 연결 성공 시,
-        /// [TcpClientService] 내부 [ReceiveLoop]에서
-        /// [LA] 응답 [Packet]을 지속적으로 수신한다.
+        /// [MR500 환경부 과제] 제어 접속 정보:
+        /// - IP   : 192.168.0.100
+        /// - Port : 9000
         /// 
-        /// 수신된 원본 [byte[] 데이터]는
-        /// [MessageReceived] 이벤트를 통해 [MainViewModel]로 전달되고,
-        /// [LaPacketParser]에서 [12 byte] Packet 단위로 분리/파싱된다.
+        /// 연결 성공 이후 [Pan] / [Tilt] /
+        /// [EO Zoom] / [EO Focus] 명령은
+        /// 동일한 TCP 연결을 통해 송신한다.
         /// </summary>
         public async Task ConnectLaAsync()
         {
-            Console.WriteLine("[LA] Connect Start");
+            Console.WriteLine("[WEB AGENT] Connect Start");
 
             bool result =
                 await _laTcpService.ConnectAsync(
-                    "127.0.0.1",
-                    // 5002 (옥상 카메라 제어)
-                    // 5005 (연구 개발실 제어)
-                    // 5001 (일층 생산팀 제어)
-                    5002);
+                    "192.168.0.100",
+                    9000);
 
             Console.WriteLine(
-                "[LA CONNECT RESULT] "
+                "[WEB AGENT CONNECT RESULT] "
                 + result);
 
             ConsoleLogHelper.PrintLine();

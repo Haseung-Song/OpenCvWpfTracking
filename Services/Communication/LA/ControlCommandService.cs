@@ -297,6 +297,26 @@
         }
 
         /// <summary>
+        /// [EO] 주간 카메라 [One Push Auto Focus] 요청
+        ///
+        /// 기존 EO 제어 구현에서 사용하던
+        /// [Pelco-D] 확장 명령을 동일한 제어 TCP 연결로 송신한다.
+        ///
+        /// [Command1 = 0x00]
+        /// [Command2 = 0x2B]
+        /// [Data1    = 0x00]
+        /// [Data2    = 0x00]
+        /// </summary>
+        public bool StartEoAutoFocus()
+        {
+            return SendCommand(
+                0x00,
+                0x2B,
+                0x00,
+                0x00);
+        }
+
+        /// <summary>
         /// [IR] 열영상 카메라 [Zoom] 위치 제어 명령
         /// 
         /// 위치 값은 [화각 * 100] 후

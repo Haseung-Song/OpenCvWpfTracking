@@ -138,16 +138,20 @@
           Background="#2C313A">
         <Grid.RowDefinitions>
             <RowDefinition Height="3*"/>
-            <RowDefinition Height="1.3*"/>
-            <!--<RowDefinition Height="100"/>-->
+            <RowDefinition Height="1.2*"/>
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2.3*" />
-                <ColumnDefinition Width="1.1*" />
-                <ColumnDefinition Width="260" />
+                <!-- [EO] 영상 영역 -->
+                <ColumnDefinition Width="1.7*" />
+
+                <!-- [IR] 영상 영역 -->
+                <ColumnDefinition Width="1*" />
+
+                <!-- 장비 제어 패널 -->
+                <ColumnDefinition Width="300" />
             </Grid.ColumnDefinitions>
 
             <!-- [좌측] 큰 영상 -->
@@ -226,24 +230,19 @@
                 </Grid>
             </Border>
 
-            <!-- [우측] 작은 영상 2개 -->
+            <!-- [우측] IR 영상 -->
             <Grid Grid.Column="1"
-                  Margin="0,0,5,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
-                    <RowDefinition Height="1*"/>
-                </Grid.RowDefinitions>
+                  Margin="0,5,10,0">
 
-                <Border Grid.Row="0"
-                        Margin="0,5,5,0"
-                        Background="Black"
+                <Border Background="Black"
                         BorderBrush="#5A5A5A"
                         BorderThickness="2">
+
                     <Grid ClipToBounds="True">
 
                         <!-- [IR] 영상 -->
                         <Image Source="{Binding IRCameraImage}"
-                               Stretch="Uniform" />
+                               Stretch="Uniform"/>
 
                         <!-- [AI] [Bounding Box] [Overlay] -->
                         <Viewbox Stretch="Uniform"
@@ -259,14 +258,16 @@
                                                 RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 Height="{Binding Height,
                                                 RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                ClipToBounds="True" />
+                                                ClipToBounds="True"/>
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
 
                                 <ItemsControl.ItemContainerStyle>
                                     <Style TargetType="ContentPresenter">
-                                        <Setter Property="Canvas.Left" Value="{Binding Left}" />
-                                        <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                        <Setter Property="Canvas.Left"
+                                                Value="{Binding Left}"/>
+                                        <Setter Property="Canvas.Top"
+                                                Value="{Binding Top}"/>
                                     </Style>
                                 </ItemsControl.ItemContainerStyle>
 
@@ -274,21 +275,25 @@
                                     <DataTemplate>
                                         <!-- [AI] [Bounding Box] 표시 영역 -->
                                         <Grid>
+
                                             <!-- [AI] 탐지 객체 [Bounding Box] -->
                                             <Rectangle Width="{Binding Width}"
                                                        Height="{Binding Height}"
                                                        Stroke="#FFFF0000"
-                                                       StrokeThickness="4" />
+                                                       StrokeThickness="4"/>
+
                                             <!-- [AI] 탐지 객체 이름 / 정확도 표시 -->
                                             <Border Background="#FFFF0000"
                                                     HorizontalAlignment="Left"
                                                     VerticalAlignment="Top">
+
                                                 <TextBlock Text="{Binding DisplayText}"
                                                            Foreground="White"
                                                            FontSize="14"
                                                            FontWeight="Bold"
-                                                           Padding="5,1" />
+                                                           Padding="5,1"/>
                                             </Border>
+
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -297,39 +302,20 @@
 
                         </Viewbox>
 
-                        <!-- 안내 문자 (오른쪽 상단에 보이게) -->
+                        <!-- [IR] 상태 표시 -->
                         <TextBlock Text="{Binding IrStatusText}"
-                                   Margin="0,0,8,0"
+                                   Margin="0,0,8,2"
                                    Foreground="#C4B5FD"
-                                   FontSize="14.5"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Bottom"
-                                   IsHitTestVisible="False" />
-                    </Grid>
-                </Border>
-
-                <Border Grid.Row="1"
-                        Margin="0,5,5,0"
-                        Background="Black"
-                        BorderBrush="#5A5A5A"
-                        BorderThickness="2">
-                    <Grid>
-                        <!-- [VD] 영상 -->
-                        <Image Source="{Binding VDCameraImage}"
-                               Stretch="Uniform"/>
-
-                        <!-- 안내 문자 (오른쪽 하단에 보이게) -->
-                        <TextBlock Text="{Binding VdStatusText}"
-                                   Margin="0,0,8,0"
-                                   Foreground="#5EC8C8"
-                                   FontSize="14.5"
+                                   FontSize="15.5"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Bottom"
                                    IsHitTestVisible="False"/>
+
                     </Grid>
+
                 </Border>
+
             </Grid>
 
             <!-- 우측 제어 패널 -->
@@ -586,14 +572,14 @@
                                             </StackPanel>
 
                                             <!-- [EO] [One Push Focus] 제어 -->
-                                            <Button Grid.Row="3"
+                                            <!--<Button Grid.Row="3"
                                                     Content="AUTO FOCUS"
                                                     Width="180"
                                                     Margin="5,5,5,0"
                                                     HorizontalAlignment="Center"
                                                     Focusable="False"
                                                     Style="{StaticResource EoControlButtonStyle}"
-                                                    PreviewMouseDown="EoAutoFocus_MouseDown"/>
+                                                    PreviewMouseDown="EoAutoFocus_MouseDown"/>-->
 
                                         </Grid>
                                     </Border>
@@ -705,14 +691,18 @@
                                                 <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
 
-                                            --><!-- 제목 --><!--
+                                            -->
+                                    <!-- 제목 -->
+                                    <!--
                                             <TextBlock Text="LRF CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
 
-                                            --><!-- [LRF] [1회] 거리 측정 --><!--
+                                            -->
+                                    <!-- [LRF] [1회] 거리 측정 -->
+                                    <!--
                                             <Button Grid.Row="1"
                                                     Content="MEASURE"
                                                     Width="180"
@@ -721,7 +711,9 @@
                                                     Style="{StaticResource LrfControlButtonStyle}"
                                                     Command="{Binding LrfMeasureCommand}"/>
 
-                                            --><!-- 추후 거리값 표시 영역 --><!--
+                                            -->
+                                    <!-- 추후 거리값 표시 영역 -->
+                                    <!--
                                             <TextBlock Grid.Row="2"
                                                        Text="{Binding LrfDistanceText}"
                                                        Foreground="#D0D7DE"
