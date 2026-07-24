@@ -619,19 +619,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Status Binding Fields]
 
         /// <summary>
-        /// [VD] 영상 상태 표시
-        /// </summary>
-        private string _vdStatusText = "Disconnected";
-
-        /// <summary>
         /// [EO] 영상 상태 표시
         /// </summary>
-        private string _eoStatusText = "Disconnected";
+        private string _eoStatusText = "[EO] Disconnected";
 
         /// <summary>
         /// [IR] 영상 상태 표시
         /// </summary>
-        private string _irStatusText = "Disconnected";
+        private string _irStatusText = "[IR] Disconnected";
 
         /// <summary>
         /// Web Agent TCP 연결 상태 문자열
@@ -1865,23 +1860,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #region [Status Properties]
 
-        /// <summary>
-        /// [VD] [RTSP] 영상 상태 출력 문자열
-        /// 예)
-        /// [VD] 연결 완료
-        /// [VD] 연결 실패
-        /// </summary>
-        public string VdStatusText
-        {
-            get => _vdStatusText;
-            private set
-            {
-                _vdStatusText = value;
-                OnPropertyChanged();
-            }
-
-        }
-
         public string EoStatusText
         {
             get => _eoStatusText;
@@ -1900,6 +1878,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged();
                 OnPropertyChanged(
                     nameof(CurrentPowerText));
+
+                OnPropertyChanged(
+                    nameof(CurrentEoPowerText));
             }
 
         }
@@ -1922,6 +1903,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged();
                 OnPropertyChanged(
                     nameof(CurrentPowerText));
+
+                OnPropertyChanged(
+                    nameof(CurrentIrPowerText));
             }
 
         }
@@ -1989,10 +1973,65 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     "[IR] Connected";
 
                 return
-                    $"PT:{ToOnOff(isPanOn && isTiltOn)} / " +
+                    $"CONTROL:{ToOnOff(isPanOn && isTiltOn)} / " +
                     $"EO:{ToOnOff(isEoOn)} / " +
                     $"IR:{ToOnOff(isIrOn)}";
             }
+
+        }
+
+        /// <summary>
+        /// CONTROL 전원 상태 표시 문자열
+        /// </summary>
+        public string CurrentControlPowerText
+        {
+            get
+            {
+                bool isPanOn =
+                    (_currentPowerStatus & 0x80) != 0;
+
+                bool isTiltOn =
+                    (_currentPowerStatus & 0x40) != 0;
+
+                return ToOnOff(
+                    isPanOn &&
+                    isTiltOn);
+            }
+
+        }
+
+        /// <summary>
+        /// EO 연결 상태 표시 문자열
+        /// </summary>
+        public string CurrentEoPowerText
+        {
+            get
+            {
+                bool isEoOn =
+                    EoStatusText ==
+                    "[EO] Connected";
+
+                return ToOnOff(
+                    isEoOn);
+            }
+
+        }
+
+        /// <summary>
+        /// IR 연결 상태 표시 문자열
+        /// </summary>
+        public string CurrentIrPowerText
+        {
+            get
+            {
+                bool isIrOn =
+                    IrStatusText ==
+                    "[IR] Connected";
+
+                return ToOnOff(
+                    isIrOn);
+            }
+
         }
 
         private static string ToOnOff(
@@ -5255,6 +5294,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 OnPropertyChanged(
                     nameof(CurrentPowerText));
+
+                /*
+                * XAML에서 개별 Run으로 바인딩 중이므로
+                * CONTROL 상태 프로퍼티도 별도로 갱신해야 한다.
+                */
+                OnPropertyChanged(
+                    nameof(CurrentControlPowerText));
             }
 
             if (dispatcher.CheckAccess())

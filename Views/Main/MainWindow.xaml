@@ -615,15 +615,42 @@
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <TextBlock Grid.Row="0" Text="EO RTSP" Foreground="#D0D7DE" Margin="0,3"/>
-                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding EoStatusText}" Foreground="#7DD3FC" FontWeight="Bold" Margin="0,3"/>
-
-                                                <TextBlock Grid.Row="1" Text="IR RTSP" Foreground="#D0D7DE" Margin="0,3"/>
-                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IrStatusText}" Foreground="#C4B5FD" FontWeight="Bold" Margin="0,3"/>
-
                                                 <TextBlock Grid.Row="2" Text="POWER" Foreground="#D0D7DE" Margin="0,6,0,3"/>
-                                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentPowerText}" Foreground="#9FE870" FontWeight="Bold" Margin="0,6,0,3"/>
+                                                <TextBlock Grid.Row="2"
+                                                           Grid.Column="1"
+                                                           FontWeight="Bold"
+                                                           Margin="0,6,0,3">
+
+                                                <Run Text="CONTROL:"
+                                                    Foreground="#4FD1C5"/>
+
+                                                <Run Text="{Binding CurrentControlPowerText,
+                                                                    Mode=OneWay}"
+                                                    Foreground="#9FE870"/>
+
+                                                <Run Text=" / "
+                                                    Foreground="#D0D7DE"/>
+
+                                                <Run Text="EO:"
+                                                    Foreground="#7DD3FC"/>
+
+                                                <Run Text="{Binding CurrentEoPowerText,
+                                                                    Mode=OneWay}"
+                                                    Foreground="#9FE870"/>
+
+                                                <Run Text=" / "
+                                                    Foreground="#D0D7DE"/>
+
+                                                <Run Text="IR:"
+                                                    Foreground="#C4B5FD"/>
+
+                                                <Run Text="{Binding CurrentIrPowerText,
+                                                                    Mode=OneWay}"
+                                                    Foreground="#9FE870"/>
+
+                                                </TextBlock>
                                             </Grid>
+
                                         </Border>
                                     </StackPanel>
                                 </Border>
@@ -1051,11 +1078,11 @@
                                 </Grid>
                             </Border>
                             <Border Grid.Row="1"
-        Margin="0,10,0,0"
-        Background="#4E555C"
-        BorderBrush="#95A5B0"
-        BorderThickness="1.5"
-        Padding="10">
+                                    Margin="0,10,0,0"
+                                    Background="#4E555C"
+                                    BorderBrush="#95A5B0"
+                                    BorderThickness="1.5"
+                                    Padding="10">
 
                                 <Grid>
                                     <Grid.RowDefinitions>
@@ -1065,12 +1092,12 @@
 
                                     <!-- 제목 -->
                                     <TextBlock Grid.Row="0"
-                   Text="CURRENT STATUS"
-                   Foreground="White"
-                   FontSize="13"
-                   FontWeight="Bold"
-                   HorizontalAlignment="Center"
-                   Margin="0,0,0,8"/>
+                                               Text="CURRENT STATUS"
+                                               Foreground="White"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
 
                                     <!-- 상태값 -->
                                     <Grid Grid.Row="1">
@@ -1082,11 +1109,10 @@
                                         </Grid.ColumnDefinitions>
 
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="26"/>
-                                            <RowDefinition Height="26"/>
-                                            <RowDefinition Height="26"/>
-                                            <RowDefinition Height="26"/>
-                                            <RowDefinition Height="26"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
                                         <!-- PAN -->
@@ -1193,24 +1219,6 @@
                                            Grid.Column="2"
                                            Text="{Binding CurrentIrFocusText}"
                                            Foreground="White"/>-->
-
-                                        <!-- POWER -->
-                                        <TextBlock Grid.Row="4"
-                                           Grid.Column="0"
-                                           Text="Power"
-                                           Foreground="White"
-                                           FontWeight="Bold"/>
-
-                                        <TextBlock Grid.Row="4"
-                                           Grid.Column="1"
-                                           Text=":"
-                                           Foreground="White"/>
-
-                                        <TextBlock Grid.Row="4"
-                                           Grid.Column="2"
-                                           Text="{Binding CurrentPowerText}"
-                                           Foreground="#9FE870"
-                                           FontWeight="Bold"/>
 
                                     </Grid>
                                 </Grid>
