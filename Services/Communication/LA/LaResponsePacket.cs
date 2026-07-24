@@ -1,10 +1,10 @@
 ﻿namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
-    /// [LA](Local Agent) 응답 [Packet] 데이터 클래스
+    /// [WEB AGENT](Local Agent) 응답 [Packet] 데이터 클래스
     /// 
     /// 역할:
-    /// 1. [LA]에서 수신한 원본 [12byte Packet] 데이터 저장
+    /// 1. [WEB AGENT]에서 수신한 원본 [12byte Packet] 데이터 저장
     /// 2. [Header] / [Function] / [Checksum] 정보 접근
     /// 3. [Packet] 유효성 상태 저장
     /// 
@@ -31,7 +31,7 @@
         #region [Fields / Properties]
 
         /// <summary>
-        /// [LA]에서 수신한 원본 [12byte Packet]
+        /// [WEB AGENT]에서 수신한 원본 [12byte Packet]
         /// 
         /// 예: FF 01 F8 FF 00 00 00 00 8B 00 C9 4C
         /// </summary>

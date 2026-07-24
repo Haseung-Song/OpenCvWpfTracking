@@ -267,7 +267,7 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
-        /// [EO] Focus Near 버튼 MouseDown
+        /// EO Focus Near 연속 이동 시작
         /// </summary>
         private void EoFocusNear_MouseDown(
             object sender,
@@ -277,7 +277,7 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
-        /// [EO] Focus Far 버튼 MouseDown
+        /// EO Focus Far 연속 이동 시작
         /// </summary>
         private void EoFocusFar_MouseDown(
             object sender,
@@ -405,7 +405,6 @@ namespace OpenCvWpfTracking
             {
                 return;
             }
-
             vm?.StopContinuousMove();
         }
         #endregion

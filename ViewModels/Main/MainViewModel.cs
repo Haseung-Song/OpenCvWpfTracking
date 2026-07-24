@@ -1,4 +1,5 @@
 ﻿using OpenCvSharp;
+using OpenCvSharp.Dnn;
 using OpenCvWpfTracking.Common;
 using OpenCvWpfTracking.Converters;
 using OpenCvWpfTracking.Models.AI;
@@ -9,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -24,7 +26,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
     /// 
     /// 메인 클래스 역할:
     /// 1. [VD] / [EO RTSP] / [IR RTSP] 영상 출력 제어
-    /// 2. [LA] ([Local Agent]) [TCP] 통신 서비스 초기화
+    /// 2. [WEB AGENT] ([Local Agent]) [TCP] 통신 서비스 초기화
     /// 3. [TORUSS] 제어 명령 서비스 관리
     /// 4. [XAML] 바인딩용 [Image] / [StatusText] 갱신
     /// </summary>
@@ -198,7 +200,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [PAN / TILT] 버튼 1회 클릭 시 이동할 각도 값
         /// 
-        /// 기존 [LA] 프로그램의 [PT] 버튼 동작처럼
+        /// 기존 [WEB AGENT] 프로그램의 [PT] 버튼 동작처럼
         /// 한 번 클릭할 때마다 [1.0]도 단위로 이동하도록 설정한다.
         /// </summary>
         private const double PanTiltMoveStep = 1.0;
@@ -218,6 +220,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 버튼 클릭 시 상대 이동 계산 기준값으로 사용한다.
         /// </summary>
         private double _currentTilt;
+
+        /// <summary>
+        /// 프로그램 시작 이후 고정밀 경과시간 측정용
+        /// </summary>
+        private readonly Stopwatch _focusLogStopwatch =
+            Stopwatch.StartNew();
+
+        /// <summary>
+        /// 마지막 Focus 명령 송신 시각
+        /// </summary>
+        private long _lastEoFocusCommandElapsedMs;
+
+        /// <summary>
+        /// 마지막 Focus 명령 종류
+        /// </summary>
+        private string _lastEoFocusCommandName =
+            "NONE";
+
+        /// <summary>
+        /// Focus 명령 송신 순번
+        /// </summary>
+        private int _eoFocusCommandSequence;
+
+        /// <summary>
+        /// Focus 상태 수신 순번
+        /// </summary>
+        private int _eoFocusReceiveSequence;
 
         /// <summary>
         /// 현재 어떤 [연속 제어]가 동작 중인지
@@ -255,9 +284,32 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentKeyboardPanTiltDirection =
                 KeyboardPanTiltDirection.None;
 
+
         #endregion
 
         #region [Control Properties]
+
+        /// <summary>
+        /// Web Agent 제어 TCP 연결 IP 입력값
+        /// </summary>
+        private string _webAgentIp;
+
+        /// <summary>
+        /// Web Agent 제어 TCP 연결 Port 입력 문자열
+        ///
+        /// TextBox에 문자 또는 빈값이 입력되더라도
+        /// 바인딩 변환 예외가 발생하지 않도록 string으로 관리한다.
+        /// </summary>
+        private string _webAgentPortText;
+
+        /// <summary>
+        /// Web Agent 연결 중 상태 최소 표시시간
+        ///
+        /// TCP 연결이 매우 빠르게 완료되더라도
+        /// Connecting 상태가 UI에 최소한 표시되도록 사용한다.
+        /// </summary>
+        private const int WebAgentConnectingMinimumDisplayMs =
+            300;
 
         /// <summary>
         /// [PAN / TILT] 속도제어 현재 속도 [Level]
@@ -270,16 +322,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private byte _panTiltSpeedLevel = 30;
 
-        /// <summary>
-        /// [EO] Focus 연속 제어 속도 Level
-        ///
-        /// 문서 기준 범위:
-        /// 0 ~ 3
-        ///
-        /// 현재는 Focus 이동이 지나치게 빠르므로
-        /// 최소 속도 Level 0을 기본값으로 사용한다.
-        /// </summary>
-        private const byte EoFocusSpeedLevel = 0;
 
         /// <summary>
         /// [ZOOM] 버튼 1회 클릭 시 이동할 값
@@ -295,7 +337,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 문서 기준 Focus 위치값은
         /// [0 = Focus Far] ~ [1000 = Focus Near] 범위를 사용한다.
         /// </summary>
-        private const short FocusMoveStep = 10;
+        private const short FocusMoveStep = 5;
 
         /// <summary>
         /// [LA Status Packet]에서 수신한 [EO] [Zoom] 현재 값
@@ -316,6 +358,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [EO Focus] 상태값으로 관리한다.
         /// </summary>
         private short _currentEoFocus;
+
+        /// <summary>
+        /// EO Focus 반복 명령용 목표값
+        ///
+        /// Web Agent 상태값이 중간에 변경되어도
+        /// 누르고 있는 동안에는 이 값을 기준으로 연속 이동한다.
+        /// </summary>
+        private int _eoFocusCommandTarget;
+
+        /// <summary>
+        /// 마지막 EO Focus Command 실행 시간
+        ///
+        /// 일정 시간 이상 입력이 없으면
+        /// 다음 입력 시 실제 상태값으로 다시 동기화한다.
+        /// </summary>
+        private DateTime _lastEoFocusCommandTime =
+            DateTime.MinValue;
+
+        /// <summary>
+        /// Focus 반복 입력 연결 판단 시간
+        ///
+        /// RepeatButton Interval보다 길게 설정한다.
+        /// </summary>
+        private const int EoFocusCommandResetMs =
+            700;
 
         /// <summary>
         /// [LRF] 최근 거리측정 값 표시 문자열
@@ -348,15 +415,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Fields]
 
         /// <summary>
-        /// [LA] 수신 [Packet Parser]
+        /// [WEB AGENT] 수신 [Packet Parser]
         /// 
         /// [TcpClientService]에서 받은 byte[] 데이터를
-        /// [12byte] 단위의 [LA] 응답 [Packet]으로 분리 / 검증하는 역할
+        /// [12byte] 단위의 [WEB AGENT] 응답 [Packet]으로 분리 / 검증하는 역할
         /// </summary>
         private readonly LAPacketParser _laPacketParser;
 
         /// <summary>
-        /// 마지막 [LA] 상태 로그 출력 시간
+        /// 마지막 [WEB AGENT] 상태 로그 출력 시간
         /// 
         /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus]
         /// 상태 [Packet]은 약 [10Hz] 주기로 수신되므로,
@@ -365,7 +432,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private DateTime _lastLaStatusLogTime = DateTime.MinValue;
 
         /// <summary>
-        /// 마지막 [LA] [Extended Status] 로그 출력 시간
+        /// 마지막 [WEB AGENT] [Extended Status] 로그 출력 시간
         /// 
         /// [IR] 확장 상태 [Packet]은
         /// 지속적으로 수신되므로,
@@ -374,7 +441,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private DateTime _lastLaExtendedStatusLogTime = DateTime.MinValue;
 
         /// <summary>
-        /// [LA] 상태 로그 출력 간격
+        /// [WEB AGENT] 상태 로그 출력 간격
         /// 
         /// [0x01] 기본 상태 Packet
         /// [0xA1] 확장 상태 Packet
@@ -567,6 +634,28 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private string _irStatusText = "Disconnected";
 
         /// <summary>
+        /// Web Agent TCP 연결 상태 문자열
+        ///
+        /// Disconnected
+        /// Connecting
+        /// Connected
+        /// Reconnecting
+        /// </summary>
+        private string _webAgentConnectionStatusText =
+            "Disconnected";
+
+        /// <summary>
+        /// Web Agent TCP 연결 상태 표시 색상
+        ///
+        /// Disconnected : Red
+        /// Connecting   : Yellow
+        /// Connected    : Green
+        /// Reconnecting : Yellow
+        /// </summary>
+        private string _webAgentConnectionStatusColor =
+            "#FF6B6B";
+
+        /// <summary>
         /// 현재 영상 [Connect] 진행 중 여부
         ///
         /// true  : [Connect] 수행 중
@@ -700,14 +789,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// [Connect] 버튼 클릭 시 호출
             /// 
-            /// 영상 스트림 및 [LA] [TCP] 통신 연결을 시작한다.
+            /// 영상 스트림 및 [WEB AGENT] [TCP] 통신 연결을 시작한다.
             /// </summary>
             ConnectCommand = new RelayCommand(Connect);
 
             /// <summary>
             /// [Disconnect] 버튼 클릭 시 호출
             /// 
-            /// 영상 스트림 및 [LA] [TCP] 통신 연결을 종료한다.
+            /// 영상 스트림 및 [WEB AGENT] [TCP] 통신 연결을 종료한다.
             /// </summary>
             DisconnectCommand = new RelayCommand(Disconnect);
 
@@ -1014,27 +1103,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _controlCommandService.EoZoomGoPosition(targetZoom);
             });
 
-            /// <summary>
-            /// EO Focus Far 단계 이동
-            ///
-            /// Focus 규격:
-            /// 0    = Far
-            /// 1000 = Near
-            /// </summary>
             FocusFarCommand = new RelayCommand(() =>
             {
                 int targetFocus =
-                    _currentEoFocus -
-                    FocusMoveStep;
-
-                targetFocus =
                     Math.Max(
                         0,
-                        targetFocus);
+                        _currentEoFocus -
+                        FocusMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine(
-                    $"[CONTROL] EO FOCUS FAR STEP : " +
+                    $"[CONTROL] EO FOCUS FAR : " +
                     $"{_currentEoFocus} -> {targetFocus}");
 
                 ConsoleLogHelper.PrintLine();
@@ -1044,27 +1123,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         (short)targetFocus);
             });
 
-            /// <summary>
-            /// EO Focus Near 단계 이동
-            ///
-            /// Focus 규격:
-            /// 0    = Far
-            /// 1000 = Near
-            /// </summary>
             FocusNearCommand = new RelayCommand(() =>
             {
                 int targetFocus =
-                    _currentEoFocus +
-                    FocusMoveStep;
-
-                targetFocus =
                     Math.Min(
                         1000,
-                        targetFocus);
+                        _currentEoFocus +
+                        FocusMoveStep);
 
                 Console.WriteLine();
                 Console.WriteLine(
-                    $"[CONTROL] EO FOCUS NEAR STEP : " +
+                    $"[CONTROL] EO FOCUS NEAR : " +
                     $"{_currentEoFocus} -> {targetFocus}");
 
                 ConsoleLogHelper.PrintLine();
@@ -1128,7 +1197,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _irDecoder = new FFmpegDecoderService("IR");
 
             /// <summary>
-            /// [LA] 통신 서비스 생성
+            /// [WEB AGENT] 통신 서비스 생성
             /// </summary>
             _laTcpService = new TcpClientService();
 
@@ -1138,12 +1207,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService = new ControlCommandService(_laTcpService);
 
             /// <summary>
-            /// [LA] 수신 [Packet Parser] 생성
+            /// [WEB AGENT] 수신 [Packet Parser] 생성
             /// </summary>
             _laPacketParser = new LAPacketParser();
 
             /// <summary>
-            /// [LA] [TCP] 수신 이벤트 연결
+            /// [WEB AGENT] [TCP] 수신 이벤트 연결
             /// 
             /// [TcpClientService]의 [ReceiveLoop]에서 데이터 수신 시
             /// [OnLaMessageReceived] 함수가 호출된다.
@@ -1184,18 +1253,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
             #region [Default Source Initialize]
 
             /// <summary>
-            /// 기본 영상 주소 초기화 (하단)
+            /// 기본 영상 주소 초기화
             /// </summary>
             InitializeDefaultSourceAddress();
 
+            /// <summary>
+            /// Web Agent 통신 설정 기본값 초기화
+            /// </summary>
+            InitializeWebAgentSetting();
 
             /// <summary>
-            /// [AI Detector] 설정 기본값 초기화
+            /// AI Detector 설정 기본값 초기화
             /// </summary>
             InitializeAiDetectorSetting();
 
             ConsoleLogHelper.PrintLine();
-            Console.WriteLine("[LA] Service Initialize Complete");
+            Console.WriteLine(
+                "[WEB AGENT] Service Initialize Complete");
             ConsoleLogHelper.PrintLine();
 
             #endregion
@@ -1222,6 +1296,58 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [IR] 열상 [RTSP] 주소
         /// </summary>
         public string IrSourceAddress { get; set; }
+
+        #endregion
+
+        #region [Web Agent Setting Properties]
+
+        /// <summary>
+        /// Web Agent 제어 TCP 연결 IP
+        /// </summary>
+        public string WebAgentIp
+        {
+            get => _webAgentIp;
+
+            set
+            {
+                if (_webAgentIp ==
+                    value)
+                {
+                    return;
+                }
+
+                _webAgentIp =
+                    value;
+
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// Web Agent 제어 TCP 연결 Port 입력 문자열
+        ///
+        /// 연결 시점에 int.TryParse로 검증한다.
+        /// </summary>
+        public string WebAgentPortText
+        {
+            get => _webAgentPortText;
+
+            set
+            {
+                if (_webAgentPortText ==
+                    value)
+                {
+                    return;
+                }
+
+                _webAgentPortText =
+                    value;
+
+                OnPropertyChanged();
+            }
+
+        }
 
         #endregion
 
@@ -1581,6 +1707,60 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
+        #region [Web Agent Communication Properties]
+
+        /// <summary>
+        /// Web Agent TCP 연결 상태 표시 문자열
+        /// </summary>
+        public string WebAgentConnectionStatusText
+        {
+            get =>
+                _webAgentConnectionStatusText;
+
+            private set
+            {
+                if (_webAgentConnectionStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _webAgentConnectionStatusText =
+                    value;
+
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// Web Agent TCP 연결 상태 표시 색상
+        ///
+        /// XAML Ellipse Fill에 바인딩한다.
+        /// </summary>
+        public string WebAgentConnectionStatusColor
+        {
+            get =>
+                _webAgentConnectionStatusColor;
+
+            private set
+            {
+                if (_webAgentConnectionStatusColor ==
+                    value)
+                {
+                    return;
+                }
+
+                _webAgentConnectionStatusColor =
+                    value;
+
+                OnPropertyChanged();
+            }
+
+        }
+
+        #endregion
+
         #region [Video Mode Properties]
 
         /// <summary>
@@ -1702,36 +1882,46 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
-        /// <summary>
-        /// [EO] [RTSP] 영상 상태 출력 문자열
-        /// 예)
-        /// [EO] 연결 완료
-        /// [EO] 연결 실패
-        /// </summary>
         public string EoStatusText
         {
             get => _eoStatusText;
+
             private set
             {
-                _eoStatusText = value;
+                if (_eoStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _eoStatusText =
+                    value;
+
                 OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(CurrentPowerText));
             }
 
         }
 
-        /// <summary>
-        /// [IR] [RTSP] 영상 상태 출력 문자열
-        /// 예)
-        /// [IR] 연결 완료
-        /// [IR] 연결 실패
-        /// </summary>
         public string IrStatusText
         {
             get => _irStatusText;
+
             private set
             {
-                _irStatusText = value;
+                if (_irStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _irStatusText =
+                    value;
+
                 OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(CurrentPowerText));
             }
 
         }
@@ -1775,10 +1965,43 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentIrFocus.ToString();
 
         /// <summary>
-        /// 현재 장비 전원 상태 표시 문자열
+        /// 현재 주요 장비 상태 표시 문자열
+        ///
+        /// PT는 Web Agent Power Status 비트를 사용하고,
+        /// EO / IR은 각 RTSP 영상 연결 상태를 기준으로 표시한다.
         /// </summary>
-        public string CurrentPowerText =>
-            $"0x{_currentPowerStatus:X2}";
+        public string CurrentPowerText
+        {
+            get
+            {
+                bool isPanOn =
+                    (_currentPowerStatus & 0x80) != 0;
+
+                bool isTiltOn =
+                    (_currentPowerStatus & 0x40) != 0;
+
+                bool isEoOn =
+                    EoStatusText ==
+                    "[EO] Connected";
+
+                bool isIrOn =
+                    IrStatusText ==
+                    "[IR] Connected";
+
+                return
+                    $"PT:{ToOnOff(isPanOn && isTiltOn)} / " +
+                    $"EO:{ToOnOff(isEoOn)} / " +
+                    $"IR:{ToOnOff(isIrOn)}";
+            }
+        }
+
+        private static string ToOnOff(
+            bool isOn)
+        {
+            return isOn
+                ? "ON"
+                : "OFF";
+        }
 
         #endregion
 
@@ -1827,6 +2050,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #endregion
 
         #region [Initialize]
+
+        /// <summary>
+        /// Web Agent 통신 설정 기본값 초기화
+        ///
+        /// 통신 설정 탭의 IP / Port 입력창에
+        /// 프로그램 시작 시 표시할 기본값을 설정한다.
+        /// </summary>
+        private void InitializeWebAgentSetting()
+        {
+            WebAgentIp =
+                "192.168.20.161";
+
+            WebAgentPortText =
+                "5005";
+
+            WebAgentConnectionStatusText =
+                "Disconnected";
+
+            WebAgentConnectionStatusColor =
+                "#FF6B6B";
+        }
 
         /// <summary>
         /// 기본 영상 주소 초기화
@@ -2095,6 +2339,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     break;
             }
+
         }
 
         /// <summary>
@@ -2457,6 +2702,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartEoZoomInMove()
         {
+            /*
+            * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
+            * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
+            */
+            _lastEoFocusCommandTime =
+                DateTime.MinValue;
+
             _currentMoveType = ContinuousMoveType.EoZoom;
 
             Console.WriteLine();
@@ -2472,6 +2724,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartEoZoomOutMove()
         {
+            /*
+            * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
+            * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
+            */
+            _lastEoFocusCommandTime =
+                DateTime.MinValue;
+
             _currentMoveType = ContinuousMoveType.EoZoom;
 
             Console.WriteLine();
@@ -2483,79 +2742,99 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [EO] 주간 카메라 [FOCUS] [Near] 연속 이동 시작
-        ///
-        /// Focus 속도 설정 후
-        /// Near 방향 연속 이동 명령을 송신한다.
+        /// EO Focus Near 연속 이동 시작
         /// </summary>
         public void StartEoFocusNearMove()
         {
-            _currentMoveType =
-                ContinuousMoveType.EoFocus;
-
-            Console.WriteLine();
-            Console.WriteLine(
-                $"[CONTROL] EO FOCUS NEAR START / SPEED : " +
-                $"{EoFocusSpeedLevel}");
-
-            ConsoleLogHelper.PrintLine();
-
-            bool speedSetResult =
-                _controlCommandService
-                    .SetEoFocusSpeed(
-                        EoFocusSpeedLevel);
-
-            if (!speedSetResult)
+            if (_currentMoveType !=
+                ContinuousMoveType.None)
             {
-                Console.WriteLine(
-                    "[CONTROL] EO FOCUS SPEED SET FAILED");
-
-                _currentMoveType =
-                    ContinuousMoveType.None;
-
                 return;
             }
 
-            _controlCommandService
-                .StartEoFocusNear();
+            int sequence =
+                Interlocked.Increment(
+                    ref _eoFocusCommandSequence);
+
+            _lastEoFocusCommandName =
+                "NEAR";
+
+            _lastEoFocusCommandElapsedMs =
+                _focusLogStopwatch.ElapsedMilliseconds;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                $"[FOCUS COMMAND #{sequence}] " +
+                $"NEAR START / " +
+                $"ELAPSED={_lastEoFocusCommandElapsedMs}ms / " +
+                $"CURRENT={_currentEoFocus}");
+
+            ConsoleLogHelper.PrintLine();
+
+            bool result =
+                _controlCommandService
+                    .StartEoFocusNear();
+
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                $"[FOCUS COMMAND #{sequence}] " +
+                $"SEND RESULT={result}");
+
+            if (result)
+            {
+                _currentMoveType =
+                    ContinuousMoveType.EoFocus;
+            }
+
         }
 
         /// <summary>
-        /// [EO] 주간 카메라 [FOCUS] [Far] 연속 이동 시작
-        ///
-        /// Focus 속도 설정 후
-        /// Far 방향 연속 이동 명령을 송신한다.
+        /// EO Focus Far 연속 이동 시작
         /// </summary>
         public void StartEoFocusFarMove()
         {
-            _currentMoveType =
-                ContinuousMoveType.EoFocus;
-
-            Console.WriteLine();
-            Console.WriteLine(
-                $"[CONTROL] EO FOCUS FAR START / SPEED : " +
-                $"{EoFocusSpeedLevel}");
-
-            ConsoleLogHelper.PrintLine();
-
-            bool speedSetResult =
-                _controlCommandService
-                    .SetEoFocusSpeed(
-                        EoFocusSpeedLevel);
-
-            if (!speedSetResult)
+            if (_currentMoveType !=
+                ContinuousMoveType.None)
             {
-                Console.WriteLine(
-                    "[CONTROL] EO FOCUS SPEED SET FAILED");
-
-                _currentMoveType =
-                    ContinuousMoveType.None;
-
                 return;
             }
 
-            _controlCommandService
-                .StartEoFocusFar();
+            int sequence =
+                Interlocked.Increment(
+                    ref _eoFocusCommandSequence);
+
+            _lastEoFocusCommandName =
+                "FAR";
+
+            _lastEoFocusCommandElapsedMs =
+                _focusLogStopwatch.ElapsedMilliseconds;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                $"[FOCUS COMMAND #{sequence}] " +
+                $"FAR START / " +
+                $"ELAPSED={_lastEoFocusCommandElapsedMs}ms / " +
+                $"CURRENT={_currentEoFocus}");
+
+            ConsoleLogHelper.PrintLine();
+
+            bool result =
+                _controlCommandService
+                    .StartEoFocusFar();
+
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                $"[FOCUS COMMAND #{sequence}] " +
+                $"SEND RESULT={result}");
+
+            if (result)
+            {
+                _currentMoveType =
+                    ContinuousMoveType.EoFocus;
+            }
+
         }
 
         /// <summary>
@@ -2713,63 +2992,85 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StopContinuousMove()
         {
-            /// <summary>
-            /// 현재, 동작 중인 연속 제어가 없으면
-            /// 불필요한 정지 [Packet] 송신 방지
-            /// </summary>
-            if (_currentMoveType == ContinuousMoveType.None)
+            ContinuousMoveType moveType =
+                _currentMoveType;
+
+            if (moveType ==
+                ContinuousMoveType.None)
+            {
                 return;
+            }
 
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] MOVE STOP: {_currentMoveType}");
+            Console.WriteLine(
+                $"[CONTROL] MOVE STOP: {moveType}");
+
             ConsoleLogHelper.PrintLine();
 
-            /// <summary>
-            /// 마지막으로 실행된 연속 제어 종류에 따라
-            /// 해당 장비의 정지 [Packet]만 송신
-            /// </summary>
-            switch (_currentMoveType)
+            switch (moveType)
             {
                 case ContinuousMoveType.PanTilt:
-
-                    // [Pan / Tilt] 기존 [Pelco-D] 연속 제어 정지
-                    _controlCommandService
-                        .StopMove();
-                    break;
-
                 case ContinuousMoveType.EoZoom:
 
-                    // [EO] 주간 카메라 [Pelco-D] Zoom 연속 제어 정지
                     _controlCommandService
                         .StopMove();
+
                     break;
 
                 case ContinuousMoveType.EoFocus:
+                    {
+                        long elapsedMs =
+                            _focusLogStopwatch.ElapsedMilliseconds;
 
-                    // [EO] 주간 카메라 [Pelco-D] Focus 연속 제어 정지
-                    _controlCommandService
-                        .StopMove();
-                    break;
+                        long commandDurationMs =
+                            elapsedMs -
+                            _lastEoFocusCommandElapsedMs;
+
+                        Console.WriteLine();
+                        Console.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                            $"[FOCUS COMMAND] STOP / " +
+                            $"DIRECTION={_lastEoFocusCommandName} / " +
+                            $"HELD={commandDurationMs}ms / " +
+                            $"CURRENT={_currentEoFocus}");
+
+                        ConsoleLogHelper.PrintLine();
+
+                        bool stopResult =
+                            _controlCommandService
+                                .StopMove();
+
+                        Console.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                            $"[FOCUS COMMAND] STOP RESULT={stopResult}");
+
+                        break;
+                    }
 
                 case ContinuousMoveType.IrZoom:
 
-                    // [IR] [Optical Zoom] 정지
-                    _controlCommandService.StopIrZoom();
+                    _controlCommandService
+                        .StopIrZoom();
+
                     break;
 
                 case ContinuousMoveType.IrFocus:
 
-                    // [IR] [Focus] 정지
-                    _controlCommandService.StopIrFocus();
+                    _controlCommandService
+                        .StopIrFocus();
+
                     break;
 
                 case ContinuousMoveType.IrDigitalZoom:
 
-                    // [IR] [Digital Zoom] 정지
-                    _controlCommandService.StopIrDigitalZoom();
+                    _controlCommandService
+                        .StopIrDigitalZoom();
+
                     break;
             }
-            _currentMoveType = ContinuousMoveType.None;
+
+            _currentMoveType =
+                ContinuousMoveType.None;
         }
 
         #endregion
@@ -2881,7 +3182,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 
                 /// 필요 시 기존 주석 제거 후 동시 연결도 가능하다.
                 /// 
-                /// [장비 연결] 버튼은 [VD] / [EO] / [IR] / [LA] 연결만 담당한다.
+                /// [장비 연결] 버튼은 [VD] / [EO] / [IR] / [WEB AGENT] 연결만 담당한다.
                 /// </summary>
                 //_ = _aiDetectorClientService.StartAutoReconnectAsync(
                 //        AiAgentIp,
@@ -3080,33 +3381,35 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     return;
                 }
 
-                // [EO / IR] 개별 상태 [Console Log] 출력
+                // EO / IR 개별 상태 Console 출력
                 WriteVideoConnectLog(result);
 
-                // [EO / IR] 개별 상태 [Status text] 출력
+                // EO / IR 최초 연결 결과 표시
                 UpdateVideoStatusText(result);
 
-                /// <summary>
-                /// [EO / IR] 영상이 모두 연결되지 않은 경우
-                /// 영상 출력 Loop를 시작하지 않는다.
-                /// </summary>
+                /*
+                 * 최초 연결에 성공한 영상만 Capture Loop 시작
+                 */
+                StartVideoLoops(result);
+
+                /*
+                 * 최초 연결에 실패한 영상은 자동 재연결 시작
+                 */
+                StartVideoReconnectLoops(result);
+
+                /*
+                 * 둘 다 최초 연결에 실패했더라도
+                 * 자동 재연결은 계속 수행한다.
+                 */
                 if (!result.EoResult &&
                     !result.IrResult)
                 {
                     Console.WriteLine(
-                        "[VIDEO] EO / IR All Connect Failed.");
+                        "[VIDEO] EO / IR All Connect Failed. " +
+                        "Reconnect Loop Started.");
 
                     ConsoleLogHelper.PrintLine();
-                    return;
                 }
-
-                StartVideoLoops(result);
-
-                /// <summary>
-                /// [EO / IR] 최초 RTSP 연결에 실패한 Stream은
-                /// 장비가 Ready 상태가 될 때까지 백그라운드에서 재연결한다.
-                /// </summary>
-                StartVideoReconnectLoops(result);
 
                 /// <summary>
                 /// [AI Detector] 다중 객체 [Bounding Box] 표시 테스트
@@ -3189,6 +3492,51 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [Web Agent] 제어 TCP 연결 해제
             /// </summary>
             _laTcpService.Disconnect();
+
+            SetWebAgentConnectionStatus(
+                "Disconnected",
+                "#FF6B6B");
+
+            /// <summary>
+            /// [CURRENT STATUS] 상태값 초기화
+            ///
+            /// Web Agent 연결 해제 후에는
+            /// 마지막 수신 상태값이 화면에 남지 않도록 초기화한다.
+            /// </summary>
+            _currentPan =
+                0.0;
+
+            _currentTilt =
+                0.0;
+
+            _currentEoZoom =
+                0;
+
+            _currentEoFocus =
+                0;
+
+            _currentIrZoom =
+                0;
+
+            _currentIrFocus =
+                0;
+
+            _currentPowerStatus =
+                0x00;
+
+            _currentMoveType =
+                ContinuousMoveType.None;
+
+            ClearKeyboardPanTiltPressedState();
+
+            _currentKeyboardPanTiltDirection =
+                KeyboardPanTiltDirection.None;
+
+            /// <summary>
+            /// CURRENT STATUS UI Binding 갱신
+            /// </summary>
+            NotifyEoCurrentStatusChanged();
+            NotifyIrCurrentStatusChanged();
 
             // 4. [UI] [Thread]에서 마지막으로 검은 화면 덮어쓰기
             App.Current.Dispatcher.Invoke(() =>
@@ -4053,103 +4401,330 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Connect]
 
         /// <summary>
+        /// Web Agent TCP 연결 상태 UI 갱신
+        /// </summary>
+        private void SetWebAgentConnectionStatus(
+            string statusText,
+            string statusColor)
+        {
+            /*
+             * 자동 재연결 Loop는 백그라운드 Task에서 실행되므로
+             * UI Dispatcher를 통해 바인딩 값을 변경한다.
+             */
+            if (App.Current?.Dispatcher ==
+                null)
+            {
+                WebAgentConnectionStatusText =
+                    statusText;
+
+                WebAgentConnectionStatusColor =
+                    statusColor;
+
+                return;
+            }
+
+            if (App.Current.Dispatcher
+                .CheckAccess())
+            {
+                WebAgentConnectionStatusText =
+                    statusText;
+
+                WebAgentConnectionStatusColor =
+                    statusColor;
+
+                return;
+            }
+
+            App.Current.Dispatcher.Invoke(
+                () =>
+                {
+                    WebAgentConnectionStatusText =
+                        statusText;
+
+                    WebAgentConnectionStatusColor =
+                        statusColor;
+                });
+        }
+
+        /// <summary>
         /// [Web Agent / LA] 제어 TCP 연결
         ///
         /// 기존 고흥 제어 구조는 유지하며,
         /// 운용 환경에 따라 연결 대상 IP / Port만 변경하여 사용한다.
-        ///
-        /// 현재:
-        /// - [Web Agent] 연결 활성화
-        ///
-        /// 필요 시:
-        /// - [Web Agent] 주소를 주석 처리
-        /// - 기존 [LA] 주소의 주석을 해제
         /// </summary>
         private async Task<bool> ConnectLaAsync()
         {
+            /*
+            * Connecting 상태가 시작된 시각을 기록한다.
+            *
+            * 실제 TCP 연결이 너무 빨리 완료되더라도
+            * 최소 표시시간을 계산하기 위해 사용한다.
+            */
+            Stopwatch connectingStopwatch =
+                Stopwatch.StartNew();
+
+            /*
+             * 연결 버튼 클릭 즉시
+             * UI 상태를 Connecting으로 변경한다.
+             */
+            SetWebAgentConnectionStatus(
+                "Connecting",
+                "#FFD166");
+
             ConsoleLogHelper.PrintLine();
 
             Console.WriteLine(
-                "[CONTROL TCP] Connect Start");
+                "[WEB AGENT] Connect Start");
 
             ConsoleLogHelper.PrintLine();
 
             /*
-             * ============================================================
-             * [제어 TCP 연결 대상 설정]
-             * ============================================================
+             * UI 입력값 검증
              *
-             * 현재 운용 환경에 맞는 연결 대상 하나만 활성화한다.
-             *
-             * [Web Agent]
-             * - MR500 / Web Agent 제어용
-             * - Pelco-D 7Byte 제어 Packet 송신
-             *
-             * [기존 LA]
-             * - 고흥 Local Agent 제어용
-             * - 기존 Pelco-D 제어 구조 확인 및 테스트용
-             *
-             * 두 주소를 동시에 활성화하지 않는다.
-             * ============================================================
+             * IP 빈값, Port 문자 입력,
+             * Port 범위 오류 등을 검사한다.
              */
-
-            // [Web Agent] 현재 사용
-            const string targetIp =
-                "192.168.20.161";
-
-            const int targetPort =
-                5005;
-
-            // [기존 LA] 사용 시 위 Web Agent 주소를 주석 처리하고
-            // 아래 주소의 주석을 해제한다.
-            //
-            //const string targetIp =
-            //    "127.0.0.1";
-
-            //const int targetPort =
-            //    5001;
-
-            bool result =
-                await _laTcpService.ConnectAsync(
-                    targetIp,
-                    targetPort);
-
-            Console.WriteLine(
-                $"[CONTROL TCP CONNECT RESULT] {result}");
-
-            Console.WriteLine(
-                $"[CONTROL TCP TARGET] {targetIp}:{targetPort}");
-
-            ConsoleLogHelper.PrintLine();
-
-            if (!result &&
-                _isDeviceConnectionRequested)
+            if (!TryGetWebAgentEndpoint(
+                    out string targetIp,
+                    out int targetPort))
             {
-                /// <summary>
-                /// 최초 연결에 실패한 경우
-                /// 백그라운드 자동 재연결 Loop를 시작한다.
-                /// </summary>
-                StartWebAgentReconnect(
-                    targetIp,
-                    targetPort);
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                return false;
             }
 
-            return result;
+            /*
+             * 이전 입력값으로 실행 중인 자동 재연결 Loop가 있다면
+             * 새 연결 시도 전에 정리한다.
+             */
+            _webAgentReconnectCts?.Cancel();
+            _webAgentReconnectCts?.Dispose();
+
+            _webAgentReconnectCts =
+                null;
+
+            try
+            {
+                bool result =
+                    await _laTcpService.ConnectAsync(
+                        targetIp,
+                        targetPort);
+
+                /*
+                * 실제 TCP 연결에 걸린 시간을 제외하고
+                * Connecting 상태 최소 표시시간이 남아 있으면 기다린다.
+                *
+                * Task.Delay를 await하므로 UI Thread를 막지 않는다.
+                */
+                int remainingDisplayMs =
+                    WebAgentConnectingMinimumDisplayMs -
+                    (int)connectingStopwatch.ElapsedMilliseconds;
+
+                if (remainingDisplayMs > 0)
+                {
+                    await Task.Delay(
+                        remainingDisplayMs);
+                }
+
+                /*
+                 * 연결 결과에 따라 UI 상태 갱신
+                 */
+                if (result)
+                {
+                    SetWebAgentConnectionStatus(
+                        "Connected",
+                        "#55D187");
+                }
+                else
+                {
+                    if (_isDeviceConnectionRequested)
+                    {
+                        SetWebAgentConnectionStatus(
+                            "Reconnecting",
+                            "#FFD166");
+                    }
+                    else
+                    {
+                        SetWebAgentConnectionStatus(
+                            "Disconnected",
+                            "#FF6B6B");
+                    }
+
+                }
+
+                Console.WriteLine(
+                    $"[WEB AGENT CONNECT RESULT] {result}");
+
+                Console.WriteLine(
+                    $"[WEB AGENT TARGET] {targetIp}:{targetPort}");
+
+                ConsoleLogHelper.PrintLine();
+
+                /*
+                 * 연결 실패 상태이지만
+                 * 사용자가 장비 연결 유지를 요청한 경우
+                 * 자동 재연결을 시작한다.
+                 */
+                if (!result &&
+                    _isDeviceConnectionRequested)
+                {
+                    StartWebAgentReconnect(
+                        targetIp,
+                        targetPort);
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                /*
+                 * 연결 예외 발생 시에도
+                 * 앱이 종료되지 않도록 상태만 갱신한다.
+                 */
+                if (_isDeviceConnectionRequested)
+                {
+                    SetWebAgentConnectionStatus(
+                        "Reconnecting",
+                        "#FFD166");
+                }
+                else
+                {
+                    SetWebAgentConnectionStatus(
+                        "Disconnected",
+                        "#FF6B6B");
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[WEB AGENT] Connect Exception");
+
+                Console.WriteLine(
+                    $"[WEB AGENT] {ex.Message}");
+
+                ConsoleLogHelper.PrintLine();
+
+                if (_isDeviceConnectionRequested)
+                {
+                    StartWebAgentReconnect(
+                        targetIp,
+                        targetPort);
+                }
+                return false;
+            }
+
+        }
+
+        /// <summary>
+        /// 통신 설정 탭의 Web Agent IP / Port 입력값 검증
+        ///
+        /// Port는 문자열로 관리한 뒤 연결 시점에 TryParse하여
+        /// 빈값이나 문자 입력으로 인한 바인딩 예외를 방지한다.
+        /// </summary>
+        private bool TryGetWebAgentEndpoint(
+            out string ipAddress,
+            out int port)
+        {
+            ipAddress =
+                WebAgentIp?.Trim();
+
+            port =
+                0;
+
+            if (string.IsNullOrWhiteSpace(
+                    ipAddress))
+            {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                Console.WriteLine(
+                    "[WEB AGENT] Connect Failed : IP is empty.");
+
+                return false;
+            }
+
+            if (!int.TryParse(
+                    WebAgentPortText?.Trim(),
+                    out port))
+            {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                Console.WriteLine(
+                    "[WEB AGENT] Connect Failed : " +
+                    "Port must be a number.");
+
+                return false;
+            }
+
+            if (port < 1 ||
+                port > 65535)
+            {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                Console.WriteLine(
+                    "[WEB AGENT] Connect Failed : " +
+                    "Port range must be 1 ~ 65535.");
+
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
         /// [Web Agent] 비정상 연결 종료 처리
+        ///
+        /// 현재 통신 설정 탭에 입력된 IP / Port를 사용하여
+        /// 자동 재연결을 시작한다.
         /// </summary>
         private void OnWebAgentConnectionClosed()
         {
             if (!_isDeviceConnectionRequested)
             {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                return;
+            }
+
+            SetWebAgentConnectionStatus(
+                "Reconnecting",
+                "#FFD166");
+
+            string targetIp =
+                WebAgentIp?.Trim();
+
+            if (string.IsNullOrWhiteSpace(
+                    targetIp))
+            {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
+                return;
+            }
+
+            if (!int.TryParse(
+                    WebAgentPortText?.Trim(),
+                    out int targetPort) ||
+                targetPort < 1 ||
+                targetPort > 65535)
+            {
+                SetWebAgentConnectionStatus(
+                    "Disconnected",
+                    "#FF6B6B");
+
                 return;
             }
 
             StartWebAgentReconnect(
-                "192.168.20.161",
-                5005);
+                targetIp,
+                targetPort);
         }
 
         /// <summary>
@@ -4192,9 +4767,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     {
                         retryCount++;
 
+                        SetWebAgentConnectionStatus(
+                            "Reconnecting",
+                            "#FFD166");
+
                         Console.WriteLine(
-                            "[WEB AGENT] Reconnect Try : " +
-                            retryCount);
+                            $"[WEB AGENT] Reconnect Try " +
+                            $"({retryCount}) : " +
+                            $"{ipAddress}:{port}");
 
                         bool connected =
                             await _laTcpService.ConnectAsync(
@@ -4203,6 +4783,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                         if (connected)
                         {
+                            SetWebAgentConnectionStatus(
+                                "Connected",
+                                "#55D187");
+
                             Console.WriteLine(
                                 "[WEB AGENT] Reconnect Success");
 
@@ -4217,6 +4801,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
                 catch (OperationCanceledException)
                 {
+                    SetWebAgentConnectionStatus(
+                        "Disconnected",
+                        "#FF6B6B");
+                }
+                catch (Exception ex)
+                {
+                    SetWebAgentConnectionStatus(
+                        "Disconnected",
+                        "#FF6B6B");
+
+                    Console.WriteLine(
+                        "[WEB AGENT] Reconnect Exception : " +
+                        ex.Message);
                 }
                 finally
                 {
@@ -4238,7 +4835,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Receive]
 
         /// <summary>
-        /// [LA] [TCP] 수신 데이터 처리 함수
+        /// [WEB AGENT] [TCP] 수신 데이터 처리 함수
         /// 
         /// [TcpClientService]에서 byte[] 원본 데이터를 받으면,
         /// [LaPacketParser]를 통해 12byte [Packet] 단위로 분리한다.
@@ -4248,7 +4845,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             DateTime receiveTime)
         {
             /// <summary>
-            /// 수신된 [byte[] 데이터]를 [LA] 응답 [Packet] 목록으로 변환.
+            /// 수신된 [byte[] 데이터]를 [WEB AGENT] 응답 [Packet] 목록으로 변환.
             /// </summary>
             List<LaResponsePacket> packets = _laPacketParser.Parse(data);
 
@@ -4267,7 +4864,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Handling]
 
         /// <summary>
-        /// [LA] 응답 [Packet] 처리 함수
+        /// [WEB AGENT] 응답 [Packet] 처리 함수
         /// 
         /// [Function] 번호를 기준으로
         /// [Status] / [Alive] / [Extended Status Packet]을 구분한다.
@@ -4413,7 +5010,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Log Helpers]
 
         /// <summary>
-        /// [LA] 상태 로그 출력 여부 확인
+        /// [WEB AGENT] 상태 로그 출력 여부 확인
         /// 
         /// 현재 시간과 마지막 출력 시간을 비교하여
         /// 설정된 출력 간격 이내인 경우
@@ -4436,7 +5033,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [LA] [Extended Status] 로그 출력 여부 확인
+        /// [WEB AGENT] [Extended Status] 로그 출력 여부 확인
         /// 
         /// 현재 시간과 마지막 출력 시간을 비교하여
         /// 설정된 출력 간격 이내인 경우
@@ -4463,7 +5060,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Parsing]
 
         /// <summary>
-        /// [LA] [Status Packet] 파싱
+        /// [WEB AGENT] [Status Packet] 파싱
         ///
         /// [Function] [0x01]:
         /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus] / [Power] 상태 정보
@@ -4483,9 +5080,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 if (printLog)
                 {
-                    Console.WriteLine(
-                        "[LA STATUS] Invalid Packet Length : " +
-                        (packet?.Length ?? 0));
+                    //Console.WriteLine(
+                    //    "[LA STATUS] Invalid Packet Length : " +
+                    //    (packet?.Length ?? 0));
                 }
 
                 return;
@@ -4514,6 +5111,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             byte powerStatus =
                 packet[10];
 
+            /*
+            * Focus 변화 비교용 이전값 저장
+            *
+            * _currentEoFocus를 갱신하기 전에
+            * 반드시 기존 값을 먼저 보관한다.
+            */
+            short previousFocus =
+                _currentEoFocus;
+
             double panDegree =
                 panRaw / 100.0;
 
@@ -4539,6 +5145,48 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 powerStatus;
 
             /*
+             * Focus 상태값 변화 상세 로그
+             *
+             * 기존 전체 상태 로그는 1초마다 제한되지만,
+             * Focus 변화 로그는 값이 실제로 바뀔 때마다 출력한다.
+             */
+            if (focusRaw !=
+                previousFocus)
+            {
+                int receiveSequence =
+                    Interlocked.Increment(
+                        ref _eoFocusReceiveSequence);
+
+                long receiveElapsedMs =
+                    _focusLogStopwatch
+                        .ElapsedMilliseconds;
+
+                long afterCommandMs =
+                    _lastEoFocusCommandElapsedMs > 0
+                        ? receiveElapsedMs -
+                          _lastEoFocusCommandElapsedMs
+                        : -1;
+
+                int difference =
+                    focusRaw -
+                    previousFocus;
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                    $"[FOCUS RECEIVE #{receiveSequence}] " +
+                    $"RAW={packet[8]:X2} {packet[9]:X2} / " +
+                    $"PREV={previousFocus} / " +
+                    $"CURRENT={focusRaw} / " +
+                    $"DELTA={difference:+#;-#;0} / " +
+                    $"LAST_CMD={_lastEoFocusCommandName} / " +
+                    $"AFTER_CMD=" +
+                    $"{(afterCommandMs >= 0 ? afterCommandMs + "ms" : "N/A")}");
+
+                ConsoleLogHelper.PrintLine();
+            }
+
+            /*
              * UI Binding 갱신
              * 반드시 printLog 검사 전에 호출
              */
@@ -4552,24 +5200,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            Console.WriteLine(
-                $"[LA PT RAW] " +
-                $"PAN BYTE={packet[2]:X2} {packet[3]:X2}, " +
-                $"TILT BYTE={packet[4]:X2} {packet[5]:X2}");
+            //Console.WriteLine(
+            //    $"[LA PT RAW] " +
+            //    $"PAN BYTE={packet[2]:X2} {packet[3]:X2}, " +
+            //    $"TILT BYTE={packet[4]:X2} {packet[5]:X2}");
 
-            Console.WriteLine(
-                $"[LA PT PARSED] " +
-                $"PAN RAW={panRaw}, PAN={panDegree:F2}°, " +
-                $"TILT RAW={tiltRaw}, TILT={tiltDegree:F2}°");
+            //Console.WriteLine(
+            //    $"[LA PT PARSED] " +
+            //    $"PAN RAW={panRaw}, PAN={panDegree:F2}°, " +
+            //    $"TILT RAW={tiltRaw}, TILT={tiltDegree:F2}°");
 
-            Console.WriteLine(
-                $"[LA STATUS] [EO Zoom]  : {_currentEoZoom}");
+            //Console.WriteLine(
+            //    $"[LA STATUS] [EO Zoom]  : {_currentEoZoom}");
 
-            Console.WriteLine(
-                $"[LA STATUS] [EO Focus] : {_currentEoFocus}");
+            //Console.WriteLine(
+            //    $"[LA STATUS] [EO Focus] : {_currentEoFocus}");
 
-            Console.WriteLine(
-                $"[LA STATUS] [Power]    : 0x{_currentPowerStatus:X2}");
+            //Console.WriteLine(
+            //    $"[LA STATUS] [Power]    : 0x{_currentPowerStatus:X2}");
         }
 
         /// <summary>
@@ -4655,7 +5303,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [LA] [Extended Status] Packet 파싱
+        /// [WEB AGENT] [Extended Status] Packet 파싱
         ///
         /// Function 0xA1
         ///

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace OpenCvWpfTracking.Services.Communication
 {
     /// <summary>
-    /// [LA](Local Agent) 수신 데이터를
+    /// [WEB AGENT](Local Agent) 수신 데이터를
     /// [TORUSS] [12byte] 응답 [Packet] 단위로 분리 / 검증하는 [Parser] 클래스
     /// </summary>
     public class LAPacketParser

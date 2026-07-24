@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenCvWpfTracking"    
         mc:Ignorable="d"
-        Title="MOE [EO/IR] TEST VIEWER"
+        Title="[MOE] EO/IR TEST VIEWER"
         Width="1920"
         Height="1080"
         Focusable="True"
@@ -114,6 +114,33 @@
                     Value="12"/>
         </Style>
 
+        <!-- [EO] Focus RepeatButton 스타일 -->
+        <Style x:Key="EoFocusRepeatButtonStyle"
+               TargetType="RepeatButton">
+            <Setter Property="Foreground"
+                    Value="White"/>
+            <Setter Property="FontWeight"
+                    Value="Bold"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="Background"
+                    Value="#30475A"/>
+            <Setter Property="Height"
+                    Value="32"/>
+            <Setter Property="FontSize"
+                    Value="12"/>
+
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                        Value="True">
+                    <Setter Property="Opacity"
+                            Value="0.85"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- [IR] 제어 버튼 스타일 -->
         <Style x:Key="IrControlButtonStyle"
                TargetType="Button"
@@ -137,6 +164,104 @@
             <Setter Property="FontSize"
                     Value="12"/>
         </Style>
+
+
+        <!-- [우측 제어 패널] Tab Header 스타일 -->
+        <Style x:Key="RightPanelTabItemStyle"
+       TargetType="TabItem">
+
+            <Setter Property="Foreground"
+            Value="#D0D7DE"/>
+
+            <Setter Property="FontWeight"
+            Value="Bold"/>
+
+            <Setter Property="FontSize"
+            Value="12"/>
+
+            <!-- 탭 사이 간격 -->
+            <Setter Property="Margin"
+                    Value="0,0,1,0"/>
+
+            <!-- 탭이 남는 공간을 균등하게 사용하도록 설정 -->
+            <Setter Property="HorizontalContentAlignment"
+            Value="Stretch"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+
+                    <ControlTemplate TargetType="TabItem">
+
+                        <Border x:Name="TabBorder"
+                                Width="190"
+                                Height="38"
+                                Background="#4F5860"
+                                BorderBrush="#95A5B0"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="5,5,0,0"
+                                Padding="14,8">
+
+                            <ContentPresenter ContentSource="Header"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsSelected"
+                             Value="True">
+
+                                <Setter TargetName="TabBorder"
+                                Property="Background"
+                                Value="#5F666D"/>
+
+                                <Setter TargetName="TabBorder"
+                                Property="BorderBrush"
+                                Value="#AAB4BE"/>
+
+                                <Setter Property="Foreground"
+                                Value="White"/>
+
+                            </Trigger>
+
+                            <Trigger Property="IsMouseOver"
+                             Value="True">
+
+                                <Setter TargetName="TabBorder"
+                                Property="Background"
+                                Value="#3B5F70"/>
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+            </Setter>
+
+        </Style>
+
+        <!-- [통신 설정] 입력 TextBox 스타일 -->
+        <Style x:Key="CommunicationTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="7,4"/>
+            <Setter Property="Foreground" Value="#20242A"/>
+            <Setter Property="Background" Value="#F4F6F8"/>
+            <Setter Property="BorderBrush" Value="#AAB4BE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- [통신 설정] 상태 표시 원형 -->
+        <Style x:Key="ConnectionStatusDotStyle" TargetType="Ellipse">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Fill" Value="#FF6B6B"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
     </Window.Resources>
 
     <!-- 메인 화면 전체 레이아웃 -->
@@ -158,7 +283,7 @@
                 <ColumnDefinition Width="1*" />
 
                 <!-- 장비 제어 패널 -->
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="420" />
             </Grid.ColumnDefinitions>
 
             <!-- [좌측] 큰 영상 -->
@@ -330,80 +455,214 @@
             </Grid>
 
             <!-- 우측 제어 패널 -->
+            <!-- 우측 통신 설정 / 운용 제어 패널 -->
+            <!-- 우측 통신 설정 / 운용 제어 패널 -->
             <Border Grid.Column="2"
-                    Margin="0,5,5,0"
+                    Margin="0,5,8,0"
                     Background="#646A71"
                     BorderBrush="#8B949E"
                     BorderThickness="2"
                     CornerRadius="5"
-                    Padding="10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <!-- 연결 해제 -->
-                        <RowDefinition Height="Auto"/>
+                    Padding="8,8,10,8">
+                <TabControl Background="#5F666D"
+                            BorderBrush="#95A5B0"
+                            BorderThickness="1"
+                            Padding="4,4,6,4"
+                            Margin="0"
+                            HorizontalContentAlignment="Stretch"
+                            ItemContainerStyle="{StaticResource RightPanelTabItemStyle}">
 
-                        <!-- 장비 연결 -->
-                        <RowDefinition Height="50"/>
+                    <!-- Web Agent 통신 연결 설정 -->
+                    <TabItem Header="통신 설정">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="5">
 
-                        <!-- 여백 -->
-                        <RowDefinition Height="20"/>
+                                <!-- Web Agent 통신 설정 카드 -->
+                                <Border Background="#5F666D"
+                                        BorderBrush="#95A5B0"
+                                        BorderThickness="1.5"
+                                        CornerRadius="5"
+                                        Padding="8"
+                                        Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="WEB AGENT 통신 설정"
+                                                   Foreground="White"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,10"/>
 
-                        <!-- 장비 제어 -->
-                        <RowDefinition Height="*"/>
+                                        <Border Background="#40464D"
+                                                BorderBrush="#95A5B0"
+                                                BorderThickness="1"
+                                                Padding="9">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="85"/>
+                                                </Grid.ColumnDefinitions>
 
-                        <!-- 현재 장비 상태 -->
-                        <RowDefinition Height="175"/>
-                    </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0"
+                                                           Grid.Column="0"
+                                                           Text="Web Agent 제어 TCP"
+                                                           Foreground="White"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center"/>
 
-                    <!-- 연결 해제 -->
-                    <Button Grid.Row="0"
-                            Height="34"
-                            Margin="0,0,0,5"
-                            Content="연결 해제"
-                            Style="{StaticResource DisconnectButtonStyle}"
-                            Command="{Binding DisconnectCommand}"/>
+                                                <StackPanel Grid.Row="0"
+                                                            Grid.Column="1"
+                                                            Orientation="Horizontal"
+                                                            HorizontalAlignment="Right">
 
-                    <!-- 장비 연결 -->
-                    <Button Grid.Row="1"
-                            Height="34"
-                            Width="130"
-                            HorizontalAlignment="Left"
-                            Content="장비 연결"
-                            Style="{StaticResource ConnectButtonStyle}"
-                            Command="{Binding ConnectCommand}"/>
+                                                    <!-- Web Agent 연결 상태 표시등 -->
+                                                    <Ellipse Width="8"
+                                                             Height="8"
+                                                             Fill="{Binding WebAgentConnectionStatusColor}"
+                                                             VerticalAlignment="Center"/>
 
-                    <!-- 장비 리스트 -->
-                    <Border Grid.Row="3"
+                                                    <!-- Web Agent 연결 상태 문자열 -->
+                                                    <TextBlock Text="{Binding WebAgentConnectionStatusText}"
+                                                               Foreground="{Binding WebAgentConnectionStatusColor}"
+                                                               FontSize="11"
+                                                               FontWeight="Bold"
+                                                               Margin="5,0,0,0"
+                                                               VerticalAlignment="Center"/>
+
+                                                </StackPanel>
+
+                                                <TextBlock Grid.Row="1"
+                                                           Grid.Column="0"
+                                                           Text="IP ADDRESS"
+                                                           Foreground="#D0D7DE"
+                                                           FontSize="11"
+                                                           Margin="0,10,0,4"/>
+
+                                                <TextBlock Grid.Row="1"
+                                                           Grid.Column="1"
+                                                           Text="PORT"
+                                                           Foreground="#D0D7DE"
+                                                           FontSize="11"
+                                                           Margin="6,10,0,4"/>
+
+                                                <TextBox Grid.Row="2"
+                                                         Grid.Column="0"
+                                                         Style="{StaticResource CommunicationTextBoxStyle}"
+                                                         Text="{Binding WebAgentIp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                                <TextBox Grid.Row="2"
+                                                         Grid.Column="1"
+                                                         Margin="6,0,0,0"
+                                                         Style="{StaticResource CommunicationTextBoxStyle}"
+                                                         Text="{Binding WebAgentPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                                <Grid Grid.Row="3"
+                                                      Grid.ColumnSpan="2"
+                                                      Margin="0,10,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="8"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button Grid.Column="0"
+                                                            Height="32"
+                                                            Content="장비 연결"
+                                                            Style="{StaticResource ConnectButtonStyle}"
+                                                            Command="{Binding ConnectCommand}"/>
+
+                                                    <Button Grid.Column="2"
+                                                            Height="32"
+                                                            Content="연결 해제"
+                                                            Style="{StaticResource DisconnectButtonStyle}"
+                                                            Command="{Binding DisconnectCommand}"/>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 영상 및 장비 상태 카드 -->
+                                <Border Background="#5F666D"
+                                        BorderBrush="#95A5B0"
+                                        BorderThickness="1.5"
+                                        CornerRadius="5"
+                                        Padding="8">
+                                    <StackPanel>
+                                        <TextBlock Text="CONNECTION STATUS"
+                                                   Foreground="White"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,8"/>
+
+                                        <Border Background="#40464D"
+                                                BorderBrush="#76818B"
+                                                BorderThickness="1"
+                                                Padding="9">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="85"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Row="0" Text="EO RTSP" Foreground="#D0D7DE" Margin="0,3"/>
+                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding EoStatusText}" Foreground="#7DD3FC" FontWeight="Bold" Margin="0,3"/>
+
+                                                <TextBlock Grid.Row="1" Text="IR RTSP" Foreground="#D0D7DE" Margin="0,3"/>
+                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IrStatusText}" Foreground="#C4B5FD" FontWeight="Bold" Margin="0,3"/>
+
+                                                <TextBlock Grid.Row="2" Text="POWER" Foreground="#D0D7DE" Margin="0,6,0,3"/>
+                                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentPowerText}" Foreground="#9FE870" FontWeight="Bold" Margin="0,6,0,3"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- 기존 장비 제어 UI -->
+                    <TabItem Header="운용 제어">
+                        <Grid Margin="5">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="175"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0"
                             Background="#5F666D"
                             BorderBrush="#95A5B0"
                             BorderThickness="1.5"
                             Padding="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <!-- 제목 -->
-                                <RowDefinition Height="Auto"/>
-                                <!-- 장비 리스트 -->
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <!-- 제목 -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- 장비 리스트 -->
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
 
-                            <TextBlock Text="장비 연결"
-                                       Foreground="White"
-                                       FontSize="16"
-                                       FontWeight="Bold"
-                                       Margin="0,0,0,5"/>
-
-                            <!-- 제어 패널 Scroll 영역 -->
-                            <ScrollViewer Grid.Row="1"
+                                    <!-- 제어 패널 Scroll 영역 -->
+                                    <ScrollViewer Grid.Row="1"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <StackPanel Orientation="Vertical" 
+                                        <StackPanel Orientation="Vertical" 
                                             Margin="0,0,0,10">
 
-                                    <!-- 테스트용 장비 선택 RadioButton 
+                                            <!-- 테스트용 장비 선택 RadioButton 
                                          현재는 단일 장비 연결 구조로 사용하므로
                                          임시 비활성화 처리.
                                          추후 다중 장비 선택 기능 추가 시 재사용 예정 -->
-                                    <!--<RadioButton Content="연결 해제"
+                                            <!--<RadioButton Content="연결 해제"
                                                  Foreground="#6EC1FF"
                                                  FontSize="15"
                                                  Margin="0,5"/>                      
@@ -412,57 +671,57 @@
                                                  FontSize="15"
                                                  Margin="0,5"/>-->
 
-                                    <!-- [PAN] / [TILT] 제어 -->
-                                    <Border Grid.Row="2"
-                                            Margin="0,10,10,0"
+                                            <!-- [PAN] / [TILT] 제어 -->
+                                            <Border Grid.Row="2"
+                                            Margin="0,5,5,0"
                                             Background="#5F666D"
                                             BorderBrush="#95A5B0"
                                             BorderThickness="1.5"
-                                            Padding="10">
+                                            Padding="12">
 
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
 
-                                            <!-- 제목 -->
-                                            <TextBlock Text="PAN / TILT CONTROL"
+                                                    <!-- 제목 -->
+                                                    <TextBlock Text="PAN / TILT CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,5"/>
 
-                                            <!-- [PT] 방향키 제어 버튼 영역 -->
-                                            <Grid Grid.Row="1"
+                                                    <!-- [PT] 방향키 제어 버튼 영역 -->
+                                                    <Grid Grid.Row="1"
                                                   Width="120"
                                                   Height="120"
                                                   HorizontalAlignment="Center">
 
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition/>
-                                                    <RowDefinition/>
-                                                    <RowDefinition/>
-                                                </Grid.RowDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition/>
+                                                            <RowDefinition/>
+                                                            <RowDefinition/>
+                                                        </Grid.RowDefinitions>
 
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition/>
-                                                    <ColumnDefinition/>
-                                                    <ColumnDefinition/>
-                                                </Grid.ColumnDefinitions>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition/>
+                                                            <ColumnDefinition/>
+                                                            <ColumnDefinition/>
+                                                        </Grid.ColumnDefinitions>
 
-                                                <!-- [PAN LEFT + TILT UP] 좌측 상단 대각선 -->
-                                                <!--<Button Grid.Row="0"
+                                                        <!-- [PAN LEFT + TILT UP] 좌측 상단 대각선 -->
+                                                        <Button Grid.Row="0"
                                                         Grid.Column="0"
                                                         Content="↖"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanLeftTiltUp_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+                                                        MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [TILT] [UP] -->
-                                                <Button Grid.Row="0"
+                                                        <!-- [TILT] [UP] -->
+                                                        <Button Grid.Row="0"
                                                         Grid.Column="1"
                                                         Content="▲"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
@@ -470,17 +729,17 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [PAN RIGHT + TILT UP] 우측 상단 대각선 -->
-                                                <!--<Button Grid.Row="0"
+                                                        <!-- [PAN RIGHT + TILT UP] 우측 상단 대각선 -->
+                                                        <Button Grid.Row="0"
                                                         Grid.Column="2"
                                                         Content="↗"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanRightTiltUp_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+                                                        MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [PAN] [LEFT] -->
-                                                <Button Grid.Row="1"
+                                                        <!-- [PAN] [LEFT] -->
+                                                        <Button Grid.Row="1"
                                                         Grid.Column="0"
                                                         Content="◀"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
@@ -488,21 +747,21 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [STOP] -->
-                                                <Border Grid.Row="1"
+                                                        <!-- [STOP] -->
+                                                        <Border Grid.Row="1"
                                                         Grid.Column="1"
                                                         Margin="5"
                                                         Background="#3F454B"
                                                         BorderBrush="#8B949E"
                                                         BorderThickness="1">
 
-                                                    <Button Content="STOP"
+                                                            <Button Content="STOP"
                                                             Style="{StaticResource StopButtonStyle}"
                                                             Command="{Binding StopMoveCommand}"/>
-                                                </Border>
+                                                        </Border>
 
-                                                <!-- [PAN] [RIGHT] -->
-                                                <Button Grid.Row="1"
+                                                        <!-- [PAN] [RIGHT] -->
+                                                        <Button Grid.Row="1"
                                                         Grid.Column="2"
                                                         Content="▶"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
@@ -510,17 +769,17 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [PAN LEFT + TILT DOWN] 좌측 하단 대각선 -->
-                                                <!--<Button Grid.Row="2"
+                                                        <!-- [PAN LEFT + TILT DOWN] 좌측 하단 대각선 -->
+                                                        <Button Grid.Row="2"
                                                         Grid.Column="0"
                                                         Content="↙"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanLeftTiltDown_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+                                                        MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [TILT] [DOWN] -->
-                                                <Button Grid.Row="2"
+                                                        <!-- [TILT] [DOWN] -->
+                                                        <Button Grid.Row="2"
                                                         Grid.Column="1"
                                                         Content="▼"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
@@ -528,59 +787,59 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseLeave"/>
 
-                                                <!-- [PAN RIGHT + TILT DOWN] 우측 하단 대각선 -->
-                                                <!--<Button Grid.Row="2"
+                                                        <!-- [PAN RIGHT + TILT DOWN] 우측 하단 대각선 -->
+                                                        <Button Grid.Row="2"
                                                         Grid.Column="2"
                                                         Content="↘"
                                                         Style="{StaticResource PanTiltDirectionButtonStyle}"
                                                         PreviewMouseDown="PanRightTiltDown_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseLeave"/>-->
+                                                        MouseLeave="MoveStop_MouseLeave"/>
 
-                                            </Grid>
+                                                    </Grid>
 
-                                            <!-- 이동 단위 표시 -->
-                                            <TextBlock Grid.Row="2"
+                                                    <!-- 이동 단위 표시 -->
+                                                    <TextBlock Grid.Row="2"
                                                        Text="{Binding PanTiltSpeedLevel,StringFormat=PT SPEED LV : {0}}"
                                                        Foreground="#D0D7DE"
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        HorizontalAlignment="Center"
                                                        Margin="0,5,0,0"/>
-                                        </Grid>
-                                    </Border>
+                                                </Grid>
+                                            </Border>
 
-                                    <!-- [EO] [ZOOM] / [FOCUS] 제어 -->
-                                    <Border Grid.Row="2"
-                                            Margin="0,10,10,0"
+                                            <!-- [EO] [ZOOM] / [FOCUS] 제어 -->
+                                            <Border Grid.Row="2"
+                                            Margin="0,5,5,0"
                                             Background="#5F666D"
                                             BorderBrush="#95A5B0"
                                             BorderThickness="1.5"
-                                            Padding="10">
+                                            Padding="12">
 
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
 
-                                            <!-- 제목 -->
-                                            <TextBlock Text="EO ZOOM / FOCUS CONTROL"
+                                                    <!-- 제목 -->
+                                                    <TextBlock Text="EO ZOOM / FOCUS CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,5"/>
 
-                                            <!-- [EO] [ZOOM] 제어 -->
-                                            <StackPanel Grid.Row="1"
+                                                    <!-- [EO] [ZOOM] 제어 -->
+                                                    <StackPanel Grid.Row="1"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                <!-- [EO] [ZOOM] 확대 -->
-                                                <Button Content="ZOOM +"
+                                                        <!-- [EO] [ZOOM] 확대 -->
+                                                        <Button Content="ZOOM +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -589,8 +848,8 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                                <!-- [EO] [ZOOM] 축소 -->
-                                                <Button Content="ZOOM -"
+                                                        <!-- [EO] [ZOOM] 축소 -->
+                                                        <Button Content="ZOOM -"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -599,38 +858,42 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                            </StackPanel>
+                                                    </StackPanel>
 
-                                            <!-- [EO] [FOCUS] 제어 -->
-                                            <StackPanel Grid.Row="2"
+                                                    <!-- [EO] [FOCUS] 제어 -->
+                                                    <StackPanel Grid.Row="2"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,0">
 
-                                                <!-- [EO] [FOCUS] [Far] -->
-                                                <Button Content="FOCUS +"
-                                                        Width="85"
-                                                        Margin="5"
-                                                        Focusable="False"
-                                                        Style="{StaticResource EoControlButtonStyle}"
-                                                        PreviewMouseDown="EoFocusFar_MouseDown"
-                                                        PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
-
-                                                <!-- [EO] [FOCUS] [Near] -->
-                                                <Button Content="FOCUS -"
+                                                        <!-- [EO] Focus Near
+                                                     누르고 있는 동안 Near 연속 이동
+                                                     버튼 해제 시 Stop -->
+                                                        <Button Content="FOCUS +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
                                                         Style="{StaticResource EoControlButtonStyle}"
                                                         PreviewMouseDown="EoFocusNear_MouseDown"
                                                         PreviewMouseUp="MoveStop_MouseUp"
-                                                        MouseLeave="MoveStop_MouseUp"/>
+                                                        MouseLeave="MoveStop_MouseLeave" />
 
-                                            </StackPanel>
+                                                        <!-- [EO] Focus Far
+                                                     누르고 있는 동안 Far 연속 이동
+                                                     버튼 해제 시 Stop -->
+                                                        <Button Content="FOCUS -"
+                                                        Width="85"
+                                                        Margin="5"
+                                                        Focusable="False"
+                                                        Style="{StaticResource EoControlButtonStyle}"
+                                                        PreviewMouseDown="EoFocusFar_MouseDown"
+                                                        PreviewMouseUp="MoveStop_MouseUp"
+                                                        MouseLeave="MoveStop_MouseLeave" />
 
-                                            <!-- [EO] [One Push Focus] 제어 -->
-                                            <!--<Button Grid.Row="3"
+                                                    </StackPanel>
+
+                                                    <!-- [EO] [One Push Focus] 제어 -->
+                                                    <!--<Button Grid.Row="3"
                                                     Content="AUTO FOCUS"
                                                     Width="180"
                                                     Margin="5,5,5,0"
@@ -639,41 +902,41 @@
                                                     Style="{StaticResource EoControlButtonStyle}"
                                                     PreviewMouseDown="EoAutoFocus_MouseDown"/>-->
 
-                                        </Grid>
-                                    </Border>
+                                                </Grid>
+                                            </Border>
 
-                                    <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
-                                    <Border Grid.Row="2"
-                                            Margin="0,10,10,0"
+                                            <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
+                                            <Border Grid.Row="2"
+                                            Margin="0,5,5,0"
                                             Background="#5F666D"
                                             BorderBrush="#95A5B0"
                                             BorderThickness="1.5"
-                                            Padding="10">
+                                            Padding="12">
 
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
 
-                                            <!-- 제목 -->
-                                            <TextBlock Text="IR ZOOM / FOCUS CONTROL"
+                                                    <!-- 제목 -->
+                                                    <TextBlock Text="IR ZOOM / FOCUS CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,5"/>
 
-                                            <!-- [IR] [ZOOM] 제어 -->
-                                            <StackPanel Grid.Row="1"
+                                                    <!-- [IR] [ZOOM] 제어 -->
+                                                    <StackPanel Grid.Row="1"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                <!-- [IR] [ZOOM] 확대 -->
-                                                <Button Content="ZOOM +"
+                                                        <!-- [IR] [ZOOM] 확대 -->
+                                                        <Button Content="ZOOM +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -682,8 +945,8 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                                <!-- [IR] [ZOOM] 축소 -->
-                                                <Button Content="ZOOM -"
+                                                        <!-- [IR] [ZOOM] 축소 -->
+                                                        <Button Content="ZOOM -"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -692,16 +955,16 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                            </StackPanel>
+                                                    </StackPanel>
 
-                                            <!-- [IR] [FOCUS] 제어 -->
-                                            <StackPanel Grid.Row="2"
+                                                    <!-- [IR] [FOCUS] 제어 -->
+                                                    <StackPanel Grid.Row="2"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                <!-- [IR] [FOCUS] [Far] -->
-                                                <Button Content="FOCUS +"
+                                                        <!-- [IR] [FOCUS] [Far] -->
+                                                        <Button Content="FOCUS +"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -710,8 +973,8 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                                <!-- [IR] [FOCUS] [Near] -->
-                                                <Button Content="FOCUS -"
+                                                        <!-- [IR] [FOCUS] [Near] -->
+                                                        <Button Content="FOCUS -"
                                                         Width="85"
                                                         Margin="5"
                                                         Focusable="False"
@@ -720,10 +983,10 @@
                                                         PreviewMouseUp="MoveStop_MouseUp"
                                                         MouseLeave="MoveStop_MouseUp"/>
 
-                                            </StackPanel>
+                                                    </StackPanel>
 
-                                            <!-- [IR] [Auto Focus] 제어 -->
-                                            <Button Grid.Row="4"
+                                                    <!-- [IR] [Auto Focus] 제어 -->
+                                                    <Button Grid.Row="4"
                                                     Content="AUTO FOCUS"
                                                     Width="180"
                                                     Margin="5"
@@ -731,11 +994,11 @@
                                                     Style="{StaticResource IrControlButtonStyle}"
                                                     PreviewMouseDown="IrAutoFocus_MouseDown"/>
 
-                                        </Grid>
-                                    </Border>
+                                                </Grid>
+                                            </Border>
 
-                                    <!-- [LRF] 제어 -->
-                                    <!--<Border Grid.Row="2"
+                                            <!-- [LRF] 제어 -->
+                                            <!--<Border Grid.Row="2"
                                             Margin="0,10,10,0"
                                             Background="#5F666D"
                                             BorderBrush="#95A5B0"
@@ -750,8 +1013,8 @@
                                             </Grid.RowDefinitions>
 
                                             -->
-                                    <!-- 제목 -->
-                                    <!--
+                                            <!-- 제목 -->
+                                            <!--
                                             <TextBlock Text="LRF CONTROL"
                                                        HorizontalAlignment="Center"
                                                        Foreground="White"
@@ -759,8 +1022,8 @@
                                                        Margin="0,0,0,8"/>
 
                                             -->
-                                    <!-- [LRF] [1회] 거리 측정 -->
-                                    <!--
+                                            <!-- [LRF] [1회] 거리 측정 -->
+                                            <!--
                                             <Button Grid.Row="1"
                                                     Content="MEASURE"
                                                     Width="180"
@@ -770,8 +1033,8 @@
                                                     Command="{Binding LrfMeasureCommand}"/>
 
                                             -->
-                                    <!-- 추후 거리값 표시 영역 -->
-                                    <!--
+                                            <!-- 추후 거리값 표시 영역 -->
+                                            <!--
                                             <TextBlock Grid.Row="2"
                                                        Text="{Binding LrfDistanceText}"
                                                        Foreground="#D0D7DE"
@@ -782,28 +1045,26 @@
                                         </Grid>
                                     </Border>-->
 
-                                </StackPanel>
-                            </ScrollViewer>
+                                        </StackPanel>
+                                    </ScrollViewer>
 
-                        </Grid>
-                    </Border>
-
-                    <!-- 현재 장비 상태 -->
-                    <Border Grid.Row="4"
+                                </Grid>
+                            </Border>
+                            <Border Grid.Row="1"
         Margin="0,10,0,0"
         Background="#4E555C"
         BorderBrush="#95A5B0"
         BorderThickness="1.5"
         Padding="10">
 
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
 
-                            <!-- 제목 -->
-                            <TextBlock Grid.Row="0"
+                                    <!-- 제목 -->
+                                    <TextBlock Grid.Row="0"
                    Text="CURRENT STATUS"
                    Foreground="White"
                    FontSize="13"
@@ -811,93 +1072,93 @@
                    HorizontalAlignment="Center"
                    Margin="0,0,0,8"/>
 
-                            <!-- 상태값 -->
-                            <Grid Grid.Row="1">
+                                    <!-- 상태값 -->
+                                    <Grid Grid.Row="1">
 
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="75"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="75"/>
+                                            <ColumnDefinition Width="10"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="26"/>
-                                    <RowDefinition Height="26"/>
-                                    <RowDefinition Height="26"/>
-                                    <RowDefinition Height="26"/>
-                                    <RowDefinition Height="26"/>
-                                </Grid.RowDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="26"/>
+                                            <RowDefinition Height="26"/>
+                                            <RowDefinition Height="26"/>
+                                            <RowDefinition Height="26"/>
+                                            <RowDefinition Height="26"/>
+                                        </Grid.RowDefinitions>
 
-                                <!-- PAN -->
-                                <TextBlock Grid.Row="0"
+                                        <!-- PAN -->
+                                        <TextBlock Grid.Row="0"
                                            Grid.Column="0"
                                            Text="Pan"
                                            Foreground="White"
                                            FontWeight="Bold"/>
 
-                                <TextBlock Grid.Row="0"
+                                        <TextBlock Grid.Row="0"
                                            Grid.Column="1"
                                            Text=":"
                                            Foreground="White"/>
 
-                                <TextBlock Grid.Row="0"
+                                        <TextBlock Grid.Row="0"
                                            Grid.Column="2"
                                            Text="{Binding CurrentPanText}"
                                            Foreground="White"/>
 
-                                <!-- TILT -->
-                                <TextBlock Grid.Row="1"
+                                        <!-- TILT -->
+                                        <TextBlock Grid.Row="1"
                                            Grid.Column="0"
                                            Text="Tilt"
                                            Foreground="White"
                                            FontWeight="Bold"/>
 
-                                <TextBlock Grid.Row="1"
+                                        <TextBlock Grid.Row="1"
                                            Grid.Column="1"
                                            Text=":"
                                            Foreground="White"/>
 
-                                <TextBlock Grid.Row="1"
+                                        <TextBlock Grid.Row="1"
                                            Grid.Column="2"
                                            Text="{Binding CurrentTiltText}"
                                            Foreground="White"/>
 
-                                <!-- EO ZOOM -->
-                                <TextBlock Grid.Row="2"
+                                        <!-- EO ZOOM -->
+                                        <TextBlock Grid.Row="2"
                                            Grid.Column="0"
                                            Text="EO Zoom"
                                            Foreground="White"
                                            FontWeight="Bold"/>
 
-                                <TextBlock Grid.Row="2"
+                                        <TextBlock Grid.Row="2"
                                            Grid.Column="1"
                                            Text=":"
                                            Foreground="White"/>
 
-                                <TextBlock Grid.Row="2"
+                                        <TextBlock Grid.Row="2"
                                            Grid.Column="2"
                                            Text="{Binding CurrentEoZoomText}"
                                            Foreground="White"/>
 
-                                <!-- EO FOCUS -->
-                                <TextBlock Grid.Row="3"
+                                        <!-- EO FOCUS -->
+                                        <TextBlock Grid.Row="3"
                                            Grid.Column="0"
                                            Text="EO Focus"
                                            Foreground="White"
                                            FontWeight="Bold"/>
 
-                                <TextBlock Grid.Row="3"
+                                        <TextBlock Grid.Row="3"
                                            Grid.Column="1"
                                            Text=":"
                                            Foreground="White"/>
 
-                                <TextBlock Grid.Row="3"
+                                        <TextBlock Grid.Row="3"
                                            Grid.Column="2"
                                            Text="{Binding CurrentEoFocusText}"
                                            Foreground="White"/>
 
-                                <!-- IR ZOOM -->
-                                <!--
+                                        <!-- IR ZOOM -->
+                                        <!--
                                 <TextBlock Grid.Row="4"
                                            Grid.Column="0"
                                            Text="IR Zoom"
@@ -915,8 +1176,8 @@
                                            Foreground="White"/>
 
                                 -->
-                                <!-- IR FOCUS -->
-                                <!--
+                                        <!-- IR FOCUS -->
+                                        <!--
                                 <TextBlock Grid.Row="5"
                                            Grid.Column="0"
                                            Text="IR Focus"
@@ -933,29 +1194,30 @@
                                            Text="{Binding CurrentIrFocusText}"
                                            Foreground="White"/>-->
 
-                                <!-- POWER -->
-                                <TextBlock Grid.Row="4"
+                                        <!-- POWER -->
+                                        <TextBlock Grid.Row="4"
                                            Grid.Column="0"
                                            Text="Power"
                                            Foreground="White"
                                            FontWeight="Bold"/>
 
-                                <TextBlock Grid.Row="4"
+                                        <TextBlock Grid.Row="4"
                                            Grid.Column="1"
                                            Text=":"
                                            Foreground="White"/>
 
-                                <TextBlock Grid.Row="4"
+                                        <TextBlock Grid.Row="4"
                                            Grid.Column="2"
                                            Text="{Binding CurrentPowerText}"
                                            Foreground="#9FE870"
                                            FontWeight="Bold"/>
 
-                            </Grid>
+                                    </Grid>
+                                </Grid>
+                            </Border>
                         </Grid>
-                    </Border>
-
-                </Grid>
+                    </TabItem>
+                </TabControl>
             </Border>
 
         </Grid>

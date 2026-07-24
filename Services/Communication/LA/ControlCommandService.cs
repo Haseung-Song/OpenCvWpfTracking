@@ -18,7 +18,7 @@ namespace OpenCvWpfTracking.Services.Communication
     public class ControlCommandService
     {
         /// <summary>
-        /// [LA](Local Agent) [TCP] 통신 서비스
+        /// [WEB AGENT](Local Agent) [TCP] 통신 서비스
         /// </summary>
         private readonly TcpClientService _tcpClientService;
 
@@ -355,15 +355,23 @@ namespace OpenCvWpfTracking.Services.Communication
         /// [EO] PTZ(회전형) 카메라 [Focus] 위치 제어 명령
         /// 범위: [0 ~ 1000]
         /// </summary>
-        public bool EoFocusGoPosition(short focus)
+        public bool EoFocusGoPosition(
+            short focus)
         {
             if (focus > 1000)
+            {
                 focus = 1000;
+            }
             else if (focus < 0)
+            {
                 focus = 0;
+            }
 
-            byte data1 = (byte)((focus >> 8) & 0xFF);
-            byte data2 = (byte)(focus & 0xFF);
+            byte data1 =
+                (byte)((focus >> 8) & 0xFF);
+
+            byte data2 =
+                (byte)(focus & 0xFF);
 
             return SendCommand(
                 0x00,
