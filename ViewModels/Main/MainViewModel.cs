@@ -1,5 +1,4 @@
 ﻿using OpenCvSharp;
-using OpenCvSharp.Dnn;
 using OpenCvWpfTracking.Common;
 using OpenCvWpfTracking.Converters;
 using OpenCvWpfTracking.Models.AI;
@@ -22,11 +21,45 @@ using System.Windows.Threading;
 namespace OpenCvWpfTracking.ViewModels.Main
 {
     /// <summary>
+    /// 통신 설정 화면의 RTSP 선택 ComboBox 항목
+    ///
+    /// DisplayName : UI에 표시할 카메라 구분명
+    /// Address     : 실제 FFmpeg 연결에 사용할 RTSP 주소
+    /// </summary>
+    public sealed class RtspSourceOption
+    {
+        /// <summary>
+        /// RTSP 카메라 선택 항목 표시명
+        /// </summary>
+        public string DisplayName { get; }
+
+        /// <summary>
+        /// RTSP 카메라 실제 연결 주소
+        /// </summary>
+        public string Address { get; }
+
+        /// <summary>
+        /// RTSP 선택 항목 생성
+        /// </summary>
+        public RtspSourceOption(
+            string displayName,
+            string address)
+        {
+            DisplayName =
+                displayName;
+
+            Address =
+                address;
+        }
+
+    }
+
+    /// <summary>
     /// [Main] 화면 [ViewModel]
     /// 
     /// 메인 클래스 역할:
     /// 1. [VD] / [EO RTSP] / [IR RTSP] 영상 출력 제어
-    /// 2. [WEB AGENT] ([Local Agent]) [TCP] 통신 서비스 초기화
+    /// 2. [CONTROL AGENT] [TCP] 통신 서비스 초기화
     /// 3. [TORUSS] 제어 명령 서비스 관리
     /// 4. [XAML] 바인딩용 [Image] / [StatusText] 갱신
     /// </summary>
@@ -113,13 +146,54 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [RTSP Source Preset Fields]
+
+        /// <summary>
+        /// [3] 1층 생산팀 [ADS] 주간(EO) 카메라 RTSP 주소
+        /// </summary>
+        private const string AdsEoRtspAddress =
+            "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
+
+        /// <summary>
+        /// [3] 1층 생산팀 [ADS] 열상(IR) 카메라 RTSP 주소
+        /// </summary>
+        private const string AdsIrRtspAddress =
+            "rtsp://admin:admin@192.168.0.101:554/hdmi";
+
+        /// <summary>
+        /// [4] 옥상 [GOP] 주간(EO) 카메라 RTSP 주소
+        /// </summary>
+        private const string GopEoRtspAddress =
+            "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
+
+        /// <summary>
+        /// [4] 옥상 [GOP] 열상(IR) 카메라 RTSP 주소
+        /// </summary>
+        private const string GopIrRtspAddress =
+            "rtsp://root:rmffhqjf1!@192.168.0.121:554/cam0_0";
+
+        /// <summary>
+        /// [5] 4층 개발팀 환경부 주간(EO) PTZ 카메라 RTSP 주소
+        /// </summary>
+        private const string MoeEoRtspAddress =
+            "rtsp://root:rmffhqjf1!@192.168.0.100:554/AVStream1_1";
+
+        /// <summary>
+        /// [5] 4층 개발팀 환경부 열상(IR) PTZ 카메라 RTSP 주소
+        /// </summary>
+        private const string MoeIrRtspAddress =
+            "rtsp://root:rmffhqjf1!@10.20.30.40:554/cam0_0";
+
+        #endregion
+
         #region [LA Communication Fields]
 
         /// <summary>
-        /// [Web Agent / LA] 제어 [TCP] 통신 서비스 객체
+        /// [Control Agent] 제어 [TCP] 통신 서비스 객체
         ///
-        /// 기존 고흥 건의 통신 구조를 유지하며,
-        /// 접속 IP / Port만 MR500 환경에 맞춰 사용한다.
+        /// 기존 고흥 건의 LA 통신 구조를 유지하며,
+        /// 운용 환경에 따라 Web Agent 또는 LA Agent 구현체와 연결한다.
+        /// UI와 공통 코드 명칭은 Control Agent로 사용한다.
         /// </summary>
         private readonly TcpClientService _laTcpService;
 
@@ -200,7 +274,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [PAN / TILT] 버튼 1회 클릭 시 이동할 각도 값
         /// 
-        /// 기존 [WEB AGENT] 프로그램의 [PT] 버튼 동작처럼
+        /// 기존 [CONTROL AGENT] 프로그램의 [PT] 버튼 동작처럼
         /// 한 번 클릭할 때마다 [1.0]도 단위로 이동하도록 설정한다.
         /// </summary>
         private const double PanTiltMoveStep = 1.0;
@@ -290,25 +364,41 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Control Properties]
 
         /// <summary>
-        /// Web Agent 제어 TCP 연결 IP 입력값
+        /// [EO] 주간 카메라 RTSP 주소 입력값
+        ///
+        /// 통신 설정 탭에서 직접 수정하며,
+        /// 장비 연결 시 현재 입력값을 사용한다.
         /// </summary>
-        private string _webAgentIp;
+        private string _eoSourceAddress;
 
         /// <summary>
-        /// Web Agent 제어 TCP 연결 Port 입력 문자열
+        /// [IR] 열상 카메라 RTSP 주소 입력값
+        ///
+        /// 통신 설정 탭에서 직접 수정하며,
+        /// 장비 연결 시 현재 입력값을 사용한다.
+        /// </summary>
+        private string _irSourceAddress;
+
+        /// <summary>
+        /// Control Agent 제어 TCP 연결 IP 입력값
+        /// </summary>
+        private string _controlControlAgentIp;
+
+        /// <summary>
+        /// Control Agent 제어 TCP 연결 Port 입력 문자열
         ///
         /// TextBox에 문자 또는 빈값이 입력되더라도
         /// 바인딩 변환 예외가 발생하지 않도록 string으로 관리한다.
         /// </summary>
-        private string _webAgentPortText;
+        private string _controlControlAgentPortText;
 
         /// <summary>
-        /// Web Agent 연결 중 상태 최소 표시시간
+        /// Control Agent 연결 중 상태 최소 표시시간
         ///
         /// TCP 연결이 매우 빠르게 완료되더라도
         /// Connecting 상태가 UI에 최소한 표시되도록 사용한다.
         /// </summary>
-        private const int WebAgentConnectingMinimumDisplayMs =
+        private const int ControlAgentConnectingMinimumDisplayMs =
             300;
 
         /// <summary>
@@ -362,7 +452,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// EO Focus 반복 명령용 목표값
         ///
-        /// Web Agent 상태값이 중간에 변경되어도
+        /// Control Agent 상태값이 중간에 변경되어도
         /// 누르고 있는 동안에는 이 값을 기준으로 연속 이동한다.
         /// </summary>
         private int _eoFocusCommandTarget;
@@ -415,15 +505,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Fields]
 
         /// <summary>
-        /// [WEB AGENT] 수신 [Packet Parser]
+        /// [CONTROL AGENT] 수신 [Packet Parser]
         /// 
         /// [TcpClientService]에서 받은 byte[] 데이터를
-        /// [12byte] 단위의 [WEB AGENT] 응답 [Packet]으로 분리 / 검증하는 역할
+        /// [12byte] 단위의 [CONTROL AGENT] 응답 [Packet]으로 분리 / 검증하는 역할
         /// </summary>
         private readonly LAPacketParser _laPacketParser;
 
         /// <summary>
-        /// 마지막 [WEB AGENT] 상태 로그 출력 시간
+        /// 마지막 [CONTROL AGENT] 상태 로그 출력 시간
         /// 
         /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus]
         /// 상태 [Packet]은 약 [10Hz] 주기로 수신되므로,
@@ -432,7 +522,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private DateTime _lastLaStatusLogTime = DateTime.MinValue;
 
         /// <summary>
-        /// 마지막 [WEB AGENT] [Extended Status] 로그 출력 시간
+        /// 마지막 [CONTROL AGENT] [Extended Status] 로그 출력 시간
         /// 
         /// [IR] 확장 상태 [Packet]은
         /// 지속적으로 수신되므로,
@@ -441,7 +531,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private DateTime _lastLaExtendedStatusLogTime = DateTime.MinValue;
 
         /// <summary>
-        /// [WEB AGENT] 상태 로그 출력 간격
+        /// [CONTROL AGENT] 상태 로그 출력 간격
         /// 
         /// [0x01] 기본 상태 Packet
         /// [0xA1] 확장 상태 Packet
@@ -473,7 +563,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector Agent] 연결 [IP]
         /// </summary>
-        private string _aiAgentIp = "192.168.20.160";
+        private string _aiControlAgentIp = "192.168.20.160";
 
         /// <summary>
         /// [AI Detector Agent] 연결 [Port]
@@ -578,9 +668,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private CancellationTokenSource _cts;
 
         /// <summary>
-        /// [Web Agent] 제어 TCP 자동 재연결 Loop 종료 Token
+        /// [Control Agent] 제어 TCP 자동 재연결 Loop 종료 Token
         /// </summary>
-        private CancellationTokenSource _webAgentReconnectCts;
+        private CancellationTokenSource _controlAgentReconnectCts;
 
         /// <summary>
         /// [EO / IR] RTSP 자동 재연결 Loop 종료 Token
@@ -629,25 +719,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private string _irStatusText = "[IR] Disconnected";
 
         /// <summary>
-        /// Web Agent TCP 연결 상태 문자열
+        /// Control Agent TCP 연결 상태 문자열
         ///
         /// Disconnected
         /// Connecting
         /// Connected
         /// Reconnecting
         /// </summary>
-        private string _webAgentConnectionStatusText =
+        private string _controlAgentConnectionStatusText =
             "Disconnected";
 
         /// <summary>
-        /// Web Agent TCP 연결 상태 표시 색상
+        /// Control Agent TCP 연결 상태 표시 색상
         ///
         /// Disconnected : Red
         /// Connecting   : Yellow
         /// Connected    : Green
         /// Reconnecting : Yellow
         /// </summary>
-        private string _webAgentConnectionStatusColor =
+        private string _controlAgentConnectionStatusColor =
             "#FF6B6B";
 
         /// <summary>
@@ -784,14 +874,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// [Connect] 버튼 클릭 시 호출
             /// 
-            /// 영상 스트림 및 [WEB AGENT] [TCP] 통신 연결을 시작한다.
+            /// 영상 스트림 및 [CONTROL AGENT] [TCP] 통신 연결을 시작한다.
             /// </summary>
             ConnectCommand = new RelayCommand(Connect);
 
             /// <summary>
             /// [Disconnect] 버튼 클릭 시 호출
             /// 
-            /// 영상 스트림 및 [WEB AGENT] [TCP] 통신 연결을 종료한다.
+            /// 영상 스트림 및 [CONTROL AGENT] [TCP] 통신 연결을 종료한다.
             /// </summary>
             DisconnectCommand = new RelayCommand(Disconnect);
 
@@ -811,7 +901,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     AiSettingStatusText = "[AI] Reconnect Start...";
 
                     _ = _aiDetectorClientService.RestartAutoReconnectAsync(
-                        AiAgentIp,
+                        AiControlAgentIp,
                         AiAgentPort,
                         3000);
 
@@ -1192,7 +1282,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _irDecoder = new FFmpegDecoderService("IR");
 
             /// <summary>
-            /// [WEB AGENT] 통신 서비스 생성
+            /// [CONTROL AGENT] 통신 서비스 생성
             /// </summary>
             _laTcpService = new TcpClientService();
 
@@ -1202,12 +1292,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService = new ControlCommandService(_laTcpService);
 
             /// <summary>
-            /// [WEB AGENT] 수신 [Packet Parser] 생성
+            /// [CONTROL AGENT] 수신 [Packet Parser] 생성
             /// </summary>
             _laPacketParser = new LAPacketParser();
 
             /// <summary>
-            /// [WEB AGENT] [TCP] 수신 이벤트 연결
+            /// [CONTROL AGENT] [TCP] 수신 이벤트 연결
             /// 
             /// [TcpClientService]의 [ReceiveLoop]에서 데이터 수신 시
             /// [OnLaMessageReceived] 함수가 호출된다.
@@ -1215,10 +1305,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _laTcpService.MessageReceived += OnLaMessageReceived;
 
             /// <summary>
-            /// [Web Agent] 서버가 연결을 종료한 경우
+            /// [Control Agent] 서버가 연결을 종료한 경우
             /// 장비 연결 요청 상태가 유지되어 있으면 자동 재연결을 시작한다.
             /// </summary>
-            _laTcpService.ConnectionClosed += OnWebAgentConnectionClosed;
+            _laTcpService.ConnectionClosed += OnControlAgentConnectionClosed;
 
             /// <summary>
             /// [AI Detector] 통신 서비스 생성
@@ -1253,9 +1343,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             InitializeDefaultSourceAddress();
 
             /// <summary>
-            /// Web Agent 통신 설정 기본값 초기화
+            /// Control Agent 통신 설정 기본값 초기화
             /// </summary>
-            InitializeWebAgentSetting();
+            InitializeControlAgentSetting();
 
             /// <summary>
             /// AI Detector 설정 기본값 초기화
@@ -1264,7 +1354,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             ConsoleLogHelper.PrintLine();
             Console.WriteLine(
-                "[WEB AGENT] Service Initialize Complete");
+                "[CONTROL AGENT] Service Initialize Complete");
             ConsoleLogHelper.PrintLine();
 
             #endregion
@@ -1284,34 +1374,76 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [EO] 주간 [RTSP] 주소
+        ///
+        /// 통신 설정 탭의 EO 카메라 선택 ComboBox와 양방향 바인딩한다.
         /// </summary>
-        public string EoSourceAddress { get; set; }
-
-        /// <summary>
-        /// [IR] 열상 [RTSP] 주소
-        /// </summary>
-        public string IrSourceAddress { get; set; }
-
-        #endregion
-
-        #region [Web Agent Setting Properties]
-
-        /// <summary>
-        /// Web Agent 제어 TCP 연결 IP
-        /// </summary>
-        public string WebAgentIp
+        public string EoSourceAddress
         {
-            get => _webAgentIp;
+            get => _eoSourceAddress;
 
             set
             {
-                if (_webAgentIp ==
+                if (_eoSourceAddress ==
                     value)
                 {
                     return;
                 }
 
-                _webAgentIp =
+                _eoSourceAddress =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(SourceAddress));
+            }
+        }
+
+        /// <summary>
+        /// [IR] 열상 [RTSP] 주소
+        ///
+        /// 통신 설정 탭의 IR 카메라 선택 ComboBox와 양방향 바인딩한다.
+        /// </summary>
+        public string IrSourceAddress
+        {
+            get => _irSourceAddress;
+
+            set
+            {
+                if (_irSourceAddress ==
+                    value)
+                {
+                    return;
+                }
+
+                _irSourceAddress =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(SourceAddress));
+            }
+        }
+
+        #endregion
+
+        #region [Control Agent Setting Properties]
+
+        /// <summary>
+        /// Control Agent 제어 TCP 연결 IP
+        /// </summary>
+        public string ControlAgentIp
+        {
+            get => _controlControlAgentIp;
+
+            set
+            {
+                if (_controlControlAgentIp ==
+                    value)
+                {
+                    return;
+                }
+
+                _controlControlAgentIp =
                     value;
 
                 OnPropertyChanged();
@@ -1320,23 +1452,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// Web Agent 제어 TCP 연결 Port 입력 문자열
+        /// Control Agent 제어 TCP 연결 Port 입력 문자열
         ///
         /// 연결 시점에 int.TryParse로 검증한다.
         /// </summary>
-        public string WebAgentPortText
+        public string ControlAgentPortText
         {
-            get => _webAgentPortText;
+            get => _controlControlAgentPortText;
 
             set
             {
-                if (_webAgentPortText ==
+                if (_controlControlAgentPortText ==
                     value)
                 {
                     return;
                 }
 
-                _webAgentPortText =
+                _controlControlAgentPortText =
                     value;
 
                 OnPropertyChanged();
@@ -1484,14 +1616,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [AI Detector Agent] 연결 [IP]
         /// </summary>
-        public string AiAgentIp
+        public string AiControlAgentIp
         {
-            get => _aiAgentIp;
+            get => _aiControlAgentIp;
             set
             {
-                if (_aiAgentIp != value)
+                if (_aiControlAgentIp != value)
                 {
-                    _aiAgentIp = value;
+                    _aiControlAgentIp = value;
                     OnPropertyChanged();
                 }
 
@@ -1702,25 +1834,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         }
 
-        #region [Web Agent Communication Properties]
+        #region [Control Agent Communication Properties]
 
         /// <summary>
-        /// Web Agent TCP 연결 상태 표시 문자열
+        /// Control Agent TCP 연결 상태 표시 문자열
         /// </summary>
-        public string WebAgentConnectionStatusText
+        public string ControlAgentConnectionStatusText
         {
             get =>
-                _webAgentConnectionStatusText;
+                _controlAgentConnectionStatusText;
 
             private set
             {
-                if (_webAgentConnectionStatusText ==
+                if (_controlAgentConnectionStatusText ==
                     value)
                 {
                     return;
                 }
 
-                _webAgentConnectionStatusText =
+                _controlAgentConnectionStatusText =
                     value;
 
                 OnPropertyChanged();
@@ -1729,24 +1861,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// Web Agent TCP 연결 상태 표시 색상
+        /// Control Agent TCP 연결 상태 표시 색상
         ///
         /// XAML Ellipse Fill에 바인딩한다.
         /// </summary>
-        public string WebAgentConnectionStatusColor
+        public string ControlAgentConnectionStatusColor
         {
             get =>
-                _webAgentConnectionStatusColor;
+                _controlAgentConnectionStatusColor;
 
             private set
             {
-                if (_webAgentConnectionStatusColor ==
+                if (_controlAgentConnectionStatusColor ==
                     value)
                 {
                     return;
                 }
 
-                _webAgentConnectionStatusColor =
+                _controlAgentConnectionStatusColor =
                     value;
 
                 OnPropertyChanged();
@@ -1875,7 +2007,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _eoStatusText =
                     value;
 
+                /*
+                 * 영상 화면 하단의 EO 상태 문자열 갱신
+                 */
                 OnPropertyChanged();
+
+                /*
+                 * 통신 설정 화면의 EO RTSP 상태 문자열 및
+                 * 상태 표시 색상을 함께 갱신한다.
+                 */
+                OnPropertyChanged(
+                    nameof(EoConnectionStatusText));
+
+                OnPropertyChanged(
+                    nameof(EoConnectionStatusColor));
+
+                /*
+                 * CONNECTION STATUS 영역의
+                 * EO 상태 표시를 함께 갱신한다.
+                 */
                 OnPropertyChanged(
                     nameof(CurrentPowerText));
 
@@ -1900,7 +2050,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _irStatusText =
                     value;
 
+                /*
+                 * 영상 화면 하단의 IR 상태 문자열 갱신
+                 */
                 OnPropertyChanged();
+
+                /*
+                 * 통신 설정 화면의 IR RTSP 상태 문자열 및
+                 * 상태 표시 색상을 함께 갱신한다.
+                 */
+                OnPropertyChanged(
+                    nameof(IrConnectionStatusText));
+
+                OnPropertyChanged(
+                    nameof(IrConnectionStatusColor));
+
+                /*
+                 * CONNECTION STATUS 영역의
+                 * IR 상태 표시를 함께 갱신한다.
+                 */
                 OnPropertyChanged(
                     nameof(CurrentPowerText));
 
@@ -1908,6 +2076,187 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     nameof(CurrentIrPowerText));
             }
 
+        }
+
+        /// <summary>
+        /// [EO RTSP] 연결 상태 표시 문자열
+        ///
+        /// 기존 EoStatusText는 영상 화면 하단 상태 표시용으로
+        /// "[EO] Connected" 형식을 사용한다.
+        ///
+        /// 통신 설정 화면에서는 장비 구분 문구를 제외하고
+        /// Connected / Connecting / Reconnecting / Disconnected
+        /// 상태 문자열만 표시한다.
+        /// </summary>
+        public string EoConnectionStatusText
+        {
+            get
+            {
+                return GetRtspConnectionStatusText(
+                    EoStatusText,
+                    "[EO]");
+            }
+
+        }
+
+        /// <summary>
+        /// [EO RTSP] 연결 상태 표시 색상
+        ///
+        /// Connected    : Green
+        /// Connecting   : Yellow
+        /// Reconnecting : Yellow
+        /// Disconnected : Red
+        ///
+        /// XAML의 상태 표시 Ellipse Fill과
+        /// 상태 문자열 Foreground에 함께 바인딩한다.
+        /// </summary>
+        public string EoConnectionStatusColor
+        {
+            get
+            {
+                return GetRtspConnectionStatusColor(
+                    EoConnectionStatusText);
+            }
+
+        }
+
+        /// <summary>
+        /// [IR RTSP] 연결 상태 표시 문자열
+        ///
+        /// 기존 IrStatusText의 "[IR]" 장비 구분 문구를 제거하고
+        /// 통신 설정 화면에 표시할 상태 문자열만 반환한다.
+        /// </summary>
+        public string IrConnectionStatusText
+        {
+            get
+            {
+                return GetRtspConnectionStatusText(
+                    IrStatusText,
+                    "[IR]");
+            }
+
+        }
+
+        /// <summary>
+        /// [IR RTSP] 연결 상태 표시 색상
+        ///
+        /// Connected    : Green
+        /// Connecting   : Yellow
+        /// Reconnecting : Yellow
+        /// Disconnected : Red
+        ///
+        /// XAML의 상태 표시 Ellipse Fill과
+        /// 상태 문자열 Foreground에 함께 바인딩한다.
+        /// </summary>
+        public string IrConnectionStatusColor
+        {
+            get
+            {
+                return GetRtspConnectionStatusColor(
+                    IrConnectionStatusText);
+            }
+
+        }
+
+        /// <summary>
+        /// 영상 화면 상태 문자열을
+        /// 통신 설정 화면용 RTSP 연결 상태 문자열로 변환
+        ///
+        /// 실제 영상 상태 문자열에는 재연결 횟수 또는
+        /// 부가 문구가 포함될 수 있으므로 완전 일치가 아닌
+        /// 상태 키워드 포함 여부를 기준으로 판단한다.
+        ///
+        /// 예시:
+        /// "[EO] Connected"
+        ///     -> "Connected"
+        ///
+        /// "[EO] Connecting..."
+        ///     -> "Connecting"
+        ///
+        /// "[EO] Reconnecting... (4)"
+        ///     -> "Reconnecting"
+        ///
+        /// "[IR] Disconnected"
+        ///     -> "Disconnected"
+        /// </summary>
+        private static string GetRtspConnectionStatusText(
+            string statusText,
+            string cameraPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    statusText))
+            {
+                return "Disconnected";
+            }
+
+            string normalizedStatus =
+                statusText
+                    .Replace(
+                        cameraPrefix,
+                        string.Empty)
+                    .Trim();
+
+            /*
+             * Reconnecting 문자열 안에는
+             * Connecting 문자열이 포함되므로
+             * 반드시 Reconnecting을 먼저 확인해야 한다.
+             */
+            if (normalizedStatus.IndexOf(
+                    "Reconnecting",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Reconnecting";
+            }
+
+            if (normalizedStatus.IndexOf(
+                    "Connecting",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Connecting";
+            }
+
+            if (normalizedStatus.IndexOf(
+                    "Disconnected",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Disconnected";
+            }
+
+            if (normalizedStatus.IndexOf(
+                    "Connected",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Connected";
+            }
+
+            return "Disconnected";
+        }
+
+        /// <summary>
+        /// RTSP 연결 상태 문자열에 맞는
+        /// 화면 표시 색상 반환
+        ///
+        /// Control Agent 연결 상태와 동일한 색상 기준을 사용한다.
+        /// </summary>
+        private static string GetRtspConnectionStatusColor(
+            string connectionStatusText)
+        {
+            switch (connectionStatusText)
+            {
+                case "Connected":
+
+                    return "#68D391";
+
+                case "Connecting":
+                case "Reconnecting":
+
+                    return "#F6E05E";
+
+                case "Disconnected":
+                default:
+
+                    return "#FF6B6B";
+            }
         }
 
         #region [Current Device Status Properties]
@@ -1951,7 +2300,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// 현재 주요 장비 상태 표시 문자열
         ///
-        /// PT는 Web Agent Power Status 비트를 사용하고,
+        /// PT는 Control Agent Power Status 비트를 사용하고,
         /// EO / IR은 각 RTSP 영상 연결 상태를 기준으로 표시한다.
         /// </summary>
         public string CurrentPowerText
@@ -2051,6 +2400,50 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Binding Collections]
 
         /// <summary>
+        /// 통신 설정 탭의 [EO RTSP] 카메라 선택 목록
+        ///
+        /// 기존 InitializeDefaultSourceAddress()에서 주석을 변경하며 사용하던
+        /// [1층 ADS] / [옥상 GOP] / [환경부 PTZ] 주소를 UI에서 선택하도록 제공한다.
+        /// </summary>
+        public ObservableCollection<RtspSourceOption> EoRtspSourceOptions { get; }
+            = new ObservableCollection<RtspSourceOption>
+            {
+                new RtspSourceOption(
+                    "1층 생산팀 ADS 주간(EO)",
+                    AdsEoRtspAddress),
+
+                new RtspSourceOption(
+                    "옥상 GOP 주간(EO)",
+                    GopEoRtspAddress),
+
+                new RtspSourceOption(
+                    "4층 환경부 PTZ 주간(EO)",
+                    MoeEoRtspAddress)
+            };
+
+        /// <summary>
+        /// 통신 설정 탭의 [IR RTSP] 카메라 선택 목록
+        ///
+        /// EO와 별도로 IR 카메라를 선택할 수 있으며,
+        /// 선택된 Address가 IrSourceAddress에 반영된다.
+        /// </summary>
+        public ObservableCollection<RtspSourceOption> IrRtspSourceOptions { get; }
+            = new ObservableCollection<RtspSourceOption>
+            {
+                new RtspSourceOption(
+                    "1층 생산팀 ADS 열상(IR)",
+                    AdsIrRtspAddress),
+
+                new RtspSourceOption(
+                    "옥상 GOP 열상(IR)",
+                    GopIrRtspAddress),
+
+                new RtspSourceOption(
+                    "4층 환경부 PTZ 열상(IR)",
+                    MoeIrRtspAddress)
+            };
+
+        /// <summary>
         /// [EO] 화면에 표시할 [AI Detector] [Bounding Box] 목록
         /// </summary>
         public ObservableCollection<AiDetectionBox> EoDetectionBoxes { get; }
@@ -2091,115 +2484,72 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [Initialize]
 
         /// <summary>
-        /// Web Agent 통신 설정 기본값 초기화
+        /// Control Agent 통신 설정 기본값 초기화
         ///
         /// 통신 설정 탭의 IP / Port 입력창에
         /// 프로그램 시작 시 표시할 기본값을 설정한다.
         /// </summary>
-        private void InitializeWebAgentSetting()
+        private void InitializeControlAgentSetting()
         {
-            WebAgentIp =
-                "192.168.20.161";
+            // 1-1. 환경부 실장비 Control Agent(Web Agent) IP
+            //ControlAgentIp =
+            //    "192.168.20.161";
 
-            WebAgentPortText =
-                "5005";
+            // 1-2. 환경부 실장비 Control Agent(Web Agent) Port
+            //ControlAgentPortText =
+            //    "5005";
 
-            WebAgentConnectionStatusText =
+            // 2-1. 옥상 GOP 장비 Local PC IP
+            ControlAgentIp =
+                "127.0.0.1";
+
+            // 2-2. 옥상 GOP 장비 Control Agent(LA) Port
+            ControlAgentPortText =
+                "5001";
+
+            ControlAgentConnectionStatusText =
                 "Disconnected";
 
-            WebAgentConnectionStatusColor =
+            ControlAgentConnectionStatusColor =
                 "#FF6B6B";
         }
 
         /// <summary>
-        /// 기본 영상 주소 초기화
-        /// 
-        /// 영상 입력 소스 구성:
-        /// 
-        /// [VD]
-        /// - [OpenCvSharp] 기반 [VideoCaptureService] 사용
-        /// - 로컬 [.mp4] 테스트 영상 출력용
+        /// 기본 EO / IR RTSP 선택값 초기화
         ///
-        /// [EO / IR]
-        /// - [FFmpeg.AutoGen] 기반 [FFmpegDecoderService] 사용
-        /// - [RTSP] Stream 직접 연결 및 Decode 수행
+        /// 통신 설정 탭에서 제공하는 카메라 프리셋:
         ///
-        /// 기본 등록 [RTSP] 주소:
+        /// [3] 1층 생산팀 ADS 카메라
+        /// - EO: 주간 카메라
+        /// - IR: 열상 카메라
         ///
-        /// [1] 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-        /// - EO / IR Viewer 공통 영상 출력 테스트용
+        /// [4] 옥상 GOP 카메라
+        /// - EO: 주간 카메라
+        /// - IR: 열상 카메라
         ///
-        /// [2] 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-        /// - PTZ 제어 및 영상 출력 테스트용
+        /// [5] 4층 환경부 PTZ 카메라
+        /// - EO: 주간 PTZ 카메라
+        /// - IR: 열상 PTZ 카메라
         ///
-        /// [3] 1층 생산팀 실장비 [ADS] 카메라
-        /// - EO: 주간카메라
-        /// - IR: 열상카메라
-        ///
-        /// [4] 옥상 [GOP] 카메라
-        /// - EO: 주간카메라
-        /// - IR: 열상카메라
-        ///
-        /// ※ 동일 변수에 여러 주소를 설정할 경우
-        /// 마지막으로 대입된 주소만 실제 적용된다.
-        /// 
-        /// ※ [EO / IR] 동시 연결 시
-        /// 잘못된 [RTSP] 주소 또는 미설정 주소가 포함되면
-        /// [FFmpeg] => [Stream Open] 과정에서 예외가 발생할 수 있으므로
-        /// 개별 연결 성공 여부 확인 후 적용한다.
+        /// 프로그램 시작 시에는 현재 개발에 사용하는
+        /// [5] 환경부 EO / IR 카메라를 기본 선택한다.
         /// </summary>
         private void InitializeDefaultSourceAddress()
         {
             /*
-             * [VD] 로컬 테스트 영상 주소
+             * 프로그램 시작 기본 선택값
              *
-             * 현재 실제 [EO / IR] 영상만 사용하므로
-             * 로컬 MP4 영상 주소 초기화를 비활성화한다.
+             * 기존 하드코딩 주소 중 현재 테스트에 사용 중인
+             * 1. 주간(EO): 옥상 GOP 주간(EO) 카메라를 기본값으로 설정한다.
+             * 2. 열상(IR): 옥상 GOP 열상(IR) 카메라를 기본값으로 설정한다.
+             * 이후에는 소스코드 주석을 변경하지 않고
+             * 통신 설정 탭의 EO / IR ComboBox에서 개별 선택한다.
              */
-
-            // VdSourceAddress =
-            //     @"D:\Project\2. C#\Main_Project\OpenCv_Wpf_Tracking\TestVideo\sample_h264.mp4";
-
-            // 1-1. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
-
-            // 2-1. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
-
-            // 3-1. 1층 생산팀 실장비 [ADS] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.100:554/rtsp_tunnel";
-
-            // 4-1. 옥상 [GOP] 주간(EO) 카메라
-            //EoSourceAddress =
-            //    "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
-
-            // 5-1. 4층 개발팀 환경부 주간(EO) PTZ(회전형) 카메라
             EoSourceAddress =
-                "rtsp://root:rmffhqjf1!@192.168.0.100:554/AVStream1_1";
+                GopEoRtspAddress;
 
-            // 1-2. 4층 개발팀 테스트 [BOSCH] 영상 출력용 카메라
-            //IrSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.107:554/rtsp_tunnel";
-
-            // 2-2. 4층 개발팀 실장비 [BOSCH] PTZ(회전형) 카메라
-            //IrSourceAddress =
-            //    "rtsp://service:Xhddlf1!@192.168.0.110:554/rtsp_tunnel";
-
-            // 3-2. 1층 생산팀 실장비 [ADS] 열상(IR) 카메라
-            // [ID], [PW] 및 [PORT] 맞는지 Config 확인 완료
-            //IrSourceAddress =
-            //    "rtsp://admin:admin@192.168.0.101:554/hdmi";
-
-            // 4-2. 옥상 [GOP] 열상(IR) 카메라
-            //IrSourceAddress =
-            //    "rtsp://root:rmffhqjf1!@192.168.0.121:554/cam0_0";
-
-            // 5-1. 4층 개발팀 환경부 열상(IR) PTZ(회전형) 카메라
             IrSourceAddress =
-                "rtsp://root:rmffhqjf1!@10.20.30.40:554/cam0_0";
+                GopIrRtspAddress;
         }
 
         /// <summary>
@@ -2476,6 +2826,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     break;
             }
+
         }
 
         /// <summary>
@@ -3144,6 +3495,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
+            /*
+             * 통신 설정 탭에서 선택된 EO / IR RTSP 주소를
+             * 실제 연결 시작 전에 검증한다.
+             *
+             * 빈값 또는 RTSP 형식 오류가 있으면
+             * FFmpeg Open을 수행하지 않고 즉시 종료하여
+             * 불필요한 연결 지연과 예외 로그를 방지한다.
+             */
+            if (!TryGetRtspEndpoints(
+                    out string eoRtspAddress,
+                    out string irRtspAddress))
+            {
+                return;
+            }
+
+            /*
+             * Trim 처리된 검증 완료 주소를
+             * 실제 영상 연결 주소로 다시 반영한다.
+             */
+            EoSourceAddress =
+                eoRtspAddress;
+
+            IrSourceAddress =
+                irRtspAddress;
+
             /// <summary>
             /// [EO/IR] 영상 재연결 시작 전 [AI Detector] 화면 표시 상태 초기화
             /// </summary>
@@ -3208,7 +3584,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     true;
 
                 /// <summary>
-                /// [Web Agent] 최초 연결을 바로 시도한다.
+                /// [Control Agent] 최초 연결을 바로 시도한다.
                 ///
                 /// 최초 연결에 실패하더라도 내부 Auto Reconnect Loop가
                 /// 일정 간격으로 연결을 다시 시도한다.
@@ -3221,10 +3597,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 
                 /// 필요 시 기존 주석 제거 후 동시 연결도 가능하다.
                 /// 
-                /// [장비 연결] 버튼은 [VD] / [EO] / [IR] / [WEB AGENT] 연결만 담당한다.
+                /// [장비 연결] 버튼은 [VD] / [EO] / [IR] / [CONTROL AGENT] 연결만 담당한다.
                 /// </summary>
                 //_ = _aiDetectorClientService.StartAutoReconnectAsync(
-                //        AiAgentIp,
+                //        AiControlAgentIp,
                 //        AiAgentPort,
                 //        3000);
 
@@ -3491,7 +3867,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _isDeviceConnectionRequested =
                 false;
 
-            _webAgentReconnectCts?.Cancel();
+            _controlAgentReconnectCts?.Cancel();
             _videoReconnectCts?.Cancel();
 
             // 1. 먼저 [Loop] 종료 요청
@@ -3528,18 +3904,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _irDecoder.Close();
 
             /// <summary>
-            /// [Web Agent] 제어 TCP 연결 해제
+            /// [Control Agent] 제어 TCP 연결 해제
             /// </summary>
             _laTcpService.Disconnect();
 
-            SetWebAgentConnectionStatus(
+            SetControlAgentConnectionStatus(
                 "Disconnected",
                 "#FF6B6B");
 
             /// <summary>
             /// [CURRENT STATUS] 상태값 초기화
             ///
-            /// Web Agent 연결 해제 후에는
+            /// Control Agent 연결 해제 후에는
             /// 마지막 수신 상태값이 화면에 남지 않도록 초기화한다.
             /// </summary>
             _currentPan =
@@ -4440,9 +4816,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Connect]
 
         /// <summary>
-        /// Web Agent TCP 연결 상태 UI 갱신
+        /// Control Agent TCP 연결 상태 UI 갱신
         /// </summary>
-        private void SetWebAgentConnectionStatus(
+        private void SetControlAgentConnectionStatus(
             string statusText,
             string statusColor)
         {
@@ -4453,10 +4829,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             if (App.Current?.Dispatcher ==
                 null)
             {
-                WebAgentConnectionStatusText =
+                ControlAgentConnectionStatusText =
                     statusText;
 
-                WebAgentConnectionStatusColor =
+                ControlAgentConnectionStatusColor =
                     statusColor;
 
                 return;
@@ -4465,10 +4841,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             if (App.Current.Dispatcher
                 .CheckAccess())
             {
-                WebAgentConnectionStatusText =
+                ControlAgentConnectionStatusText =
                     statusText;
 
-                WebAgentConnectionStatusColor =
+                ControlAgentConnectionStatusColor =
                     statusColor;
 
                 return;
@@ -4477,16 +4853,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
             App.Current.Dispatcher.Invoke(
                 () =>
                 {
-                    WebAgentConnectionStatusText =
+                    ControlAgentConnectionStatusText =
                         statusText;
 
-                    WebAgentConnectionStatusColor =
+                    ControlAgentConnectionStatusColor =
                         statusColor;
                 });
         }
 
         /// <summary>
-        /// [Web Agent / LA] 제어 TCP 연결
+        /// [Control Agent] 제어 TCP 연결
         ///
         /// 기존 고흥 제어 구조는 유지하며,
         /// 운용 환경에 따라 연결 대상 IP / Port만 변경하여 사용한다.
@@ -4506,14 +4882,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
              * 연결 버튼 클릭 즉시
              * UI 상태를 Connecting으로 변경한다.
              */
-            SetWebAgentConnectionStatus(
+            SetControlAgentConnectionStatus(
                 "Connecting",
                 "#FFD166");
 
             ConsoleLogHelper.PrintLine();
 
             Console.WriteLine(
-                "[WEB AGENT] Connect Start");
+                "[CONTROL AGENT] Connect Start");
 
             ConsoleLogHelper.PrintLine();
 
@@ -4523,11 +4899,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
              * IP 빈값, Port 문자 입력,
              * Port 범위 오류 등을 검사한다.
              */
-            if (!TryGetWebAgentEndpoint(
+            if (!TryGetControlAgentEndpoint(
                     out string targetIp,
                     out int targetPort))
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
@@ -4538,10 +4914,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
              * 이전 입력값으로 실행 중인 자동 재연결 Loop가 있다면
              * 새 연결 시도 전에 정리한다.
              */
-            _webAgentReconnectCts?.Cancel();
-            _webAgentReconnectCts?.Dispose();
+            _controlAgentReconnectCts?.Cancel();
+            _controlAgentReconnectCts?.Dispose();
 
-            _webAgentReconnectCts =
+            _controlAgentReconnectCts =
                 null;
 
             try
@@ -4558,7 +4934,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 * Task.Delay를 await하므로 UI Thread를 막지 않는다.
                 */
                 int remainingDisplayMs =
-                    WebAgentConnectingMinimumDisplayMs -
+                    ControlAgentConnectingMinimumDisplayMs -
                     (int)connectingStopwatch.ElapsedMilliseconds;
 
                 if (remainingDisplayMs > 0)
@@ -4572,7 +4948,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                  */
                 if (result)
                 {
-                    SetWebAgentConnectionStatus(
+                    SetControlAgentConnectionStatus(
                         "Connected",
                         "#55D187");
                 }
@@ -4580,13 +4956,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     if (_isDeviceConnectionRequested)
                     {
-                        SetWebAgentConnectionStatus(
+                        SetControlAgentConnectionStatus(
                             "Reconnecting",
                             "#FFD166");
                     }
                     else
                     {
-                        SetWebAgentConnectionStatus(
+                        SetControlAgentConnectionStatus(
                             "Disconnected",
                             "#FF6B6B");
                     }
@@ -4594,10 +4970,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
                 Console.WriteLine(
-                    $"[WEB AGENT CONNECT RESULT] {result}");
+                    $"[CONTROL AGENT CONNECT RESULT] {result}");
 
                 Console.WriteLine(
-                    $"[WEB AGENT TARGET] {targetIp}:{targetPort}");
+                    $"[CONTROL AGENT TARGET] {targetIp}:{targetPort}");
 
                 ConsoleLogHelper.PrintLine();
 
@@ -4609,7 +4985,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 if (!result &&
                     _isDeviceConnectionRequested)
                 {
-                    StartWebAgentReconnect(
+                    StartControlAgentReconnect(
                         targetIp,
                         targetPort);
                 }
@@ -4623,29 +4999,29 @@ namespace OpenCvWpfTracking.ViewModels.Main
                  */
                 if (_isDeviceConnectionRequested)
                 {
-                    SetWebAgentConnectionStatus(
+                    SetControlAgentConnectionStatus(
                         "Reconnecting",
                         "#FFD166");
                 }
                 else
                 {
-                    SetWebAgentConnectionStatus(
+                    SetControlAgentConnectionStatus(
                         "Disconnected",
                         "#FF6B6B");
                 }
 
                 Console.WriteLine();
                 Console.WriteLine(
-                    "[WEB AGENT] Connect Exception");
+                    "[CONTROL AGENT] Connect Exception");
 
                 Console.WriteLine(
-                    $"[WEB AGENT] {ex.Message}");
+                    $"[CONTROL AGENT] {ex.Message}");
 
                 ConsoleLogHelper.PrintLine();
 
                 if (_isDeviceConnectionRequested)
                 {
-                    StartWebAgentReconnect(
+                    StartControlAgentReconnect(
                         targetIp,
                         targetPort);
                 }
@@ -4655,17 +5031,107 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// 통신 설정 탭의 Web Agent IP / Port 입력값 검증
+        /// 통신 설정 탭에서 선택된 EO / IR RTSP 주소 검증
+        ///
+        /// 선택값이 없거나 rtsp / rtsps 형식이 아닌 주소는
+        /// 실제 FFmpeg 연결 전에 차단한다.
+        /// </summary>
+        private bool TryGetRtspEndpoints(
+            out string eoRtspAddress,
+            out string irRtspAddress)
+        {
+            eoRtspAddress =
+                EoSourceAddress?.Trim();
+
+            irRtspAddress =
+                IrSourceAddress?.Trim();
+
+            if (!IsValidRtspAddress(
+                    eoRtspAddress))
+            {
+                EoStatusText =
+                    "[EO] Invalid RTSP Address";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[EO RTSP] Connect Failed : " +
+                    "Invalid RTSP address.");
+
+                Console.WriteLine(
+                    $"[EO RTSP] INPUT : {EoSourceAddress}");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+
+            if (!IsValidRtspAddress(
+                    irRtspAddress))
+            {
+                IrStatusText =
+                    "[IR] Invalid RTSP Address";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[IR RTSP] Connect Failed : " +
+                    "Invalid RTSP address.");
+
+                Console.WriteLine(
+                    $"[IR RTSP] INPUT : {IrSourceAddress}");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// RTSP 주소 형식 확인
+        ///
+        /// 절대 URI이며 Scheme이 rtsp 또는 rtsps인 경우만
+        /// 유효한 영상 주소로 처리한다.
+        /// </summary>
+        private static bool IsValidRtspAddress(
+            string address)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    address))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(
+                    address,
+                    UriKind.Absolute,
+                    out Uri uri))
+            {
+                return false;
+            }
+
+            return string.Equals(
+                       uri.Scheme,
+                       "rtsp",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(
+                       uri.Scheme,
+                       "rtsps",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 통신 설정 탭의 Control Agent IP / Port 입력값 검증
         ///
         /// Port는 문자열로 관리한 뒤 연결 시점에 TryParse하여
         /// 빈값이나 문자 입력으로 인한 바인딩 예외를 방지한다.
         /// </summary>
-        private bool TryGetWebAgentEndpoint(
+        private bool TryGetControlAgentEndpoint(
             out string ipAddress,
             out int port)
         {
             ipAddress =
-                WebAgentIp?.Trim();
+                ControlAgentIp?.Trim();
 
             port =
                 0;
@@ -4673,26 +5139,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
             if (string.IsNullOrWhiteSpace(
                     ipAddress))
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
                 Console.WriteLine(
-                    "[WEB AGENT] Connect Failed : IP is empty.");
+                    "[CONTROL AGENT] Connect Failed : IP is empty.");
 
                 return false;
             }
 
             if (!int.TryParse(
-                    WebAgentPortText?.Trim(),
+                    ControlAgentPortText?.Trim(),
                     out port))
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
                 Console.WriteLine(
-                    "[WEB AGENT] Connect Failed : " +
+                    "[CONTROL AGENT] Connect Failed : " +
                     "Port must be a number.");
 
                 return false;
@@ -4701,12 +5167,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             if (port < 1 ||
                 port > 65535)
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
                 Console.WriteLine(
-                    "[WEB AGENT] Connect Failed : " +
+                    "[CONTROL AGENT] Connect Failed : " +
                     "Port range must be 1 ~ 65535.");
 
                 return false;
@@ -4715,33 +5181,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [Web Agent] 비정상 연결 종료 처리
+        /// [Control Agent] 비정상 연결 종료 처리
         ///
         /// 현재 통신 설정 탭에 입력된 IP / Port를 사용하여
         /// 자동 재연결을 시작한다.
         /// </summary>
-        private void OnWebAgentConnectionClosed()
+        private void OnControlAgentConnectionClosed()
         {
             if (!_isDeviceConnectionRequested)
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
                 return;
             }
 
-            SetWebAgentConnectionStatus(
+            SetControlAgentConnectionStatus(
                 "Reconnecting",
                 "#FFD166");
 
             string targetIp =
-                WebAgentIp?.Trim();
+                ControlAgentIp?.Trim();
 
             if (string.IsNullOrWhiteSpace(
                     targetIp))
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
@@ -4749,46 +5215,46 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
             if (!int.TryParse(
-                    WebAgentPortText?.Trim(),
+                    ControlAgentPortText?.Trim(),
                     out int targetPort) ||
                 targetPort < 1 ||
                 targetPort > 65535)
             {
-                SetWebAgentConnectionStatus(
+                SetControlAgentConnectionStatus(
                     "Disconnected",
                     "#FF6B6B");
 
                 return;
             }
 
-            StartWebAgentReconnect(
+            StartControlAgentReconnect(
                 targetIp,
                 targetPort);
         }
 
         /// <summary>
-        /// [Web Agent] 자동 재연결 Loop 시작
+        /// [Control Agent] 자동 재연결 Loop 시작
         ///
         /// 최초 연결 실패 또는 운용 중 연결 종료 시
         /// 연결 해제 요청 전까지 일정 간격으로 재연결한다.
         /// </summary>
-        private void StartWebAgentReconnect(
+        private void StartControlAgentReconnect(
             string ipAddress,
             int port)
         {
-            if (_webAgentReconnectCts != null &&
-                !_webAgentReconnectCts.IsCancellationRequested)
+            if (_controlAgentReconnectCts != null &&
+                !_controlAgentReconnectCts.IsCancellationRequested)
             {
                 return;
             }
 
-            _webAgentReconnectCts?.Dispose();
+            _controlAgentReconnectCts?.Dispose();
 
-            _webAgentReconnectCts =
+            _controlAgentReconnectCts =
                 new CancellationTokenSource();
 
             CancellationToken token =
-                _webAgentReconnectCts.Token;
+                _controlAgentReconnectCts.Token;
 
             _ = Task.Run(async () =>
             {
@@ -4806,12 +5272,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     {
                         retryCount++;
 
-                        SetWebAgentConnectionStatus(
+                        SetControlAgentConnectionStatus(
                             "Reconnecting",
                             "#FFD166");
 
                         Console.WriteLine(
-                            $"[WEB AGENT] Reconnect Try " +
+                            $"[CONTROL AGENT] Reconnect Try " +
                             $"({retryCount}) : " +
                             $"{ipAddress}:{port}");
 
@@ -4822,12 +5288,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                         if (connected)
                         {
-                            SetWebAgentConnectionStatus(
+                            SetControlAgentConnectionStatus(
                                 "Connected",
                                 "#55D187");
 
                             Console.WriteLine(
-                                "[WEB AGENT] Reconnect Success");
+                                "[CONTROL AGENT] Reconnect Success");
 
                             return;
                         }
@@ -4840,27 +5306,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
                 catch (OperationCanceledException)
                 {
-                    SetWebAgentConnectionStatus(
+                    SetControlAgentConnectionStatus(
                         "Disconnected",
                         "#FF6B6B");
                 }
                 catch (Exception ex)
                 {
-                    SetWebAgentConnectionStatus(
+                    SetControlAgentConnectionStatus(
                         "Disconnected",
                         "#FF6B6B");
 
                     Console.WriteLine(
-                        "[WEB AGENT] Reconnect Exception : " +
+                        "[CONTROL AGENT] Reconnect Exception : " +
                         ex.Message);
                 }
                 finally
                 {
-                    if (_webAgentReconnectCts != null &&
-                        _webAgentReconnectCts.Token == token)
+                    if (_controlAgentReconnectCts != null &&
+                        _controlAgentReconnectCts.Token == token)
                     {
-                        _webAgentReconnectCts.Dispose();
-                        _webAgentReconnectCts = null;
+                        _controlAgentReconnectCts.Dispose();
+                        _controlAgentReconnectCts = null;
                     }
 
                 }
@@ -4874,7 +5340,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Receive]
 
         /// <summary>
-        /// [WEB AGENT] [TCP] 수신 데이터 처리 함수
+        /// [CONTROL AGENT] [TCP] 수신 데이터 처리 함수
         /// 
         /// [TcpClientService]에서 byte[] 원본 데이터를 받으면,
         /// [LaPacketParser]를 통해 12byte [Packet] 단위로 분리한다.
@@ -4884,7 +5350,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             DateTime receiveTime)
         {
             /// <summary>
-            /// 수신된 [byte[] 데이터]를 [WEB AGENT] 응답 [Packet] 목록으로 변환.
+            /// 수신된 [byte[] 데이터]를 [CONTROL AGENT] 응답 [Packet] 목록으로 변환.
             /// </summary>
             List<LaResponsePacket> packets = _laPacketParser.Parse(data);
 
@@ -4903,7 +5369,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Handling]
 
         /// <summary>
-        /// [WEB AGENT] 응답 [Packet] 처리 함수
+        /// [CONTROL AGENT] 응답 [Packet] 처리 함수
         /// 
         /// [Function] 번호를 기준으로
         /// [Status] / [Alive] / [Extended Status Packet]을 구분한다.
@@ -5049,7 +5515,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Log Helpers]
 
         /// <summary>
-        /// [WEB AGENT] 상태 로그 출력 여부 확인
+        /// [CONTROL AGENT] 상태 로그 출력 여부 확인
         /// 
         /// 현재 시간과 마지막 출력 시간을 비교하여
         /// 설정된 출력 간격 이내인 경우
@@ -5072,7 +5538,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [WEB AGENT] [Extended Status] 로그 출력 여부 확인
+        /// [CONTROL AGENT] [Extended Status] 로그 출력 여부 확인
         /// 
         /// 현재 시간과 마지막 출력 시간을 비교하여
         /// 설정된 출력 간격 이내인 경우
@@ -5099,7 +5565,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [LA Packet Parsing]
 
         /// <summary>
-        /// [WEB AGENT] [Status Packet] 파싱
+        /// [CONTROL AGENT] [Status Packet] 파싱
         ///
         /// [Function] [0x01]:
         /// [Pan] / [Tilt] / [EO Zoom] / [EO Focus] / [Power] 상태 정보
@@ -5349,7 +5815,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [WEB AGENT] [Extended Status] Packet 파싱
+        /// [CONTROL AGENT] [Extended Status] Packet 파싱
         ///
         /// Function 0xA1
         ///
