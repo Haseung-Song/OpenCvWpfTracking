@@ -14,6 +14,55 @@
         PreviewKeyDown="Window_PreviewKeyDown"
         PreviewKeyUp="Window_PreviewKeyUp">
     <Window.Resources>
+        <!-- [EO / IR] 영상 중앙 십자선 공통 Template
+
+             화면 전체를 가로지르는 기준선이 아니라
+             실제 운용 시 영상과 AI Bounding Box를 가리지 않도록
+             중앙에 짧게 표시하는 Reticle 형태로 구성한다.
+
+             검정 외곽선 위에 적색 본선을 겹쳐 표시하여
+             밝은 EO 영상과 흑백 IR 영상에서 모두 식별 가능하도록 한다. -->
+        <ControlTemplate x:Key="CenterCrosshairTemplate"
+                         TargetType="Control">
+            <Grid Width="72"
+                  Height="72"
+                  IsHitTestVisible="False">
+
+                <!-- 검정 외곽선 -->
+                <Canvas Width="72"
+                        Height="72">
+                    <Line X1="36" Y1="2" X2="36" Y2="27"
+                          Stroke="#CC000000" StrokeThickness="4"/>
+                    <Line X1="36" Y1="45" X2="36" Y2="70"
+                          Stroke="#CC000000" StrokeThickness="4"/>
+                    <Line X1="2" Y1="36" X2="27" Y2="36"
+                          Stroke="#CC000000" StrokeThickness="4"/>
+                    <Line X1="45" Y1="36" X2="70" Y2="36"
+                          Stroke="#CC000000" StrokeThickness="4"/>
+                    <Ellipse Canvas.Left="31" Canvas.Top="31"
+                             Width="10" Height="10"
+                             Stroke="#CC000000" StrokeThickness="4"/>
+                </Canvas>
+
+                <!-- 적색 십자선 본선 -->
+                <Canvas Width="72"
+                        Height="72">
+                    <Line X1="36" Y1="2" X2="36" Y2="27"
+                          Stroke="#FFFF3B30" StrokeThickness="2"/>
+                    <Line X1="36" Y1="45" X2="36" Y2="70"
+                          Stroke="#FFFF3B30" StrokeThickness="2"/>
+                    <Line X1="2" Y1="36" X2="27" Y2="36"
+                          Stroke="#FFFF3B30" StrokeThickness="2"/>
+                    <Line X1="45" Y1="36" X2="70" Y2="36"
+                          Stroke="#FFFF3B30" StrokeThickness="2"/>
+                    <Ellipse Canvas.Left="31" Canvas.Top="31"
+                             Width="10" Height="10"
+                             Stroke="#FFFF3B30" StrokeThickness="2"/>
+                </Canvas>
+
+            </Grid>
+        </ControlTemplate>
+
         <!-- [AI Detector] 설정 패널 공통 버튼 스타일 -->
         <Style x:Key="AiSettingButtonStyle"
                TargetType="Button">
@@ -387,6 +436,31 @@
 
                     </Viewbox>
 
+                    <!-- [EO] 영상 중앙 십자선 [Overlay]
+
+                         RTSP 원본 Frame 또는 AI Bounding Box Canvas에
+                         직접 그리지 않고 영상 Grid 중앙에 별도 표시한다.
+                         따라서 Zoom In / Out 중에도 화면 중앙에 고정된다. -->
+                    <Control Template="{StaticResource CenterCrosshairTemplate}"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Panel.ZIndex="30"
+                             IsHitTestVisible="False">
+                        <Control.Style>
+                            <Style TargetType="Control">
+                                <Setter Property="Visibility"
+                                        Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCrosshairVisible}"
+                                                 Value="True">
+                                        <Setter Property="Visibility"
+                                                Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Control.Style>
+                    </Control>
+
                     <!-- 안내 문자 (왼쪽 상하단에 보이게) -->
                     <TextBlock Text="{Binding EoStatusText}"
                                Margin="0,0,8,2"
@@ -470,6 +544,30 @@
                             </ItemsControl>
 
                         </Viewbox>
+
+                        <!-- [IR] 영상 중앙 십자선 [Overlay]
+
+                             EO 영상과 동일한 Template 및 표시 상태를 사용하여
+                             두 영상의 중앙 기준점을 동일하게 확인한다. -->
+                        <Control Template="{StaticResource CenterCrosshairTemplate}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Panel.ZIndex="30"
+                                 IsHitTestVisible="False">
+                            <Control.Style>
+                                <Style TargetType="Control">
+                                    <Setter Property="Visibility"
+                                            Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCrosshairVisible}"
+                                                     Value="True">
+                                            <Setter Property="Visibility"
+                                                    Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Control.Style>
+                        </Control>
 
                         <!-- [IR] 상태 표시 -->
                         <TextBlock Text="{Binding IrStatusText}"
@@ -676,10 +774,9 @@
                                                               Style="{StaticResource CommunicationComboBoxStyle}"
                                                               ItemsSource="{Binding EoRtspSourceOptions}"
                                                               DisplayMemberPath="DisplayName"
-                                                              SelectedValuePath="Address"
-                                                              SelectedValue="{Binding EoSourceAddress,
-                                                                                      Mode=TwoWay,
-                                                                                      UpdateSourceTrigger=PropertyChanged}"
+                                                              SelectedItem="{Binding SelectedEoRtspSource,
+                                                                                     Mode=TwoWay,
+                                                                                     UpdateSourceTrigger=PropertyChanged}"
                                                               IsEditable="False"
                                                               MaxDropDownHeight="180"/>
 
@@ -878,6 +975,66 @@
                                                              Foreground="#6EC1FF"
                                                              FontSize="15"
                                                              Margin="0,5"/>-->
+
+                                            <!-- [EO / IR] 영상 Overlay 표시 제어 -->
+                                            <Border Margin="0,5,5,0"
+                                                    Background="#5F666D"
+                                                    BorderBrush="#95A5B0"
+                                                    BorderThickness="1.5"
+                                                    Padding="12">
+
+                                                <StackPanel>
+
+                                                    <!-- 제목 -->
+                                                    <TextBlock Text="DISPLAY OVERLAY"
+                                                               HorizontalAlignment="Center"
+                                                               Foreground="White"
+                                                               FontWeight="Bold"
+                                                               Margin="0,0,0,8"/>
+
+                                                    <!-- EO / IR 중앙 십자선 활성화 / 비활성화 Toggle 버튼 -->
+                                                    <Button Content="{Binding CrosshairButtonText}"
+                                                            Command="{Binding ToggleCrosshairCommand}"
+                                                            Height="34"
+                                                            Foreground="White"
+                                                            FontWeight="Bold"
+                                                            BorderThickness="1"
+                                                            BorderBrush="#95A5B0"
+                                                            Cursor="Hand">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Background"
+                                                                        Value="#4A4F55"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCrosshairVisible}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Background"
+                                                                                Value="#2F6F5E"/>
+                                                                        <Setter Property="BorderBrush"
+                                                                                Value="#72D6B3"/>
+                                                                    </DataTrigger>
+                                                                    <Trigger Property="IsMouseOver"
+                                                                             Value="True">
+                                                                        <Setter Property="Opacity"
+                                                                                Value="0.85"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+
+                                                    <!-- 기능 안내 -->
+                                                    <TextBlock Text="※ EO / IR 화면의 중앙 기준점을 동시에 표시하거나 숨깁니다."
+                                                               Foreground="#D0D7DE"
+                                                               FontSize="10"
+                                                               TextWrapping="Wrap"
+                                                               HorizontalAlignment="Center"
+                                                               TextAlignment="Center"
+                                                               Margin="0,7,0,0"/>
+
+                                                </StackPanel>
+
+                                            </Border>
 
                                             <!-- [PAN] / [TILT] 제어 -->
                                             <Border Grid.Row="2"
@@ -1803,7 +1960,6 @@
             </Grid>
 
         </Border>
-
     </Grid>
 </Window>
     

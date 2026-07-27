@@ -129,6 +129,8 @@
     <Compile Include="Services\Communication\AI\AiDetectorClientService.cs" />
     <Compile Include="Services\Communication\AI\AiDetectorPacketBuilder.cs" />
     <Compile Include="Services\Communication\AI\AiDetectorPacketParser.cs" />
+    <Compile Include="Services\Communication\Camera\CtecCameraCommandService.cs" />
+    <Compile Include="Services\Communication\Camera\CtecCameraResponseService.cs" />
     <Compile Include="Services\Communication\LA\ControlCommandService.cs" />
     <Compile Include="Services\Communication\LA\LAPacketParser.cs" />
     <Compile Include="Services\Communication\LA\LaResponsePacket.cs" />

@@ -21,10 +21,31 @@ using System.Windows.Threading;
 namespace OpenCvWpfTracking.ViewModels.Main
 {
     /// <summary>
+    /// 카메라 제어 명령 송신 경로
+    /// </summary>
+    public enum CameraControlType
+    {
+        /// <summary>
+        /// 기존 Control Agent TCP를 통한 장비 제어
+        /// </summary>
+        ControlAgent,
+
+        /// <summary>
+        /// XV-Z4850HC CTEC CGI를 통한 카메라 직접 제어
+        /// </summary>
+        CtecCgi
+    }
+
+    /// <summary>
     /// 통신 설정 화면의 RTSP 선택 ComboBox 항목
     ///
-    /// DisplayName : UI에 표시할 카메라 구분명
-    /// Address     : 실제 FFmpeg 연결에 사용할 RTSP 주소
+    /// DisplayName       : UI에 표시할 카메라 구분명
+    /// Address           : 실제 FFmpeg 연결에 사용할 RTSP 주소
+    /// ControlType       : Zoom / Focus 명령 송신 경로
+    /// ControlIp         : CTEC CGI 직접 제어 대상 IP
+    /// ControlUserName   : 카메라 CGI 인증 계정
+    /// ControlPassword   : 카메라 CGI 인증 암호
+    /// UseHttps          : CGI HTTPS 사용 여부
     /// </summary>
     public sealed class RtspSourceOption
     {
@@ -39,17 +60,66 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public string Address { get; }
 
         /// <summary>
+        /// 카메라 Zoom / Focus 제어 명령 송신 경로
+        /// </summary>
+        public CameraControlType ControlType { get; }
+
+        /// <summary>
+        /// CTEC CGI 직접 제어 대상 카메라 IP
+        /// </summary>
+        public string ControlIp { get; }
+
+        /// <summary>
+        /// CTEC CGI 인증 계정
+        /// </summary>
+        public string ControlUserName { get; }
+
+        /// <summary>
+        /// CTEC CGI 인증 암호
+        /// </summary>
+        public string ControlPassword { get; }
+
+        /// <summary>
+        /// CTEC CGI HTTPS 사용 여부
+        /// </summary>
+        public bool UseHttps { get; }
+
+        /// <summary>
         /// RTSP 선택 항목 생성
+        ///
+        /// 별도 직접 제어 정보가 없으면
+        /// 기존 Control Agent 제어 방식으로 처리한다.
         /// </summary>
         public RtspSourceOption(
             string displayName,
-            string address)
+            string address,
+            CameraControlType controlType =
+                CameraControlType.ControlAgent,
+            string controlIp = null,
+            string controlUserName = null,
+            string controlPassword = null,
+            bool useHttps = false)
         {
             DisplayName =
                 displayName;
 
             Address =
                 address;
+
+            ControlType =
+                controlType;
+
+            ControlIp =
+                controlIp;
+
+            ControlUserName =
+                controlUserName;
+
+            ControlPassword =
+                controlPassword;
+
+            UseHttps =
+                useHttps;
         }
 
     }
@@ -167,6 +237,52 @@ namespace OpenCvWpfTracking.ViewModels.Main
             "rtsp://root:rmffhqjf1!@192.168.1.2:554/AVStream1_1";
 
         /// <summary>
+        /// [4] 옥상 [GOP] 주간(EO) 카메라 CTEC CGI 직접 제어 정보
+        ///
+        /// RTSP 영상 수신 주소와 별도로
+        /// Zoom / Focus 명령을 카메라 CGI로 직접 송신할 때 사용한다.
+        /// </summary>
+        private const string GopEoControlIp =
+            "192.168.1.2";
+
+        private const string GopEoControlUserName =
+            "root";
+
+        private const string GopEoControlPassword =
+            "rmffhqjf1!";
+
+        /// <summary>
+        /// [옥상 GOP EO] 카메라 CGI 제어 HTTPS 사용 여부
+        ///
+        /// 실제 카메라 웹 설정의 [Connection Mode]가 [HTTPS]이므로
+        /// HTTP 요청 시 Viewer Page Redirection HTML이 반환된다.
+        /// 따라서 CTEC CGI 명령은 HTTPS Port 443으로 직접 송신한다.
+        /// </summary>
+        private const bool GopEoControlUseHttps =
+            true;
+
+        /// <summary>
+        /// 옥상 GOP EO 카메라 Zoom / Focus 연속 제어 속도
+        ///
+        /// XV-Z4850HC 문서 기준 유효 범위는 [1 ~ 7]이다.
+        /// </summary>
+        private const byte GopEoCtecControlSpeed =
+            7;
+
+        /// <summary>
+        /// 옥상 GOP EO 카메라 CTEC 응답 수신 TCP Port
+        ///
+        /// 카메라 웹 설정:
+        /// [Services] -> [Port] -> [Serial Port #1]
+        /// -> [TCP Access Enable] -> [Port 9000]
+        ///
+        /// 카메라 웹 설정의 Port를 변경한 경우
+        /// 이 값도 동일하게 변경해야 한다.
+        /// </summary>
+        private const int GopEoCtecResponsePort =
+            9000;
+
+        /// <summary>
         /// [4] 옥상 [GOP] 열상(IR) 카메라 RTSP 주소
         /// </summary>
         private const string GopIrRtspAddress =
@@ -203,6 +319,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [TORUSS] 제어 [Protocol] 기준 [7byte Packet] 생성 / 송신 담당
         /// </summary>
         private readonly ControlCommandService _controlCommandService;
+
+        /// <summary>
+        /// [옥상 GOP EO] [XV-Z4850HC] CTEC CGI 직접 제어 서비스
+        ///
+        /// 선택된 EO 프리셋의 제어 방식이 CtecCgi인 경우에만 사용하며,
+        /// 그 외 EO / Pan / Tilt / IR 제어는 기존 Control Agent 경로를 유지한다.
+        /// </summary>
+        private readonly CtecCameraCommandService _ctecCameraCommandService;
+
+        /// <summary>
+        /// [옥상 GOP EO] [XV-Z4850HC] CTEC 응답 수신 서비스
+        ///
+        /// 카메라 IP의 TCP Port 9000에 Client로 연결하여
+        /// CGI Inquiry 명령에 대한 [0x99 0x55 ... 0xFF] 응답을 수신한다.
+        /// </summary>
+        private readonly CtecCameraResponseService _ctecCameraResponseService;
 
         /// <summary>
         /// [EO] 영상 첫 Frame 화면 표시 여부
@@ -326,6 +458,47 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 현재 어떤 [연속 제어]가 동작 중인지
         /// </summary>
         private ContinuousMoveType _currentMoveType = ContinuousMoveType.None;
+
+        /// <summary>
+        /// 현재 EO 연속 제어를 시작한 CTEC CGI 직접 제어 프리셋
+        ///
+        /// Zoom / Focus 시작 이후 사용자가 ComboBox 선택값을 변경하더라도
+        /// Stop 명령이 반드시 시작 명령을 보낸 동일 카메라로 전송되도록 저장한다.
+        ///
+        /// null이면 현재 EO 연속 제어는 기존 Control Agent 경로이다.
+        /// </summary>
+        private RtspSourceOption _activeEoCtecSource;
+
+        /// <summary>
+        /// 현재 장비 연결 시점에 확정된 EO CTEC 직접 제어 프리셋
+        ///
+        /// ComboBox 선택값은 다음 장비 연결 시 적용되므로,
+        /// 연결 중 선택값이 변경되어도 현재 TCP Response 연결 대상과
+        /// 명령 조회 대상이 변경되지 않도록 별도로 저장한다.
+        /// </summary>
+        private RtspSourceOption _connectedEoCtecSource;
+
+        /// <summary>
+        /// CTEC Port 9000 응답으로 수신한 EO Optical Zoom Position
+        ///
+        /// 문서 기준 범위: 0x0000 ~ 0x4000
+        /// </summary>
+        private ushort _currentCtecEoZoomPosition;
+
+        /// <summary>
+        /// CTEC Port 9000 응답으로 수신한 EO Focus Position
+        ///
+        /// 문서 기준 범위: 0x1000 ~ 0x8000
+        /// </summary>
+        private ushort _currentCtecEoFocusPosition;
+
+        /// <summary>
+        /// CTEC Port 9000 응답으로 수신한 EO Focus Mode
+        ///
+        /// 0x02 = Auto
+        /// 0x03 = Manual
+        /// </summary>
+        private byte _currentCtecEoFocusMode;
 
         /// <summary>
         /// Keyboard Pan Left 입력 상태
@@ -619,6 +792,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private bool _isAutoTrackingEnabled;
 
+        /// <summary>
+        /// [EO / IR] 영상 중앙 십자선 표시 여부
+        ///
+        /// true:
+        /// EO / IR 영상 화면 중앙에 십자선을 표시한다.
+        ///
+        /// false:
+        /// EO / IR 영상 화면의 십자선을 숨긴다.
+        ///
+        /// 십자선은 RTSP 원본 Frame에 직접 그리지 않고
+        /// WPF Overlay로 표시하므로 AI Bounding Box 좌표와
+        /// 영상 Decoder 처리에는 영향을 주지 않는다.
+        /// </summary>
+        private bool _isCrosshairVisible =
+            false;
+
         #endregion
 
         #region [AI Overlay Size Binding Fields]
@@ -754,6 +943,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #region [ICommand]
 
+        #region [Display Overlay Commands]
+
+        /// <summary>
+        /// [EO / IR] 영상 중앙 십자선 표시 상태 전환 [Command]
+        /// </summary>
+        public ICommand ToggleCrosshairCommand { get; }
+
+        #endregion
+
         #region [Video Commands]
 
         /// <summary>
@@ -868,6 +1066,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public MainViewModel()
         {
             #region [Command Initialize]
+
+            #region [Display Overlay Command Binding]
+
+            /// <summary>
+            /// [EO / IR] 중앙 십자선 표시 상태 전환
+            ///
+            /// 버튼을 누를 때마다 [IsCrosshairVisible] 값을 반전하여
+            /// EO / IR 영상의 십자선을 동시에 표시하거나 숨긴다.
+            /// </summary>
+            ToggleCrosshairCommand =
+                new RelayCommand(() =>
+                {
+                    IsCrosshairVisible =
+                        !IsCrosshairVisible;
+                });
+
+            #endregion
 
             #region [Connect / Disconnect Command Binding]
 
@@ -1292,6 +1507,30 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _controlCommandService = new ControlCommandService(_laTcpService);
 
             /// <summary>
+            /// [옥상 GOP EO] CTEC CGI 직접 제어 서비스 생성
+            /// </summary>
+            _ctecCameraCommandService =
+                new CtecCameraCommandService();
+
+            /// <summary>
+            /// [옥상 GOP EO] CTEC Port 9000 응답 수신 서비스 생성
+            /// </summary>
+            _ctecCameraResponseService =
+                new CtecCameraResponseService();
+
+            /// <summary>
+            /// CTEC Camera Response Packet 수신 이벤트 연결
+            /// </summary>
+            _ctecCameraResponseService.PacketReceived +=
+                OnCtecCameraResponsePacketReceived;
+
+            /// <summary>
+            /// CTEC Response TCP 연결 상태 이벤트 연결
+            /// </summary>
+            _ctecCameraResponseService.ConnectionStatusChanged +=
+                OnCtecCameraResponseConnectionStatusChanged;
+
+            /// <summary>
             /// [CONTROL AGENT] 수신 [Packet Parser] 생성
             /// </summary>
             _laPacketParser = new LAPacketParser();
@@ -1395,6 +1634,47 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged();
                 OnPropertyChanged(
                     nameof(SourceAddress));
+
+                /*
+                 * EO RTSP 주소가 외부 로직에서 변경된 경우에도
+                 * 통신 설정 ComboBox 선택 항목을 함께 갱신한다.
+                 */
+                OnPropertyChanged(
+                    nameof(SelectedEoRtspSource));
+            }
+        }
+
+        /// <summary>
+        /// 통신 설정 탭에서 선택된 EO RTSP 프리셋
+        ///
+        /// 기존에는 SelectedValue로 주소만 바인딩했지만,
+        /// 옥상 GOP EO 카메라의 CTEC CGI 직접 제어 여부까지 판단해야 하므로
+        /// 선택 항목 전체를 SelectedItem으로 바인딩한다.
+        /// </summary>
+        public RtspSourceOption SelectedEoRtspSource
+        {
+            get
+            {
+                return EoRtspSourceOptions
+                    .FirstOrDefault(
+                        option =>
+                            string.Equals(
+                                option.Address,
+                                EoSourceAddress,
+                                StringComparison.OrdinalIgnoreCase));
+            }
+
+            set
+            {
+                if (value == null)
+                {
+                    return;
+                }
+
+                EoSourceAddress =
+                    value.Address;
+
+                OnPropertyChanged();
             }
         }
 
@@ -1833,6 +2113,54 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
 
         }
+
+        #region [Display Overlay Properties]
+
+        /// <summary>
+        /// [EO / IR] 영상 중앙 십자선 표시 여부
+        ///
+        /// 운용 제어 탭의 [CROSSHAIR] Toggle 버튼과
+        /// EO / IR 영상의 십자선 Overlay가 동일한 값에 바인딩된다.
+        ///
+        /// Zoom In / Out 중에도 십자선은 화면 중앙에 고정되며,
+        /// 영상 중심 및 광축 정렬 상태 확인 기준점으로 사용한다.
+        /// </summary>
+        public bool IsCrosshairVisible
+        {
+            get =>
+                _isCrosshairVisible;
+
+            set
+            {
+                if (_isCrosshairVisible ==
+                    value)
+                {
+                    return;
+                }
+
+                _isCrosshairVisible =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(
+                        CrosshairButtonText));
+            }
+
+        }
+
+        /// <summary>
+        /// [EO / IR] 중앙 십자선 Toggle 버튼 표시 문자열
+        ///
+        /// 현재 활성 상태를 버튼 자체에서 바로 확인할 수 있도록
+        /// ENABLED / DISABLED 상태 문자열을 반환한다.
+        /// </summary>
+        public string CrosshairButtonText =>
+            IsCrosshairVisible
+                ? "CROSSHAIR : ENABLED"
+                : "CROSSHAIR : DISABLED";
+
+        #endregion
 
         #region [Control Agent Communication Properties]
 
@@ -2277,13 +2605,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 현재 EO Zoom 상태 표시 문자열
         /// </summary>
         public string CurrentEoZoomText =>
-            _currentEoZoom.ToString();
+            _connectedEoCtecSource != null
+                ? _currentCtecEoZoomPosition.ToString()
+                : _currentEoZoom.ToString();
 
         /// <summary>
         /// 현재 EO Focus 상태 표시 문자열
+        ///
+        /// 옥상 GOP EO 직접 제어 연결 상태에서는
+        /// TCP Port 9000으로 수신한 CTEC Focus Position을 표시한다.
+        /// 그 외 장비는 기존 Control Agent 상태값을 표시한다.
         /// </summary>
         public string CurrentEoFocusText =>
-            _currentEoFocus.ToString();
+            _connectedEoCtecSource != null
+                ? _currentCtecEoFocusPosition.ToString()
+                : _currentEoFocus.ToString();
 
         /// <summary>
         /// 현재 IR Zoom 상태 표시 문자열
@@ -2414,7 +2750,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 new RtspSourceOption(
                     "옥상 GOP 주간(EO)",
-                    GopEoRtspAddress),
+                    GopEoRtspAddress,
+                    CameraControlType.CtecCgi,
+                    GopEoControlIp,
+                    GopEoControlUserName,
+                    GopEoControlPassword,
+                    GopEoControlUseHttps),
 
                 new RtspSourceOption(
                     "4층 환경부 PTZ 주간(EO)",
@@ -3089,52 +3430,165 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// [EO] 주간 카메라 [ZOOM] [Tele] 연속 이동 시작
+        ///
+        /// 옥상 GOP EO 카메라 선택 시:
+        /// - XV-Z4850HC CTEC CGI 직접 제어
+        ///
+        /// 그 외 EO 카메라 선택 시:
+        /// - 기존 Control Agent 제어 유지
         /// </summary>
-        public void StartEoZoomInMove()
+        public async void StartEoZoomInMove()
         {
             /*
-            * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
-            * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
-            */
+             * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
+             * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
+             */
             _lastEoFocusCommandTime =
                 DateTime.MinValue;
 
-            _currentMoveType = ContinuousMoveType.EoZoom;
+            _currentMoveType =
+                ContinuousMoveType.EoZoom;
 
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] EO ZOOM TELE START");
+            Console.WriteLine(
+                "[CONTROL] EO ZOOM TELE START");
+
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService
-                .StartEoZoomTele();
+            bool result;
+
+            if (TryGetSelectedEoCtecSource(
+                    out RtspSourceOption ctecSource))
+            {
+                _activeEoCtecSource =
+                    ctecSource;
+
+                Console.WriteLine(
+                    "[CONTROL] EO ZOOM ROUTE : CTEC CGI DIRECT");
+
+                result =
+                    await _ctecCameraCommandService
+                        .StartZoomTeleAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            GopEoCtecControlSpeed);
+            }
+            else
+            {
+                _activeEoCtecSource =
+                    null;
+
+                Console.WriteLine(
+                    "[CONTROL] EO ZOOM ROUTE : CONTROL AGENT");
+
+                result =
+                    _controlCommandService
+                        .StartEoZoomTele();
+            }
+
+            Console.WriteLine(
+                $"[CONTROL] EO ZOOM TELE SEND RESULT : {result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!result &&
+                _currentMoveType ==
+                    ContinuousMoveType.EoZoom)
+            {
+                _currentMoveType =
+                    ContinuousMoveType.None;
+
+                _activeEoCtecSource =
+                    null;
+            }
         }
 
         /// <summary>
         /// [EO] 주간 카메라 [ZOOM] [Wide] 연속 이동 시작
+        ///
+        /// 선택된 EO 프리셋에 따라
+        /// CTEC CGI 직접 제어 또는 Control Agent 제어로 분기한다.
         /// </summary>
-        public void StartEoZoomOutMove()
+        public async void StartEoZoomOutMove()
         {
             /*
-            * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
-            * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
-            */
+             * Zoom 동작 시 카메라가 Focus를 자동 변경할 수 있으므로
+             * 다음 Focus 입력은 새 상태값에서 다시 시작하도록 초기화한다.
+             */
             _lastEoFocusCommandTime =
                 DateTime.MinValue;
 
-            _currentMoveType = ContinuousMoveType.EoZoom;
+            _currentMoveType =
+                ContinuousMoveType.EoZoom;
 
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] EO ZOOM WIDE START");
+            Console.WriteLine(
+                "[CONTROL] EO ZOOM WIDE START");
+
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService
-                .StartEoZoomWide();
+            bool result;
+
+            if (TryGetSelectedEoCtecSource(
+                    out RtspSourceOption ctecSource))
+            {
+                _activeEoCtecSource =
+                    ctecSource;
+
+                Console.WriteLine(
+                    "[CONTROL] EO ZOOM ROUTE : CTEC CGI DIRECT");
+
+                result =
+                    await _ctecCameraCommandService
+                        .StartZoomWideAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            GopEoCtecControlSpeed);
+            }
+            else
+            {
+                _activeEoCtecSource =
+                    null;
+
+                Console.WriteLine(
+                    "[CONTROL] EO ZOOM ROUTE : CONTROL AGENT");
+
+                result =
+                    _controlCommandService
+                        .StartEoZoomWide();
+            }
+
+            Console.WriteLine(
+                $"[CONTROL] EO ZOOM WIDE SEND RESULT : {result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!result &&
+                _currentMoveType ==
+                    ContinuousMoveType.EoZoom)
+            {
+                _currentMoveType =
+                    ContinuousMoveType.None;
+
+                _activeEoCtecSource =
+                    null;
+            }
         }
 
         /// <summary>
-        /// EO Focus Near 연속 이동 시작
+        /// [EO] 주간 카메라 Focus Near 연속 이동 시작
+        ///
+        /// 옥상 GOP EO 선택 시:
+        /// Focus Manual -> Focus Near 순서로 CTEC CGI 직접 송신한다.
+        ///
+        /// 그 외 EO 선택 시:
+        /// 기존 Control Agent Focus Near 명령을 유지한다.
         /// </summary>
-        public void StartEoFocusNearMove()
+        public async void StartEoFocusNearMove()
         {
             if (_currentMoveType !=
                 ContinuousMoveType.None)
@@ -3152,6 +3606,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _lastEoFocusCommandElapsedMs =
                 _focusLogStopwatch.ElapsedMilliseconds;
 
+            _currentMoveType =
+                ContinuousMoveType.EoFocus;
+
             Console.WriteLine();
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] " +
@@ -3162,27 +3619,66 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             ConsoleLogHelper.PrintLine();
 
-            bool result =
-                _controlCommandService
-                    .StartEoFocusNear();
+            bool result;
+
+            if (TryGetSelectedEoCtecSource(
+                    out RtspSourceOption ctecSource))
+            {
+                _activeEoCtecSource =
+                    ctecSource;
+
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS ROUTE : CTEC CGI DIRECT");
+
+                result =
+                    await _ctecCameraCommandService
+                        .StartFocusNearAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            GopEoCtecControlSpeed);
+            }
+            else
+            {
+                _activeEoCtecSource =
+                    null;
+
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS ROUTE : CONTROL AGENT");
+
+                result =
+                    _controlCommandService
+                        .StartEoFocusNear();
+            }
 
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] " +
                 $"[FOCUS COMMAND #{sequence}] " +
                 $"SEND RESULT={result}");
 
-            if (result)
+            if (!result &&
+                _currentMoveType ==
+                    ContinuousMoveType.EoFocus)
             {
                 _currentMoveType =
-                    ContinuousMoveType.EoFocus;
-            }
+                    ContinuousMoveType.None;
 
+                _activeEoCtecSource =
+                    null;
+            }
         }
 
         /// <summary>
-        /// EO Focus Far 연속 이동 시작
+        /// [EO] 주간 카메라 Focus Far 연속 이동 시작
+        ///
+        /// 옥상 GOP EO 선택 시:
+        /// Focus Manual -> Focus Far 순서로 CTEC CGI 직접 송신한다.
+        ///
+        /// 그 외 EO 선택 시:
+        /// 기존 Control Agent Focus Far 명령을 유지한다.
         /// </summary>
-        public void StartEoFocusFarMove()
+        public async void StartEoFocusFarMove()
         {
             if (_currentMoveType !=
                 ContinuousMoveType.None)
@@ -3200,6 +3696,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _lastEoFocusCommandElapsedMs =
                 _focusLogStopwatch.ElapsedMilliseconds;
 
+            _currentMoveType =
+                ContinuousMoveType.EoFocus;
+
             Console.WriteLine();
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] " +
@@ -3210,34 +3709,341 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             ConsoleLogHelper.PrintLine();
 
-            bool result =
-                _controlCommandService
-                    .StartEoFocusFar();
+            bool result;
+
+            if (TryGetSelectedEoCtecSource(
+                    out RtspSourceOption ctecSource))
+            {
+                _activeEoCtecSource =
+                    ctecSource;
+
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS ROUTE : CTEC CGI DIRECT");
+
+                result =
+                    await _ctecCameraCommandService
+                        .StartFocusFarAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            GopEoCtecControlSpeed);
+            }
+            else
+            {
+                _activeEoCtecSource =
+                    null;
+
+                Console.WriteLine(
+                    "[CONTROL] EO FOCUS ROUTE : CONTROL AGENT");
+
+                result =
+                    _controlCommandService
+                        .StartEoFocusFar();
+            }
 
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] " +
                 $"[FOCUS COMMAND #{sequence}] " +
                 $"SEND RESULT={result}");
 
-            if (result)
+            if (!result &&
+                _currentMoveType ==
+                    ContinuousMoveType.EoFocus)
             {
                 _currentMoveType =
-                    ContinuousMoveType.EoFocus;
-            }
+                    ContinuousMoveType.None;
 
+                _activeEoCtecSource =
+                    null;
+            }
         }
 
         /// <summary>
         /// [EO] 주간 카메라 [One Push Focus] 요청
+        ///
+        /// 옥상 GOP EO 선택 시 CTEC CGI 직접 제어,
+        /// 그 외 EO 선택 시 기존 Control Agent 명령을 사용한다.
         /// </summary>
-        public void StartEoAutoFocusMove()
+        public async void StartEoAutoFocusMove()
         {
             Console.WriteLine();
-            Console.WriteLine("[CONTROL] EO ONE PUSH FOCUS REQUEST");
+            Console.WriteLine(
+                "[CONTROL] EO ONE PUSH FOCUS REQUEST");
+
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService
-                .StartEoAutoFocus();
+            bool result;
+
+            if (TryGetSelectedEoCtecSource(
+                    out RtspSourceOption ctecSource))
+            {
+                result =
+                    await _ctecCameraCommandService
+                        .OnePushFocusAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps);
+            }
+            else
+            {
+                result =
+                    _controlCommandService
+                        .StartEoAutoFocus();
+            }
+
+            Console.WriteLine(
+                $"[CONTROL] EO ONE PUSH FOCUS RESULT : {result}");
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// 현재 선택된 EO 프리셋이
+        /// CTEC CGI 직접 제어 대상인지 확인한다.
+        ///
+        /// EO 주소가 프리셋 외부 값으로 변경된 경우에는
+        /// 잘못된 카메라로 명령이 송신되지 않도록
+        /// 기존 Control Agent 경로를 사용한다.
+        /// </summary>
+        private bool TryGetSelectedEoCtecSource(
+            out RtspSourceOption sourceOption)
+        {
+            sourceOption =
+                SelectedEoRtspSource;
+
+            return sourceOption != null &&
+                   sourceOption.ControlType ==
+                       CameraControlType.CtecCgi &&
+                   !string.IsNullOrWhiteSpace(
+                       sourceOption.ControlIp);
+        }
+
+        /// <summary>
+        /// 현재 선택된 EO 프리셋 기준으로
+        /// CTEC Response TCP Port 9000 연결 시작
+        ///
+        /// 옥상 GOP EO CTEC 직접 제어 프리셋이 아니면
+        /// 기존 Response 연결을 종료하고 별도 TCP 연결을 생성하지 않는다.
+        /// </summary>
+        private async Task StartSelectedEoCtecResponseAsync()
+        {
+            if (!TryGetSelectedEoCtecSource(
+                    out RtspSourceOption sourceOption))
+            {
+                _connectedEoCtecSource =
+                    null;
+
+                _ctecCameraResponseService.Stop();
+
+                OnPropertyChanged(
+                    nameof(CurrentEoZoomText));
+
+                OnPropertyChanged(
+                    nameof(CurrentEoFocusText));
+
+                return;
+            }
+
+            _connectedEoCtecSource =
+                sourceOption;
+
+            _currentCtecEoZoomPosition =
+                0;
+
+            _currentCtecEoFocusPosition =
+                0;
+
+            _currentCtecEoFocusMode =
+                0;
+
+            OnPropertyChanged(
+                nameof(CurrentEoZoomText));
+
+            OnPropertyChanged(
+                nameof(CurrentEoFocusText));
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[CTEC RESPONSE] START : " +
+                $"{sourceOption.ControlIp}:{GopEoCtecResponsePort}");
+
+            ConsoleLogHelper.PrintLine();
+
+            await _ctecCameraResponseService
+                .StartAsync(
+                    sourceOption.ControlIp,
+                    GopEoCtecResponsePort);
+        }
+
+        /// <summary>
+        /// CTEC Response TCP 연결 상태 변경 처리
+        ///
+        /// Connected 상태가 되면 현재 Zoom / Focus Position 및
+        /// Focus Mode Inquiry를 순차 송신하여 초기 상태값을 조회한다.
+        /// </summary>
+        private void OnCtecCameraResponseConnectionStatusChanged(
+            string status)
+        {
+            Console.WriteLine(
+                $"[CTEC RESPONSE] STATUS : {status}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!string.Equals(
+                    status,
+                    "Connected",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _ = RequestConnectedEoCtecStatusAsync();
+        }
+
+        /// <summary>
+        /// 현재 연결된 옥상 GOP EO 카메라 상태 조회
+        ///
+        /// Inquiry 명령은 CGI로 송신하고,
+        /// 실제 응답은 TCP Port 9000 수신 서비스에서 처리한다.
+        /// </summary>
+        private async Task RequestConnectedEoCtecStatusAsync()
+        {
+            RtspSourceOption sourceOption =
+                _connectedEoCtecSource;
+
+            if (sourceOption == null ||
+                !_ctecCameraResponseService.IsConnected)
+            {
+                return;
+            }
+
+            await _ctecCameraCommandService
+                .RequestZoomPositionAsync(
+                    sourceOption.ControlIp,
+                    sourceOption.ControlUserName,
+                    sourceOption.ControlPassword,
+                    sourceOption.UseHttps);
+
+            await Task.Delay(
+                100);
+
+            await _ctecCameraCommandService
+                .RequestFocusPositionAsync(
+                    sourceOption.ControlIp,
+                    sourceOption.ControlUserName,
+                    sourceOption.ControlPassword,
+                    sourceOption.UseHttps);
+
+            await Task.Delay(
+                100);
+
+            await _ctecCameraCommandService
+                .RequestFocusModeAsync(
+                    sourceOption.ControlIp,
+                    sourceOption.ControlUserName,
+                    sourceOption.ControlPassword,
+                    sourceOption.UseHttps);
+        }
+
+        /// <summary>
+        /// CTEC Camera Response Packet 수신 처리
+        ///
+        /// 공통 Header:
+        /// 0x99 0x55
+        ///
+        /// Command Code:
+        /// 0x47 = Zoom Position
+        /// 0x48 = Focus Position
+        /// 0x38 = Focus Mode
+        /// </summary>
+        private void OnCtecCameraResponsePacketReceived(
+            byte[] packet)
+        {
+            if (packet == null ||
+                packet.Length < 7 ||
+                packet[0] != 0x99 ||
+                packet[1] != 0x55 ||
+                packet[packet.Length - 1] != 0xFF)
+            {
+                Console.WriteLine(
+                    "[CTEC RESPONSE] Invalid Packet");
+
+                ConsoleLogHelper.PrintLine();
+
+                return;
+            }
+
+            switch (packet[2])
+            {
+                case 0x47:
+                    {
+                        ushort zoomPosition =
+                            (ushort)((packet[4] << 8) |
+                                     packet[5]);
+
+                        _currentCtecEoZoomPosition =
+                            zoomPosition;
+
+                        OnPropertyChanged(
+                            nameof(CurrentEoZoomText));
+
+                        Console.WriteLine(
+                            $"[CTEC RESPONSE] EO ZOOM POSITION : " +
+                            $"{zoomPosition} (0x{zoomPosition:X4})");
+
+                        break;
+                    }
+
+                case 0x48:
+                    {
+                        ushort focusPosition =
+                            (ushort)((packet[4] << 8) |
+                                     packet[5]);
+
+                        _currentCtecEoFocusPosition =
+                            focusPosition;
+
+                        OnPropertyChanged(
+                            nameof(CurrentEoFocusText));
+
+                        Console.WriteLine(
+                            $"[CTEC RESPONSE] EO FOCUS POSITION : " +
+                            $"{focusPosition} (0x{focusPosition:X4})");
+
+                        break;
+                    }
+
+                case 0x38:
+                    {
+                        _currentCtecEoFocusMode =
+                            packet[5];
+
+                        string focusModeText =
+                            _currentCtecEoFocusMode == 0x02
+                                ? "AUTO"
+                                : _currentCtecEoFocusMode == 0x03
+                                    ? "MANUAL"
+                                    : $"UNKNOWN(0x{_currentCtecEoFocusMode:X2})";
+
+                        Console.WriteLine(
+                            $"[CTEC RESPONSE] EO FOCUS MODE : " +
+                            $"{focusModeText}");
+
+                        break;
+                    }
+
+                default:
+
+                    Console.WriteLine(
+                        $"[CTEC RESPONSE] UNHANDLED CODE : " +
+                        $"0x{packet[2]:X2}");
+
+                    break;
+            }
+
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -3377,10 +4183,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// 연속 이동 정지
-        /// 
+        ///
         /// 버튼 [MouseUp] 또는 [MouseLeave] 시 호출된다.
+        ///
+        /// 옥상 GOP EO Zoom / Focus는 CTEC CGI 전용 Stop 명령을 송신하고,
+        /// 그 외 제어는 기존 Control Agent Stop 명령을 유지한다.
         /// </summary>
-        public void StopContinuousMove()
+        public async void StopContinuousMove()
         {
             ContinuousMoveType moveType =
                 _currentMoveType;
@@ -3391,6 +4200,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
+            /*
+             * Stop 중복 호출을 방지하기 위해
+             * 실제 비동기 송신 전에 이동 상태를 먼저 초기화한다.
+             */
+            _currentMoveType =
+                ContinuousMoveType.None;
+
+            RtspSourceOption activeEoCtecSource =
+                _activeEoCtecSource;
+
+            _activeEoCtecSource =
+                null;
+
             Console.WriteLine();
             Console.WriteLine(
                 $"[CONTROL] MOVE STOP: {moveType}");
@@ -3400,12 +4222,50 @@ namespace OpenCvWpfTracking.ViewModels.Main
             switch (moveType)
             {
                 case ContinuousMoveType.PanTilt:
-                case ContinuousMoveType.EoZoom:
 
                     _controlCommandService
                         .StopMove();
 
                     break;
+
+                case ContinuousMoveType.EoZoom:
+                    {
+                        if (activeEoCtecSource !=
+                            null)
+                        {
+                            bool stopResult =
+                                await _ctecCameraCommandService
+                                    .StopZoomAsync(
+                                        activeEoCtecSource.ControlIp,
+                                        activeEoCtecSource.ControlUserName,
+                                        activeEoCtecSource.ControlPassword,
+                                        activeEoCtecSource.UseHttps);
+
+                            Console.WriteLine(
+                                $"[CONTROL] EO CTEC ZOOM STOP RESULT : {stopResult}");
+
+                            if (stopResult &&
+                                _ctecCameraResponseService.IsConnected)
+                            {
+                                await Task.Delay(
+                                    100);
+
+                                await _ctecCameraCommandService
+                                    .RequestZoomPositionAsync(
+                                        activeEoCtecSource.ControlIp,
+                                        activeEoCtecSource.ControlUserName,
+                                        activeEoCtecSource.ControlPassword,
+                                        activeEoCtecSource.UseHttps);
+                            }
+                        }
+                        else
+                        {
+                            _controlCommandService
+                                .StopMove();
+                        }
+
+                        break;
+                    }
 
                 case ContinuousMoveType.EoFocus:
                     {
@@ -3426,13 +4286,44 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                         ConsoleLogHelper.PrintLine();
 
-                        bool stopResult =
-                            _controlCommandService
-                                .StopMove();
+                        bool stopResult;
+
+                        if (activeEoCtecSource !=
+                            null)
+                        {
+                            stopResult =
+                                await _ctecCameraCommandService
+                                    .StopFocusAsync(
+                                        activeEoCtecSource.ControlIp,
+                                        activeEoCtecSource.ControlUserName,
+                                        activeEoCtecSource.ControlPassword,
+                                        activeEoCtecSource.UseHttps);
+                        }
+                        else
+                        {
+                            stopResult =
+                                _controlCommandService
+                                    .StopMove();
+                        }
 
                         Console.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] " +
                             $"[FOCUS COMMAND] STOP RESULT={stopResult}");
+
+                        if (stopResult &&
+                            activeEoCtecSource != null &&
+                            _ctecCameraResponseService.IsConnected)
+                        {
+                            await Task.Delay(
+                                100);
+
+                            await _ctecCameraCommandService
+                                .RequestFocusPositionAsync(
+                                    activeEoCtecSource.ControlIp,
+                                    activeEoCtecSource.ControlUserName,
+                                    activeEoCtecSource.ControlPassword,
+                                    activeEoCtecSource.UseHttps);
+                        }
 
                         break;
                     }
@@ -3458,9 +4349,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                     break;
             }
-
-            _currentMoveType =
-                ContinuousMoveType.None;
         }
 
         #endregion
@@ -3590,6 +4478,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 일정 간격으로 연결을 다시 시도한다.
                 /// </summary>
                 await ConnectLaAsync();
+
+                /// <summary>
+                /// 선택된 EO 카메라가 [옥상 GOP CTEC] 직접 제어 장비이면
+                /// 카메라 IP의 [TCP Port 9000] 응답 수신 연결을 시작한다.
+                ///
+                /// CGI 명령 송신과 TCP 응답 수신은 서로 다른 통로이며,
+                /// Port 9000 연결은 명령 처리 결과 및 위치 조회 응답 수신에 사용한다.
+                /// </summary>
+                await StartSelectedEoCtecResponseAsync();
 
                 /// <summary>
                 /// [AI Detector Agent] 자동 재연결 시작은
@@ -3802,6 +4699,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 // EO / IR 최초 연결 결과 표시
                 UpdateVideoStatusText(result);
 
+                /// <summary>
+                /// [EO / IR] 영상 연결 성공 시 중앙 십자선 자동 활성화
+                ///
+                /// 프로그램 최초 실행 상태에서는 십자선을 숨기고,
+                /// EO 또는 IR RTSP 영상이 하나라도 정상 연결된 시점에
+                /// 운용자가 중심 기준점을 바로 확인할 수 있도록 자동 표시한다.
+                ///
+                /// 자동 활성화는 연결 성공 시 한 번만 수행하며,
+                /// 이후에는 [DISPLAY OVERLAY] 버튼을 통한 수동 조작값을 유지한다.
+                /// </summary>
+                if (result.EoResult ||
+                    result.IrResult)
+                {
+                    IsCrosshairVisible =
+                        true;
+                }
+
                 /*
                  * 최초 연결에 성공한 영상만 Capture Loop 시작
                  */
@@ -3908,9 +4822,38 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// </summary>
             _laTcpService.Disconnect();
 
+            /// <summary>
+            /// [옥상 GOP EO] CTEC Response TCP Port 9000 연결 해제
+            /// </summary>
+            _ctecCameraResponseService.Stop();
+
+            _connectedEoCtecSource =
+                null;
+
+            _activeEoCtecSource =
+                null;
+
+            _currentCtecEoZoomPosition =
+                0;
+
+            _currentCtecEoFocusPosition =
+                0;
+
+            _currentCtecEoFocusMode =
+                0;
+
             SetControlAgentConnectionStatus(
                 "Disconnected",
                 "#FF6B6B");
+
+            /// <summary>
+            /// 장비 연결 해제 시 중앙 십자선 비활성화
+            ///
+            /// 다음 연결 전까지 검은 화면에 십자선이 남지 않도록
+            /// 기본 상태인 [DISABLED]로 초기화한다.
+            /// </summary>
+            IsCrosshairVisible =
+                false;
 
             /// <summary>
             /// [CURRENT STATUS] 상태값 초기화
@@ -4253,6 +5196,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                             IrVideoHeight = decoder.VideoHeight;
                             IrStatusText = "[IR] Connected";
                         }
+
+                        /// <summary>
+                        /// 최초 연결에는 실패했지만 Auto Reconnect로
+                        /// EO 또는 IR 영상이 정상 연결된 경우에도
+                        /// 중앙 십자선을 자동 활성화한다.
+                        /// </summary>
+                        IsCrosshairVisible =
+                            true;
 
                     });
 
