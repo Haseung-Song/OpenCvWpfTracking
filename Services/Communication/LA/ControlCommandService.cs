@@ -72,10 +72,460 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
+        /// LA 실제 구현 기준 Pan / Tilt Home Position 실행.
+        ///
+        /// UICommandParser:
+        /// Command2 = 0xB1
+        /// pm-&gt;StartHoming();
+        /// tm-&gt;StartHoming();
+        /// </summary>
+        public bool MoveHomePosition()
+        {
+            return SendCommand(
+                0x00,
+                0xB1,
+                0x00,
+                0x00);
+        }
+
+        /// <summary>
+        /// [Pan] 이동 시 원점 통과 모드 설정
+        ///
+        /// TORUSS / Pelco-D 확장 명령:
+        /// Command2 = 0x4D
+        /// Data1    = 0x01
+        /// Data2    = 0x00
+        ///
+        /// 이후 Pan 위치 이동 명령에서 장비가 원점 통과 경로를 선택한다.
+        /// </summary>
+        public bool SetPanViaZeroMode()
+        {
+            return SendCommand(
+                0x00,
+                0x4D,
+                0x01,
+                0x00);
+        }
+
+        /// <summary>
+        /// [Pan] 이동 시 최단거리 선택 모드 설정
+        ///
+        /// TORUSS / Pelco-D 확장 명령:
+        /// Command2 = 0x4D
+        /// Data1    = 0x02
+        /// Data2    = 0x00
+        ///
+        /// 이후 Pan 위치 이동 명령에서 장비가 최단 회전 경로를 선택한다.
+        /// </summary>
+        public bool SetPanShortestPathMode()
+        {
+            return SendCommand(
+                0x00,
+                0x4D,
+                0x02,
+                0x00);
+        }
+
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 프리셋 ID를 설정한다.
+        ///
+        /// Command2 = 0x19
+        /// Data1/Data2 = ID (0 ~ 99, Big Endian)
+        /// </summary>
+        public bool SetLaPresetId(
+            ushort presetId)
+        {
+            presetId =
+                NormalizeLaPresetId(
+                    presetId);
+
+            return SendUnsignedShortCommand(
+                0x19,
+                presetId);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 프리셋 Pan 위치를 설정한다.
+        ///
+        /// Command2 = 0x91
+        /// Data1/Data2 = Degree * 100 (signed short, Big Endian)
+        /// </summary>
+        public bool SetLaPresetPan(
+            double pan)
+        {
+            return SendSignedDegreeCommand(
+                0x91,
+                pan);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 프리셋 Tilt 위치를 설정한다.
+        ///
+        /// Command2 = 0x93
+        /// Data1/Data2 = Degree * 100 (signed short, Big Endian)
+        /// </summary>
+        public bool SetLaPresetTilt(
+            double tilt)
+        {
+            return SendSignedDegreeCommand(
+                0x93,
+                tilt);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 프리셋 Zoom 위치를 설정한다.
+        ///
+        /// Command2 = 0x95
+        /// Data1/Data2 = Position (0 ~ 1000, Big Endian)
+        /// </summary>
+        public bool SetLaPresetZoom(
+            ushort position)
+        {
+            position =
+                NormalizePresetPosition(
+                    position);
+
+            return SendUnsignedShortCommand(
+                0x95,
+                position);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 프리셋 Focus 위치를 설정하고,
+        /// LA 내부 scan-&gt;AddPreset()을 완료한다.
+        ///
+        /// Command2 = 0x97
+        /// Data1/Data2 = Position (0 ~ 1000, Big Endian)
+        /// </summary>
+        public bool SetLaPresetFocusAndCommit(
+            ushort position)
+        {
+            position =
+                NormalizePresetPosition(
+                    position);
+
+            return SendUnsignedShortCommand(
+                0x97,
+                position);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 프리셋 위치로 이동한다.
+        ///
+        /// 실제 LA UICommandParser 구현:
+        /// case 0x05:
+        ///     scan-&gt;GotoPreset(GetInteger(data1, data2));
+        ///
+        /// Command2 = 0x05
+        /// Data1/Data2 = ID (0 ~ 99, Big Endian)
+        /// </summary>
+        public bool MoveToLaPreset(
+            ushort presetId)
+        {
+            presetId =
+                NormalizeLaPresetId(
+                    presetId);
+
+            return SendUnsignedShortCommand(
+                0x05,
+                presetId);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 스캔 이동 모드를 순환(CYCLE)으로 설정한다.
+        ///
+        /// UICommandParser:
+        /// Command2 = 0x1B
+        /// Data1 = 0x01 : CYCLE
+        /// Data2 = 0x00
+        ///
+        /// P01 -> P02 -> ... -> P01 반복 순회를 보장하기 위해
+        /// AUTO SCAN START 직전에 송신한다.
+        /// </summary>
+        public bool SetLaPresetScanCycleMode()
+        {
+            return SendCommand(
+                0x00,
+                0x1B,
+                0x01,
+                0x00);
+        }
+
+        /// <summary>
+        /// LA 실제 구현 기준 전체 스캔 프리셋 데이터를 초기화한다.
+        ///
+        /// Command2 = 0x9B
+        /// Data1 = 0x00
+        /// Data2 = 0x01
+        /// </summary>
+        public bool ClearAllLaPresets()
+        {
+            return SendCommand(
+                0x00,
+                0x9B,
+                0x00,
+                0x01);
+        }
+
+        /// <summary>
+        /// signed Degree 값을 Degree * 100으로 변환하여
+        /// Big Endian 2byte 명령으로 송신한다.
+        /// </summary>
+        private bool SendSignedDegreeCommand(
+            byte command2,
+            double degree)
+        {
+            double safeDegree =
+                Math.Max(
+                    -180.0,
+                    Math.Min(
+                        180.0,
+                        degree));
+
+            short value =
+                safeDegree < 0.0
+                    ? (short)((safeDegree - 0.005) * 100.0)
+                    : (short)((safeDegree + 0.005) * 100.0);
+
+            byte data1 =
+                (byte)((value >> 8) & 0xFF);
+
+            byte data2 =
+                (byte)(value & 0xFF);
+
+            return SendCommand(
+                0x00,
+                command2,
+                data1,
+                data2);
+        }
+
+        /// <summary>
+        /// unsigned 16bit 값을 Big Endian 2byte 명령으로 송신한다.
+        /// </summary>
+        private bool SendUnsignedShortCommand(
+            byte command2,
+            ushort value)
+        {
+            byte data1 =
+                (byte)((value >> 8) & 0xFF);
+
+            byte data2 =
+                (byte)(value & 0xFF);
+
+            return SendCommand(
+                0x00,
+                command2,
+                data1,
+                data2);
+        }
+
+        private static ushort NormalizeLaPresetId(
+            ushort presetId)
+        {
+            return presetId > 98
+                ? (ushort)98
+                : presetId;
+        }
+
+        private static ushort NormalizePresetPosition(
+            ushort position)
+        {
+            return position > 1000
+                ? (ushort)1000
+                : position;
+        }
+
+        /// <summary>
+        /// 현재 PTZF 위치를 프리셋 슬롯에 추가 / 갱신한다.
+        ///
+        /// TORUSS 프리셋 실행 / 편집 명령:
+        /// Command2 = 0x03
+        /// Data1    = 0x00
+        /// Data2    = Preset Number
+        ///
+        /// 유효 슬롯:
+        /// 1 ~ 63
+        /// </summary>
+        public bool AddPresetPoint(
+            byte presetNumber)
+        {
+            presetNumber =
+                NormalizePresetNumber(
+                    presetNumber);
+
+            return SendCommand(
+                0x00,
+                0x03,
+                0x00,
+                presetNumber);
+        }
+
+        /// <summary>
+        /// 프리셋 슬롯을 제거한다.
+        ///
+        /// TORUSS 프리셋 실행 / 편집 명령:
+        /// Command2 = 0x05
+        /// Data1    = 0x00
+        /// Data2    = Preset Number
+        /// </summary>
+        public bool RemovePresetPoint(
+            byte presetNumber)
+        {
+            presetNumber =
+                NormalizePresetNumber(
+                    presetNumber);
+
+            return SendCommand(
+                0x00,
+                0x05,
+                0x00,
+                presetNumber);
+        }
+
+        /// <summary>
+        /// 저장된 프리셋 슬롯으로 이동한다.
+        ///
+        /// TORUSS 프리셋 실행 / 편집 명령:
+        /// Command2 = 0x07
+        /// Data1    = 0x00
+        /// Data2    = Preset Number
+        /// </summary>
+        public bool MoveToPresetPoint(
+            byte presetNumber)
+        {
+            presetNumber =
+                NormalizePresetNumber(
+                    presetNumber);
+
+            return SendCommand(
+                0x00,
+                0x07,
+                0x00,
+                presetNumber);
+        }
+
+        /// <summary>
+        /// 프리셋 오토 스캔을 시작한다.
+        ///
+        /// TORUSS 프리셋 설정 / 오토 스캔 명령:
+        /// Command2 = 0x99
+        /// Data1    = Speed (1 ~ 60)
+        /// Data2    = Delay (1 ~ 60)
+        /// </summary>
+        public bool StartPresetScan(
+            byte speed,
+            byte delay)
+        {
+            speed =
+                NormalizePresetScanValue(
+                    speed);
+
+            delay =
+                NormalizePresetScanValue(
+                    delay);
+
+            return SendCommand(
+                0x00,
+                0x99,
+                speed,
+                delay);
+        }
+
+        /// <summary>
+        /// 프리셋 오토 스캔을 정지한다.
+        ///
+        /// TORUSS 프리셋 설정 / 오토 스캔 명령:
+        /// Command2 = 0x9B
+        /// Data1    = 0x00
+        /// Data2    = 0x00
+        ///
+        /// Data2 = 0x01은 프리셋 데이터 초기화이므로
+        /// 일반 정지 함수에서는 사용하지 않는다.
+        /// </summary>
+        public bool StopPresetScan()
+        {
+            return SendCommand(
+                0x00,
+                0x9B,
+                0x00,
+                0x00);
+        }
+
+        /// <summary>
+        /// 실행 중인 프리셋 스캔의 속도 / 정지시간을 변경한다.
+        ///
+        /// TORUSS 프리셋 설정 / 오토 스캔 명령:
+        /// Command2 = 0x9D
+        /// Data1    = Speed (1 ~ 60)
+        /// Data2    = Delay (1 ~ 60)
+        /// </summary>
+        public bool UpdatePresetScan(
+            byte speed,
+            byte delay)
+        {
+            speed =
+                NormalizePresetScanValue(
+                    speed);
+
+            delay =
+                NormalizePresetScanValue(
+                    delay);
+
+            return SendCommand(
+                0x00,
+                0x9D,
+                speed,
+                delay);
+        }
+
+        /// <summary>
+        /// 프리셋 번호를 문서 허용 범위 1 ~ 63으로 제한한다.
+        /// </summary>
+        private static byte NormalizePresetNumber(
+            byte presetNumber)
+        {
+            if (presetNumber < 1)
+            {
+                return 1;
+            }
+
+            if (presetNumber > 63)
+            {
+                return 63;
+            }
+
+            return presetNumber;
+        }
+
+        /// <summary>
+        /// 스캔 Speed / Delay를 문서 허용 범위 1 ~ 60으로 제한한다.
+        /// </summary>
+        private static byte NormalizePresetScanValue(
+            byte value)
+        {
+            if (value < 1)
+            {
+                return 1;
+            }
+
+            if (value > 60)
+            {
+                return 60;
+            }
+
+            return value;
+        }
+
+        /// <summary>
         /// [Pan] 위치 제어 명령
         /// 
-        /// 위치 값은 [각도 * 100] 후
-        /// [Data1 / Data2]에 [Big Endian] 방식으로 설정
+        /// 입력 기준은 -180 ~ 180도이다.
+        ///
+        /// 범위를 벗어난 내부 계산값은 signed Pan 범위로 정규화한 뒤,
+        /// 위치 값을 [각도 * 100]하여
+        /// [Data1 / Data2]에 [Big Endian] 방식으로 설정한다.
         /// </summary>
         public bool PanGoPosition(double pan)
         {

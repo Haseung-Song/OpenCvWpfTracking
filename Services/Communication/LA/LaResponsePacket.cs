@@ -58,9 +58,9 @@
         /// 
         /// [0x01] [Pan] / [Tilt] / [Zoom] / [Focus] 상태 정보
         /// 
-        /// [0x07] [Alive] / [ACK] 계열 [Packet]
-        /// 
-        /// [0xA1] 확장 상태 [Packet] 추정
+        /// [0x07] [IR Zoom] / [IR Focus] 위치 상태 [Packet]
+        ///
+        /// [0xA1] 미확인 확장 상태 [Packet]
         /// 
         /// [0x04] [LRF] 거리측정 응답 [Packet]
         /// </summary>
@@ -74,6 +74,62 @@
         /// 위치: packet[11]
         /// </summary>
         public byte Checksum => RawData[11];
+
+        /// <summary>
+        /// [IR Camera Status Packet] 여부
+        ///
+        /// Function 0x07:
+        /// 열영상 카메라 Zoom / Focus 위치 상태
+        /// </summary>
+        public bool IsIrCameraStatus =>
+            Function ==
+            0x07;
+
+        /// <summary>
+        /// [IR Zoom Position]
+        ///
+        /// Function 0x07 Packet:
+        /// packet[2] = Low Byte
+        /// packet[3] = High Byte
+        ///
+        /// 장비 수신 Packet은 Little Endian 형식으로 확인된다.
+        ///
+        /// 예:
+        /// D6 03 → 0x03D6 → 982
+        ///
+        /// 정상 운용 범위:
+        /// 0 ~ 1000
+        /// </summary>
+        public ushort IrZoomPosition =>
+            IsIrCameraStatus &&
+            RawData != null &&
+            RawData.Length >= 6
+                ? (ushort)(
+                    RawData[2] |
+                    RawData[3] << 8)
+                : (ushort)0;
+
+        /// <summary>
+        /// [IR Focus Position]
+        ///
+        /// Function 0x07 Packet:
+        /// packet[4] = Low Byte
+        /// packet[5] = High Byte
+        ///
+        /// 예:
+        /// E8 03 → 0x03E8 → 1000
+        ///
+        /// 정상 운용 범위:
+        /// 0 ~ 1000
+        /// </summary>
+        public ushort IrFocusPosition =>
+            IsIrCameraStatus &&
+            RawData != null &&
+            RawData.Length >= 6
+                ? (ushort)(
+                    RawData[4] |
+                    RawData[5] << 8)
+                : (ushort)0;
 
         /// <summary>
         /// [Packet] 유효성 여부

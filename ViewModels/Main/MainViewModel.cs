@@ -4,6 +4,7 @@ using OpenCvWpfTracking.Converters;
 using OpenCvWpfTracking.Models.AI;
 using OpenCvWpfTracking.Services.Communication;
 using OpenCvWpfTracking.Services.Communication.AI;
+using OpenCvWpfTracking.Services.Communication.WebAgent;
 using OpenCvWpfTracking.Services.Video;
 using System;
 using System.Collections.Generic;
@@ -34,6 +35,177 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// XV-Z4850HC CTEC CGI를 통한 카메라 직접 제어
         /// </summary>
         CtecCgi
+    }
+
+    /// <summary>
+    /// CURRENT STATUS 화면에 표시할 장비 구성
+    /// </summary>
+    public enum EquipmentStatusMode
+    {
+        /// <summary>
+        /// 옥상 시험장비
+        /// 한국씨텍 EO 직접 제어 + IR 제어 구성
+        /// </summary>
+        Rooftop,
+
+        /// <summary>
+        /// 환경장비
+        /// Web Agent 기준 EO / IR Zoom 0 ~ 1000 구성
+        /// </summary>
+        Environment
+    }
+
+    /// <summary>
+    /// [Pan Absolute] 이동 시 사용할 선회 방향 계산 모드
+    ///
+    /// VertiportNexus의 PAN TURN MODE 동작 기준을
+    /// 현재 Control Agent 제어 구조에 맞춰 적용한다.
+    /// </summary>
+    public enum PanTurnMode
+    {
+        /// <summary>
+        /// 현재 위치에서 목표 위치까지
+        /// 0도 방향을 경유하는 정방향 회전을 수행한다.
+        /// </summary>
+        ViaZero,
+
+        /// <summary>
+        /// 현재 위치에서 목표 위치까지
+        /// 가장 짧은 회전 방향을 계산한다.
+        /// </summary>
+        Short
+    }
+
+    /// <summary>
+    /// [EO / IR Zoom Synchronization]
+    ///
+    /// 환경장비 Web Agent 기준 Zoom Position
+    /// 0 ~ 1000 범위를 100 단위로 구분한 선택 항목
+    ///
+    /// 구성:
+    /// LEVEL 0  = 0
+    /// LEVEL 1  = 100
+    /// LEVEL 2  = 200
+    /// ...
+    /// LEVEL 10 = 1000
+    ///
+    /// 총 11개 Position을 사용한다.
+    /// </summary>
+    public sealed class ZoomSyncLevelOption
+    {
+        public int Level { get; }
+
+        public short Position { get; }
+
+        public string DisplayText =>
+            $"LEVEL {Level}  /  {Position}";
+
+        public ZoomSyncLevelOption(
+            int level,
+            short position)
+        {
+            Level = level;
+            Position = position;
+        }
+    }
+
+
+    /// <summary>
+    /// PRESET 탭에서 표시하는 프리셋 슬롯 정보
+    ///
+    /// TORUSS 규격에는 프리셋 목록 조회 응답이 별도로 없으므로,
+    /// 이 객체는 현재 프로그램에서 ADD 명령을 송신한 시점의
+    /// PTZF 상태를 화면 확인용으로 보관한다.
+    ///
+    /// 실제 프리셋 저장 / 이동 주체는 Control Agent(Local Agent)이다.
+    /// </summary>
+    public sealed class PresetPointOption
+    {
+        /// <summary>
+        /// TORUSS 프리셋 슬롯 번호
+        ///
+        /// 프리셋 추가 / 제거 / 이동 명령 기준:
+        /// 1 ~ 63
+        /// </summary>
+        public int Number { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 Pan 상태값
+        /// </summary>
+        public double Pan { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 Tilt 상태값
+        /// </summary>
+        public double Tilt { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 EO Zoom 표시값
+        /// </summary>
+        public string EoZoomText { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 EO Focus 표시값
+        /// </summary>
+        public string EoFocusText { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 IR Zoom 표시값
+        /// </summary>
+        public string IrZoomText { get; }
+
+        /// <summary>
+        /// 등록 명령 송신 시점의 IR Focus 표시값
+        /// </summary>
+        public string IrFocusText { get; }
+
+        /// <summary>
+        /// ComboBox 한 줄 표시 문자열
+        /// </summary>
+        public string DisplayText =>
+            $"P{Number:00}  |  PAN {Pan:F2}°  |  TILT {Tilt:F2}°";
+
+        /// <summary>
+        /// 선택된 프리셋 상세 표시 문자열
+        /// </summary>
+        public string DetailText =>
+            $"PAN      : {Pan:F2}°\n" +
+            $"TILT     : {Tilt:F2}°\n" +
+            $"EO ZOOM  : {EoZoomText} / 1000\n" +
+            $"EO FOCUS : {EoFocusText} / 1000\n" +
+            $"IR ZOOM  : {IrZoomText} / 1000\n" +
+            $"IR FOCUS : {IrFocusText} / 1000";
+
+        public PresetPointOption(
+            int number,
+            double pan,
+            double tilt,
+            string eoZoomText,
+            string eoFocusText,
+            string irZoomText,
+            string irFocusText)
+        {
+            Number =
+                number;
+
+            Pan =
+                pan;
+
+            Tilt =
+                tilt;
+
+            EoZoomText =
+                eoZoomText ?? "-";
+
+            EoFocusText =
+                eoFocusText ?? "-";
+
+            IrZoomText =
+                irZoomText ?? "-";
+
+            IrFocusText =
+                irFocusText ?? "-";
+        }
     }
 
     /// <summary>
@@ -321,6 +493,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private readonly ControlCommandService _controlCommandService;
 
         /// <summary>
+        /// MCB Pan / Tilt Zero 및 Home fallback 직접 명령 서비스
+        /// </summary>
+        private readonly McbMaintenanceCommandService _mcbMaintenanceCommandService;
+
+        /// <summary>
+        /// LA Connect.ini 기본 MCB Port
+        /// </summary>
+        private const int McbMaintenancePort =
+            4001;
+
+        /// <summary>
+        /// 환경장비 Web Agent 기준 EO / IR Zoom 동기화 Adapter
+        /// </summary>
+        private readonly WebAgentZoomControlService _webAgentZoomControlService;
+
+        /// <summary>
         /// [옥상 GOP EO] [XV-Z4850HC] CTEC CGI 직접 제어 서비스
         ///
         /// 선택된 EO 프리셋의 제어 방식이 CtecCgi인 경우에만 사용하며,
@@ -420,6 +608,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private double _currentPan;
 
         /// <summary>
+        /// 마지막으로 송신한 Pan Absolute 목표값
+        ///
+        /// -180도와 +180도는 물리적으로 같은 위치이므로
+        /// LA 상태 Packet이 두 값을 모두 +180도로 반환할 수 있다.
+        ///
+        /// 사용자가 -180을 명령한 경우에는 Current Status도 -180으로,
+        /// +180을 명령한 경우에는 +180으로 표시하기 위해
+        /// 마지막 목표 부호를 보관한다.
+        /// </summary>
+        private double? _lastPanAbsoluteTarget;
+
+        /// <summary>
         /// 현재 [TILT] 각도 값(현재 위치 저장용)
         /// 
         /// [LA Status Packet] 수신 시 갱신되고,
@@ -479,16 +679,196 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private RtspSourceOption _connectedEoCtecSource;
 
         /// <summary>
+        /// [XV-Z4850HC] EO Optical Zoom Position 최대 원시값
+        ///
+        /// CTEC 응답의 Zoom Position은 0x0000 ~ 0x4000 범위이며,
+        /// 십진수 기준 0 ~ 16384로 사용한다.
+        /// </summary>
+        private const int CtecEoZoomPositionMax =
+            0x4000;
+
+        /// <summary>
+        /// [XV-Z4850HC] EO Focus Position 최대 원시값
+        ///
+        /// 실제 장비에서 확인한 Focus Position은 0x0000 ~ 0x8000 범위이며,
+        /// 십진수 기준 0 ~ 32768로 사용한다.
+        /// </summary>
+        private const int CtecEoFocusPositionMax =
+            0x8000;
+
+        /// <summary>
+        /// [CTEC EO Zoom / Focus] 실시간 Position Inquiry 주기
+        ///
+        /// 연속 이동 명령은 최초 1회만 송신하고,
+        /// 버튼을 누르고 있는 동안 현재 Position 조회만 반복한다.
+        ///
+        /// 200ms = 초당 약 5회 상태 갱신
+        /// </summary>
+        private const int CtecEoPositionPollingIntervalMs =
+            75;
+
+        /// <summary>
+        /// [CTEC Position Inquiry] TCP 9000 응답 제한시간
+        ///
+        /// CGI 200 OK는 Inquiry 명령 전달 성공일 뿐이며
+        /// 실제 Position 값은 TCP 9000 응답을 받아야 확정된다.
+        /// </summary>
+        private const int CtecEoPositionResponseTimeoutMs =
+            1000;
+
+        /// <summary>
+        /// Stop 이후 최종 Position 안정화 최대 조회 횟수
+        /// </summary>
+        private const int CtecEoPositionSettleMaximumCount =
+            6;
+
+        /// <summary>
+        /// 연속 두 Position 차이가 이 값 이하이면 동일 위치로 판단한다.
+        /// </summary>
+        private const int CtecEoPositionStableTolerance =
+            5;
+
+        /// <summary>
+        /// [CTEC EO Zoom / Focus] 실시간 Position Inquiry 종료 Token
+        ///
+        /// Zoom 또는 Focus 버튼을 누르면 생성하고,
+        /// MouseUp / MouseLeave / Disconnect 시 Cancel한다.
+        /// </summary>
+        private CancellationTokenSource _ctecEoPositionPollingCts;
+
+        /// <summary>
+        /// [CTEC Position Inquiry] CGI 송신부터 TCP 응답 수신까지 한 묶음으로 직렬화한다.
+        ///
+        /// Inquiry CGI 자체의 Lock만으로는 TCP 응답 대기 구간이 보호되지 않으므로,
+        /// Zoom / Focus Polling과 Stop 후 최종 조회가 동시에 대기 작업을 만들지 않게 한다.
+        /// </summary>
+        private readonly SemaphoreSlim _ctecEoPositionQueryLock =
+            new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// CTEC Zoom / Focus 이동 및 안정화 작업 세대 번호
+        ///
+        /// 새 이동이 시작되면 증가하며,
+        /// 이전 Stop 안정화 작업은 세대가 달라진 즉시 종료한다.
+        /// </summary>
+        private long _ctecEoPositionOperationGeneration;
+
+        /// <summary>
+        /// [CURRENT STATUS] 현재 표시 중인 장비 구성
+        ///
+        /// Rooftop    : 한국씨텍 EO 직접 제어 상태
+        /// Environment: Web Agent 기준 0 ~ 1000 상태
+        /// </summary>
+        private EquipmentStatusMode _selectedEquipmentStatusMode =
+            EquipmentStatusMode.Rooftop;
+
+        /// <summary>
+        /// [EO / IR Zoom Synchronization] 현재 선택된 10단계 Zoom Level
+        /// </summary>
+        private ZoomSyncLevelOption _selectedZoomSyncLevel;
+
+        /// <summary>
+        /// [EO / IR Zoom Synchronization] 동작 상태 표시 문자열
+        /// </summary>
+        private string _zoomSyncStatusText =
+            "READY";
+
+        /// <summary>
+        /// [옥상장비 Zoom Sync] 한국씨텍 EO 목표 위치 이동 종료 Token
+        /// </summary>
+        private CancellationTokenSource _rooftopZoomSyncCts;
+
+        /// <summary>
+        /// [옥상장비 Zoom Sync] EO Direct Position 도착 허용 오차
+        ///
+        /// Direct Position 명령은 목표값을 카메라에 직접 전달하므로
+        /// 연속 이동 방식처럼 큰 제동 구간이나 방향 보정이 필요하지 않다.
+        /// 실제 장비 Position 응답의 미세 편차만 허용한다.
+        /// </summary>
+        private const int RooftopZoomSyncTolerance =
+            120;
+
+        /// <summary>
+        /// [옥상장비 Zoom Sync] Direct Position 도착 확인 주기
+        /// </summary>
+        private const int RooftopZoomSyncInquiryIntervalMs =
+            100;
+
+        /// <summary>
+        /// [옥상장비 Zoom Sync] Direct Position 이동 완료 대기시간
+        /// </summary>
+        private const int RooftopZoomSyncTimeoutMs =
+            15000;
+
+        /// <summary>
+        /// [EO / IR Focus Synchronization] 현재 선택된 10단계 Focus Level
+        /// </summary>
+        private ZoomSyncLevelOption _selectedFocusSyncLevel;
+
+        /// <summary>
+        /// [EO / IR Focus Synchronization] 동작 상태 표시 문자열
+        /// </summary>
+        private string _focusSyncStatusText =
+            "READY";
+
+        /// <summary>
+        /// [옥상장비 Focus Sync] 한국씨텍 EO 목표 위치 이동 종료 Token
+        /// </summary>
+        private CancellationTokenSource _rooftopFocusSyncCts;
+
+        /// <summary>
+        /// [옥상장비 Focus Sync] EO Direct Position 도착 허용 오차
+        ///
+        /// CTEC EO Focus 전체 범위는 0 ~ 32768이며,
+        /// 실제 응답의 미세 편차를 고려하여 ±240을 허용한다.
+        /// </summary>
+        private const int RooftopFocusSyncTolerance =
+            240;
+
+        /// <summary>
+        /// [옥상장비 Focus Sync] Direct Position 도착 확인 주기
+        /// </summary>
+        private const int RooftopFocusSyncInquiryIntervalMs =
+            100;
+
+        /// <summary>
+        /// [옥상장비 Focus Sync] Direct Position 이동 완료 대기시간
+        /// </summary>
+        private const int RooftopFocusSyncTimeoutMs =
+            15000;
+
+        /// <summary>
+        /// [IR Focus Sync] 목표 위치 허용 오차
+        ///
+        /// IR Focus 상태값은 정지 상태에서도 약 ±1 정도 흔들릴 수 있으므로
+        /// 목표값 기준 ±5 이내를 도착으로 판단한다.
+        /// </summary>
+        private const int IrFocusSyncTolerance =
+            5;
+
+        /// <summary>
+        /// [IR Focus Sync] 상태 확인 주기
+        /// </summary>
+        private const int IrFocusSyncPollingIntervalMs =
+            80;
+
+        /// <summary>
+        /// [IR Focus Sync] 최대 이동 대기시간
+        /// </summary>
+        private const int IrFocusSyncTimeoutMs =
+            12000;
+
+        /// <summary>
         /// CTEC Port 9000 응답으로 수신한 EO Optical Zoom Position
         ///
-        /// 문서 기준 범위: 0x0000 ~ 0x4000
+        /// 원시값 범위: 0x0000 ~ 0x4000 (0 ~ 16384)
         /// </summary>
         private ushort _currentCtecEoZoomPosition;
 
         /// <summary>
         /// CTEC Port 9000 응답으로 수신한 EO Focus Position
         ///
-        /// 문서 기준 범위: 0x1000 ~ 0x8000
+        /// 원시값 범위: 0x0000 ~ 0x8000 (0 ~ 32768)
         /// </summary>
         private ushort _currentCtecEoFocusPosition;
 
@@ -672,6 +1052,206 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 수신 Raw 값을 기준으로 관리한다.
         /// </summary>
         private ushort _currentIrFocus;
+
+        #region [Move Control Constants / Fields]
+
+        /// <summary>
+        /// 이동 제어 화면에서 사용하는 공통 Lens Position 최소값
+        /// </summary>
+        private const int MoveControlPositionMinimum =
+            0;
+
+        /// <summary>
+        /// 이동 제어 화면에서 사용하는 공통 Lens Position 최대값
+        /// </summary>
+        private const int MoveControlPositionMaximum =
+            1000;
+
+        /// <summary>
+        /// EO / IR 광학 Zoom 최소 배율
+        /// </summary>
+        private const double MoveControlMinimumZoomRatio =
+            1.0;
+
+        /// <summary>
+        /// 옥상 EO 카메라 XV-Z2050HC 최대 광학 배율
+        ///
+        /// 6 ~ 300mm:
+        /// 광학 50배
+        /// </summary>
+        private const double MoveControlEoMaximumZoomRatio =
+            50.0;
+
+        /// <summary>
+        /// IR 카메라 Infra-LWZ-30-150-AF 최대 광학 배율
+        ///
+        /// 30 ~ 150mm:
+        /// 광학 5배
+        /// </summary>
+        private const double MoveControlIrMaximumZoomRatio =
+            5.0;
+
+        /// <summary>
+        /// LA / Pelco-D 기준 Pan 입력 허용 범위
+        ///
+        /// Pan Absolute는 -180 ~ 180을 사용한다.
+        /// 범위를 벗어난 입력은 각각 -180 또는 180으로 제한한다.
+        /// </summary>
+        private const double MoveControlPanMinimum =
+            -180.0;
+
+        private const double MoveControlPanMaximum =
+            180.0;
+
+        /// <summary>
+        /// Tilt Absolute 입력 허용 범위
+        /// </summary>
+        private const double MoveControlTiltMinimum =
+            -90.0;
+
+        private const double MoveControlTiltMaximum =
+            90.0;
+
+        /// <summary>
+        /// VIA 0 Pan 이동 완료 판단 허용 오차
+        /// </summary>
+        private const double MoveControlPanTolerance =
+            0.50;
+
+        /// <summary>
+        /// VIA 0 Pan 상태 확인 주기
+        /// </summary>
+        private const int MoveControlPanPollingIntervalMs =
+            80;
+
+        /// <summary>
+        /// VIA 0 Pan 최대 이동 대기시간
+        /// </summary>
+        private const int MoveControlPanTimeoutMs =
+            20000;
+
+        /// <summary>
+        /// 현재 Pan 선회 모드
+        /// </summary>
+        private PanTurnMode _panTurnMode =
+            PanTurnMode.Short;
+
+        /// <summary>
+        /// Pan Absolute 입력값
+        /// </summary>
+        private double? _panAbsoluteValue =
+            0.0;
+
+        /// <summary>
+        /// Tilt Absolute 입력값
+        /// </summary>
+        private double? _tiltAbsoluteValue =
+            0.0;
+
+        /// <summary>
+        /// EO / IR Zoom 공통 Position 입력값
+        /// </summary>
+        private int? _zoomPositionValue =
+            0;
+
+        /// <summary>
+        /// EO / IR Zoom 공통 배율 입력값
+        /// </summary>
+        private double? _zoomRatioValue =
+            1.0;
+
+        /// <summary>
+        /// EO / IR Focus 공통 Position 입력값
+        /// </summary>
+        private int? _focusPositionValue =
+            0;
+
+        /// <summary>
+        /// Home / Pan Zero / Tilt Zero 최근 실행 상태
+        /// </summary>
+        private string _homeZeroStatusText =
+            "READY";
+
+
+        /// <summary>
+        /// PRESET 1 (LA TEST) 선택 ID
+        /// LA 실제 구현 기준 0 ~ 99
+        /// </summary>
+        private int _laPresetSlotNumber =
+            1;
+
+        private PresetPointOption _selectedLaPresetPoint;
+
+        private int _laPresetScanSpeed =
+            10;
+
+        private int _laPresetScanDelay =
+            1;
+
+        private string _laPresetCommandStatusText =
+            "READY";
+
+        private bool _isLaPresetScanRunning;
+
+        /// <summary>
+        /// 프리셋 추가 / 제거 대상 슬롯 번호
+        ///
+        /// TORUSS 프리셋 실행 / 편집 명령 기준:
+        /// 1 ~ 63
+        /// </summary>
+        private int _presetSlotNumber =
+            1;
+
+        /// <summary>
+        /// PRESET ComboBox에서 현재 선택된 프리셋
+        /// </summary>
+        private PresetPointOption _selectedPresetPoint;
+
+        /// <summary>
+        /// 오토 스캔 이동 속도
+        ///
+        /// TORUSS 문서 기준:
+        /// 1 ~ 60
+        /// </summary>
+        private int _presetScanSpeed =
+            10;
+
+        /// <summary>
+        /// 오토 스캔 프리셋 정지시간
+        ///
+        /// TORUSS 문서 기준:
+        /// 1 ~ 60초
+        /// </summary>
+        private int _presetScanDelay =
+            1;
+
+        /// <summary>
+        /// 마지막 프리셋 / 스캔 명령 상태 표시
+        ///
+        /// 별도 ACK / 프리셋 상태 응답이 없으므로
+        /// 실제 장비 상태가 아니라 TCP 송신 결과를 표시한다.
+        /// </summary>
+        private string _presetCommandStatusText =
+            "READY";
+
+        /// <summary>
+        /// 현재 프로그램에서 스캔 시작 명령을 송신한 상태
+        ///
+        /// 장비 응답 기반 상태가 아닌 UI 표시용 로컬 상태이다.
+        /// </summary>
+        private bool _isPresetScanRunning;
+
+        /// <summary>
+        /// VIA 0 Pan 연속 이동 취소 Token
+        /// </summary>
+        private CancellationTokenSource _moveControlPanCts;
+
+        /// <summary>
+        /// PRESET 1 WPF 직접 오토 스캔 작업 취소 토큰
+        /// </summary>
+        private CancellationTokenSource _laPresetDirectScanCts;
+
+        #endregion
 
         #endregion
 
@@ -950,6 +1530,56 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public ICommand ToggleCrosshairCommand { get; }
 
+        /// <summary>
+        /// CURRENT STATUS를 옥상장비 상태로 전환 [Command]
+        /// </summary>
+        public ICommand ShowRooftopStatusCommand { get; }
+
+        /// <summary>
+        /// CURRENT STATUS를 환경장비 상태로 전환 [Command]
+        /// </summary>
+        public ICommand ShowEnvironmentStatusCommand { get; }
+
+        /// <summary>
+        /// Zoom Sync 이전 Level 선택 [Command]
+        /// </summary>
+        public ICommand PreviousZoomSyncLevelCommand { get; }
+
+        /// <summary>
+        /// Zoom Sync 다음 Level 선택 [Command]
+        /// </summary>
+        public ICommand NextZoomSyncLevelCommand { get; }
+
+        /// <summary>
+        /// 선택한 Zoom Sync Level 적용 [Command]
+        /// </summary>
+        public ICommand ApplyZoomSyncCommand { get; }
+
+        /// <summary>
+        /// 진행 중인 Zoom Sync 정지 [Command]
+        /// </summary>
+        public ICommand StopZoomSyncCommand { get; }
+
+        /// <summary>
+        /// Focus Sync 이전 Level 선택 [Command]
+        /// </summary>
+        public ICommand PreviousFocusSyncLevelCommand { get; }
+
+        /// <summary>
+        /// Focus Sync 다음 Level 선택 [Command]
+        /// </summary>
+        public ICommand NextFocusSyncLevelCommand { get; }
+
+        /// <summary>
+        /// 선택한 Focus Sync Level 적용 [Command]
+        /// </summary>
+        public ICommand ApplyFocusSyncCommand { get; }
+
+        /// <summary>
+        /// 진행 중인 Focus Sync 정지 [Command]
+        /// </summary>
+        public ICommand StopFocusSyncCommand { get; }
+
         #endregion
 
         #region [Video Commands]
@@ -1014,6 +1644,101 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [Move Control Commands]
+
+        /// <summary>
+        /// Pan / Tilt Home Position 실행 [Command]
+        /// </summary>
+        public ICommand MoveHomePositionCommand { get; }
+
+        /// <summary>
+        /// Pan 현재 위치를 0으로 설정 [Command]
+        /// </summary>
+        public ICommand SetPanZeroCommand { get; }
+
+        /// <summary>
+        /// Tilt 현재 위치를 0으로 설정 [Command]
+        /// </summary>
+        public ICommand SetTiltZeroCommand { get; }
+
+        /// <summary>
+        /// Pan Absolute 이동 [Command]
+        /// </summary>
+        public ICommand MovePanAbsoluteCommand { get; }
+
+        /// <summary>
+        /// Tilt Absolute 이동 [Command]
+        /// </summary>
+        public ICommand MoveTiltAbsoluteCommand { get; }
+
+        /// <summary>
+        /// EO / IR Zoom Position 이동 [Command]
+        /// </summary>
+        public ICommand SetZoomPositionCommand { get; }
+
+        /// <summary>
+        /// EO / IR Zoom Ratio 이동 [Command]
+        /// </summary>
+        public ICommand SetZoomRatioCommand { get; }
+
+        /// <summary>
+        /// EO / IR Focus Position 이동 [Command]
+        /// </summary>
+        public ICommand SetFocusPositionCommand { get; }
+
+        /// <summary>
+        /// 이동 제어 입력값 초기화 [Command]
+        /// </summary>
+        public ICommand ResetPositionInputCommand { get; }
+
+
+        /// <summary>
+        /// PRESET 1 (LA TEST) 현재 PTZF를 LA 스캔 프리셋으로 등록
+        /// </summary>
+        public ICommand AddOrUpdateLaPresetCommand { get; }
+
+        public ICommand ClearAllLaPresetsCommand { get; }
+
+        public ICommand MoveToLaPresetCommand { get; }
+
+        public ICommand StartLaPresetScanCommand { get; }
+
+        public ICommand UpdateLaPresetScanCommand { get; }
+
+        public ICommand StopLaPresetScanCommand { get; }
+
+        /// <summary>
+        /// 현재 PTZF 위치를 선택 슬롯에 프리셋으로 추가 / 갱신
+        /// </summary>
+        public ICommand AddOrUpdatePresetCommand { get; }
+
+        /// <summary>
+        /// 선택 슬롯 프리셋 제거
+        /// </summary>
+        public ICommand DeletePresetCommand { get; }
+
+        /// <summary>
+        /// ComboBox에서 선택한 프리셋으로 이동
+        /// </summary>
+        public ICommand MoveToPresetCommand { get; }
+
+        /// <summary>
+        /// 프리셋 오토 스캔 시작
+        /// </summary>
+        public ICommand StartPresetScanCommand { get; }
+
+        /// <summary>
+        /// 실행 중인 스캔 속도 / 정지시간 변경
+        /// </summary>
+        public ICommand UpdatePresetScanCommand { get; }
+
+        /// <summary>
+        /// 프리셋 오토 스캔 정지
+        /// </summary>
+        public ICommand StopPresetScanCommand { get; }
+
+        #endregion
+
         #region [LRF Commands]
 
         /// <summary>
@@ -1058,6 +1783,855 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [Equipment Status / Zoom Sync Properties]
+
+        /// <summary>
+        /// [Environment Equipment / Zoom Synchronization]
+        ///
+        /// Web Agent 기준 EO / IR Zoom Position을
+        /// 0부터 1000까지 100 단위로 구분한 목록
+        ///
+        /// LEVEL 0  = 0
+        /// LEVEL 1  = 100
+        /// LEVEL 2  = 200
+        /// LEVEL 3  = 300
+        /// LEVEL 4  = 400
+        /// LEVEL 5  = 500
+        /// LEVEL 6  = 600
+        /// LEVEL 7  = 700
+        /// LEVEL 8  = 800
+        /// LEVEL 9  = 900
+        /// LEVEL 10 = 1000
+        ///
+        /// 총 11개 항목을 사용한다.
+        /// </summary>
+        public ObservableCollection<ZoomSyncLevelOption> ZoomSyncLevelOptions { get; }
+
+        /// <summary>
+        /// [Environment Equipment / Focus Synchronization]
+        ///
+        /// EO / IR Focus Position을 0부터 1000까지
+        /// 100 단위로 구분한 총 11개의 단계 목록이다.
+        ///
+        /// LEVEL 0  = 0
+        /// LEVEL 1  = 100
+        /// ...
+        /// LEVEL 10 = 1000
+        /// </summary>
+        public ObservableCollection<ZoomSyncLevelOption> FocusSyncLevelOptions { get; }
+
+        /// <summary>
+        /// CURRENT STATUS 화면에 표시할 장비 구성
+        /// </summary>
+        public EquipmentStatusMode SelectedEquipmentStatusMode
+        {
+            get => _selectedEquipmentStatusMode;
+            set
+            {
+                if (_selectedEquipmentStatusMode == value)
+                {
+                    return;
+                }
+
+                _selectedEquipmentStatusMode = value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsRooftopStatusSelected));
+                OnPropertyChanged(nameof(IsEnvironmentStatusSelected));
+                OnPropertyChanged(nameof(CurrentStatusEquipmentText));
+            }
+        }
+
+        public bool IsRooftopStatusSelected =>
+            SelectedEquipmentStatusMode == EquipmentStatusMode.Rooftop;
+
+        public bool IsEnvironmentStatusSelected =>
+            SelectedEquipmentStatusMode == EquipmentStatusMode.Environment;
+
+        public string CurrentStatusEquipmentText =>
+            IsRooftopStatusSelected
+                ? "ROOFTOP EQUIPMENT / LA AGENT"
+                : "ENVIRONMENT EQUIPMENT / WEB AGENT";
+
+        /// <summary>
+        /// 현재 선택된 Zoom Sync Level
+        /// </summary>
+        public ZoomSyncLevelOption SelectedZoomSyncLevel
+        {
+            get => _selectedZoomSyncLevel;
+            set
+            {
+                if (_selectedZoomSyncLevel == value)
+                {
+                    return;
+                }
+
+                _selectedZoomSyncLevel = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedZoomSyncPositionText));
+            }
+        }
+
+        public string SelectedZoomSyncPositionText =>
+            SelectedZoomSyncLevel == null
+                ? "0 / 1000"
+                : $"{SelectedZoomSyncLevel.Position} / 1000";
+
+        public string ZoomSyncStatusText
+        {
+            get => _zoomSyncStatusText;
+            private set
+            {
+                if (_zoomSyncStatusText == value)
+                {
+                    return;
+                }
+
+                _zoomSyncStatusText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 현재 선택된 Focus Sync Level
+        /// </summary>
+        public ZoomSyncLevelOption SelectedFocusSyncLevel
+        {
+            get => _selectedFocusSyncLevel;
+            set
+            {
+                if (_selectedFocusSyncLevel == value)
+                {
+                    return;
+                }
+
+                _selectedFocusSyncLevel = value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(SelectedFocusSyncPositionText));
+            }
+        }
+
+        /// <summary>
+        /// Focus Sync 표준 위치 표시 문자열
+        /// </summary>
+        public string SelectedFocusSyncPositionText =>
+            SelectedFocusSyncLevel == null
+                ? "0 / 1000"
+                : $"{SelectedFocusSyncLevel.Position} / 1000";
+
+        /// <summary>
+        /// Focus Sync 실행 상태 표시 문자열
+        /// </summary>
+        public string FocusSyncStatusText
+        {
+            get => _focusSyncStatusText;
+            private set
+            {
+                if (_focusSyncStatusText == value)
+                {
+                    return;
+                }
+
+                _focusSyncStatusText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string RooftopEoZoomStatusText =>
+            $"{GetCurrentPresetStandardZoom()} / 1000";
+
+        public string RooftopEoFocusStatusText =>
+            $"{GetCurrentPresetStandardFocus()} / 1000";
+
+        public string RooftopIrZoomStatusText =>
+            $"{GetCurrentIrZoomStandardPosition()} / 1000";
+
+        public string RooftopIrFocusStatusText =>
+            $"{GetCurrentIrFocusStandardPosition()} / 1000";
+
+        public string EnvironmentEoZoomStatusText =>
+            $"{GetCurrentPresetStandardZoom()} / 1000";
+
+        public string EnvironmentEoFocusStatusText =>
+            $"{GetCurrentPresetStandardFocus()} / 1000";
+
+        public string EnvironmentIrZoomStatusText =>
+            $"{GetCurrentIrZoomStandardPosition()} / 1000";
+
+        public string EnvironmentIrFocusStatusText =>
+            $"{GetCurrentIrFocusStandardPosition()} / 1000";
+
+        /// <summary>
+        /// Home / Zero 실행 상태 표시
+        /// </summary>
+        public string HomeZeroStatusText
+        {
+            get =>
+                _homeZeroStatusText;
+
+            private set
+            {
+                if (_homeZeroStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _homeZeroStatusText =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        #endregion
+
+        #region [Move Control Properties]
+
+        /// <summary>
+        /// Pan Absolute 이동 시 장비 최단거리 모드(0x4D / 0x02)를 사용하는지 여부
+        /// </summary>
+        public bool IsPanTurnShortMode
+        {
+            get =>
+                _panTurnMode ==
+                PanTurnMode.Short;
+
+            set
+            {
+                if (!value ||
+                    _panTurnMode ==
+                        PanTurnMode.Short)
+                {
+                    return;
+                }
+
+                _panTurnMode =
+                    PanTurnMode.Short;
+
+                ApplySelectedPanTurnMode();
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(IsPanTurnViaZeroMode));
+            }
+        }
+
+        /// <summary>
+        /// Pan Absolute 이동 시 장비 원점 통과 모드(0x4D / 0x01)를 사용하는지 여부
+        /// </summary>
+        public bool IsPanTurnViaZeroMode
+        {
+            get =>
+                _panTurnMode ==
+                PanTurnMode.ViaZero;
+
+            set
+            {
+                if (!value ||
+                    _panTurnMode ==
+                        PanTurnMode.ViaZero)
+                {
+                    return;
+                }
+
+                _panTurnMode =
+                    PanTurnMode.ViaZero;
+
+                ApplySelectedPanTurnMode();
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(IsPanTurnShortMode));
+            }
+        }
+
+        /// <summary>
+        /// Pan Absolute 목표값
+        /// </summary>
+        public double? PanAbsoluteValue
+        {
+            get =>
+                _panAbsoluteValue;
+
+            set
+            {
+                double? roundedValue =
+                    RoundNullableAngle(
+                        value);
+
+                if (_panAbsoluteValue ==
+                    roundedValue)
+                {
+                    return;
+                }
+
+                _panAbsoluteValue =
+                    roundedValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// Tilt Absolute 목표값
+        /// </summary>
+        public double? TiltAbsoluteValue
+        {
+            get =>
+                _tiltAbsoluteValue;
+
+            set
+            {
+                double? roundedValue =
+                    RoundNullableAngle(
+                        value);
+
+                if (_tiltAbsoluteValue ==
+                    roundedValue)
+                {
+                    return;
+                }
+
+                _tiltAbsoluteValue =
+                    roundedValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// EO / IR 공통 Zoom Position
+        /// </summary>
+        public int? ZoomPositionValue
+        {
+            get =>
+                _zoomPositionValue;
+
+            set
+            {
+                if (_zoomPositionValue ==
+                    value)
+                {
+                    return;
+                }
+
+                _zoomPositionValue =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 이동 제어 EO 기준 Zoom Ratio
+        ///
+        /// 입력 범위:
+        /// EO 1.0 ~ 50.0배
+        ///
+        /// 입력한 EO 배율을 0 ~ 1000 진행률로 변환하고,
+        /// 같은 진행률을 IR에 적용한다.
+        ///
+        /// 예:
+        /// EO 1.0배  / IR 1.0배  -> Position 0
+        /// EO 50.0배 / IR 5.0배  -> Position 1000
+        /// </summary>
+        public double? ZoomRatioValue
+        {
+            get =>
+                _zoomRatioValue;
+
+            set
+            {
+                double? roundedValue =
+                    value.HasValue
+                        ? Math.Round(
+                            value.Value,
+                            1,
+                            MidpointRounding.AwayFromZero)
+                        : (double?)null;
+
+                if (_zoomRatioValue ==
+                    roundedValue)
+                {
+                    return;
+                }
+
+                _zoomRatioValue =
+                    roundedValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// EO / IR 공통 Focus Position
+        /// </summary>
+        public int? FocusPositionValue
+        {
+            get =>
+                _focusPositionValue;
+
+            set
+            {
+                if (_focusPositionValue ==
+                    value)
+                {
+                    return;
+                }
+
+                _focusPositionValue =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+
+
+        /// <summary>
+        /// PRESET 1 (LA TEST) ID 선택 목록
+        /// </summary>
+        public ObservableCollection<int> LaPresetSlotOptions { get; } =
+            new ObservableCollection<int>(
+                Enumerable.Range(
+                    1,
+                    99));
+
+        public ObservableCollection<PresetPointOption> LaPresetPoints { get; } =
+            new ObservableCollection<PresetPointOption>();
+
+        public int LaPresetSlotNumber
+        {
+            get =>
+                _laPresetSlotNumber;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        0,
+                        Math.Min(
+                            99,
+                            value));
+
+                if (_laPresetSlotNumber ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _laPresetSlotNumber =
+                    safeValue;
+
+                OnPropertyChanged();
+
+                SelectedLaPresetPoint =
+                    LaPresetPoints
+                        .FirstOrDefault(
+                            preset =>
+                                preset.Number ==
+                                safeValue);
+            }
+        }
+
+        public PresetPointOption SelectedLaPresetPoint
+        {
+            get =>
+                _selectedLaPresetPoint;
+
+            set
+            {
+                if (ReferenceEquals(
+                    _selectedLaPresetPoint,
+                    value))
+                {
+                    return;
+                }
+
+                _selectedLaPresetPoint =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(SelectedLaPresetDetailText));
+
+                if (value != null &&
+                    _laPresetSlotNumber !=
+                        value.Number)
+                {
+                    _laPresetSlotNumber =
+                        value.Number;
+
+                    OnPropertyChanged(
+                        nameof(LaPresetSlotNumber));
+                }
+            }
+        }
+
+        public string CurrentLaPresetSnapshotText =>
+            $"PAN      : {_currentPan:F2}°\n" +
+            $"TILT     : {_currentTilt:F2}°\n" +
+            $"EO ZOOM  : {CurrentEoZoomText} / 1000\n" +
+            $"EO FOCUS : {CurrentEoFocusText} / 1000\n" +
+            $"IR ZOOM  : {CurrentIrZoomText} / 1000\n" +
+            $"IR FOCUS : {CurrentIrFocusText} / 1000";
+
+        public string SelectedLaPresetDetailText =>
+            SelectedLaPresetPoint == null
+                ? "NO PRESET SELECTED"
+                : SelectedLaPresetPoint.DetailText;
+
+        public int LaPresetScanSpeed
+        {
+            get =>
+                _laPresetScanSpeed;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            60,
+                            value));
+
+                if (_laPresetScanSpeed ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _laPresetScanSpeed =
+                    safeValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public int LaPresetScanDelay
+        {
+            get =>
+                _laPresetScanDelay;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            60,
+                            value));
+
+                if (_laPresetScanDelay ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _laPresetScanDelay =
+                    safeValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string LaPresetCommandStatusText
+        {
+            get =>
+                _laPresetCommandStatusText;
+
+            private set
+            {
+                if (_laPresetCommandStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _laPresetCommandStatusText =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsLaPresetScanRunning
+        {
+            get =>
+                _isLaPresetScanRunning;
+
+            private set
+            {
+                if (_isLaPresetScanRunning ==
+                    value)
+                {
+                    return;
+                }
+
+                _isLaPresetScanRunning =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 슬롯 선택 목록
+        ///
+        /// 프리셋 추가 / 제거 / 이동 명령에서 사용할 수 있는
+        /// 1 ~ 63 슬롯을 제공한다.
+        /// </summary>
+        public ObservableCollection<int> PresetSlotOptions { get; } =
+            new ObservableCollection<int>(
+                Enumerable.Range(
+                    1,
+                    63));
+
+        /// <summary>
+        /// 현재 프로그램에서 등록 명령을 송신한 프리셋 목록
+        ///
+        /// TORUSS 응답 프로토콜에는 프리셋 목록 조회 응답이 없으므로
+        /// 이 목록은 장비 전체 프리셋 데이터가 아니라
+        /// 현재 프로그램 세션에서 관리하는 화면 확인용 목록이다.
+        /// </summary>
+        public ObservableCollection<PresetPointOption> PresetPoints { get; } =
+            new ObservableCollection<PresetPointOption>();
+
+        /// <summary>
+        /// 스캔 속도 / 정지시간 선택 목록
+        ///
+        /// TORUSS 문서 기준:
+        /// 1 ~ 60
+        /// </summary>
+        public ObservableCollection<int> PresetScanValueOptions { get; } =
+            new ObservableCollection<int>(
+                Enumerable.Range(
+                    1,
+                    60));
+
+        /// <summary>
+        /// 프리셋 추가 / 제거 대상 슬롯 번호
+        /// </summary>
+        public int PresetSlotNumber
+        {
+            get =>
+                _presetSlotNumber;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            63,
+                            value));
+
+                if (_presetSlotNumber ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _presetSlotNumber =
+                    safeValue;
+
+                OnPropertyChanged();
+
+                PresetPointOption existingPreset =
+                    PresetPoints
+                        .FirstOrDefault(
+                            preset =>
+                                preset.Number ==
+                                safeValue);
+
+                /*
+                 * 등록되지 않은 새 슬롯을 선택한 경우에는
+                 * 기존 ComboBox 선택이 남아 잘못 이동하지 않도록
+                 * 선택 프리셋을 null로 초기화한다.
+                 */
+                SelectedPresetPoint =
+                    existingPreset;
+            }
+        }
+
+        /// <summary>
+        /// 등록된 프리셋 ComboBox 선택값
+        /// </summary>
+        public PresetPointOption SelectedPresetPoint
+        {
+            get =>
+                _selectedPresetPoint;
+
+            set
+            {
+                if (ReferenceEquals(
+                    _selectedPresetPoint,
+                    value))
+                {
+                    return;
+                }
+
+                _selectedPresetPoint =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(SelectedPresetDetailText));
+
+                if (value != null &&
+                    _presetSlotNumber !=
+                        value.Number)
+                {
+                    _presetSlotNumber =
+                        value.Number;
+
+                    OnPropertyChanged(
+                        nameof(PresetSlotNumber));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 현재 PTZF 상태 Snapshot 표시
+        ///
+        /// ADD / UPDATE 명령을 송신하면
+        /// 이 상태를 선택 슬롯의 화면 확인용 정보로 저장한다.
+        /// </summary>
+        public string CurrentPresetSnapshotText =>
+            $"PAN      : {_currentPan:F2}°\n" +
+            $"TILT     : {_currentTilt:F2}°\n" +
+            $"EO ZOOM  : {CurrentEoZoomText} / 1000\n" +
+            $"EO FOCUS : {CurrentEoFocusText} / 1000\n" +
+            $"IR ZOOM  : {CurrentIrZoomText} / 1000\n" +
+            $"IR FOCUS : {CurrentIrFocusText} / 1000";
+
+        /// <summary>
+        /// ComboBox에서 선택한 프리셋 상세값
+        /// </summary>
+        public string SelectedPresetDetailText =>
+            SelectedPresetPoint == null
+                ? "등록된 프리셋을 선택하세요."
+                : SelectedPresetPoint.DetailText;
+
+        /// <summary>
+        /// 오토 스캔 이동 속도
+        ///
+        /// 범위:
+        /// 1 ~ 60
+        /// </summary>
+        public int PresetScanSpeed
+        {
+            get =>
+                _presetScanSpeed;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            60,
+                            value));
+
+                if (_presetScanSpeed ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _presetScanSpeed =
+                    safeValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 오토 스캔 프리셋 정지시간
+        ///
+        /// 범위:
+        /// 1 ~ 60초
+        /// </summary>
+        public int PresetScanDelay
+        {
+            get =>
+                _presetScanDelay;
+
+            set
+            {
+                int safeValue =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            60,
+                            value));
+
+                if (_presetScanDelay ==
+                    safeValue)
+                {
+                    return;
+                }
+
+                _presetScanDelay =
+                    safeValue;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 / 스캔 마지막 명령 상태
+        ///
+        /// 별도 ACK가 없으므로 TCP 송신 결과를 표시한다.
+        /// </summary>
+        public string PresetCommandStatusText
+        {
+            get =>
+                _presetCommandStatusText;
+
+            private set
+            {
+                if (_presetCommandStatusText ==
+                    value)
+                {
+                    return;
+                }
+
+                _presetCommandStatusText =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 현재 프로그램에서 스캔 시작 명령을 송신한 상태
+        /// </summary>
+        public bool IsPresetScanRunning
+        {
+            get =>
+                _isPresetScanRunning;
+
+            private set
+            {
+                if (_isPresetScanRunning ==
+                    value)
+                {
+                    return;
+                }
+
+                _isPresetScanRunning =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        #endregion
+
         #region [Constructor]
 
         /// <summary>
@@ -1081,6 +2655,98 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     IsCrosshairVisible =
                         !IsCrosshairVisible;
                 });
+
+
+            /// <summary>
+            /// [Environment Equipment / Zoom Synchronization]
+            ///
+            /// Web Agent 기준 EO / IR Zoom Position을
+            /// 0부터 1000까지 100 단위로 생성한다.
+            ///
+            /// LEVEL과 Position을 동일한 기준으로 사용한다.
+            ///
+            /// LEVEL 0  = 0
+            /// LEVEL 1  = 100
+            /// LEVEL 2  = 200
+            /// ...
+            /// LEVEL 10 = 1000
+            ///
+            /// Enumerable.Range(0, 11):
+            /// 0부터 10까지 총 11개의 항목을 생성한다.
+            /// </summary>
+            ZoomSyncLevelOptions =
+                new ObservableCollection<ZoomSyncLevelOption>(
+                    Enumerable.Range(
+                            0,
+                            11)
+                        .Select(level =>
+                            new ZoomSyncLevelOption(
+                                level,
+                                (short)(
+                                    level *
+                                    100))));
+
+            SelectedZoomSyncLevel =
+                ZoomSyncLevelOptions[0];
+
+            ShowRooftopStatusCommand =
+                new RelayCommand(() =>
+                    SelectedEquipmentStatusMode =
+                        EquipmentStatusMode.Rooftop);
+
+            ShowEnvironmentStatusCommand =
+                new RelayCommand(() =>
+                    SelectedEquipmentStatusMode =
+                        EquipmentStatusMode.Environment);
+
+            PreviousZoomSyncLevelCommand =
+                new RelayCommand(SelectPreviousZoomSyncLevel);
+
+            NextZoomSyncLevelCommand =
+                new RelayCommand(SelectNextZoomSyncLevel);
+
+            ApplyZoomSyncCommand =
+                new AsyncRelayCommand(ApplySelectedZoomSyncLevelAsync);
+
+            StopZoomSyncCommand =
+                new AsyncRelayCommand(StopZoomSyncAsync);
+
+            /// <summary>
+            /// [EO / IR Focus Synchronization]
+            ///
+            /// Focus 역시 Web Agent 표준 범위 0 ~ 1000을 사용하며,
+            /// Zoom Sync와 동일하게 LEVEL 0 ~ LEVEL 10으로 구성한다.
+            /// </summary>
+            FocusSyncLevelOptions =
+                new ObservableCollection<ZoomSyncLevelOption>(
+                    Enumerable.Range(
+                            0,
+                            11)
+                        .Select(level =>
+                            new ZoomSyncLevelOption(
+                                level,
+                                (short)(
+                                    level *
+                                    100))));
+
+            SelectedFocusSyncLevel =
+                FocusSyncLevelOptions[0];
+
+            PreviousFocusSyncLevelCommand =
+                new RelayCommand(
+                    SelectPreviousFocusSyncLevel);
+
+            NextFocusSyncLevelCommand =
+                new RelayCommand(
+                    SelectNextFocusSyncLevel);
+
+            ApplyFocusSyncCommand =
+                new AsyncRelayCommand(
+                    ApplySelectedFocusSyncLevelAsync);
+
+            StopFocusSyncCommand =
+                new AsyncRelayCommand(
+                    StopFocusSyncAsync);
 
             #endregion
 
@@ -1445,6 +3111,102 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             #endregion
 
+            #region [Move Control Command Binding]
+
+            /// <summary>
+            /// VertiportNexus 이동 제어 기능을 현재 프로젝트 구조에 맞춰 연결한다.
+            ///
+            /// 포함 기능:
+            /// - Home Position : LA 실제 0xB1 명령
+            /// - Pan Zero / Tilt Zero : MCB 직접 Set0 명령
+            /// </summary>
+            MoveHomePositionCommand =
+                new AsyncRelayCommand(
+                    MoveHomePositionAsync);
+
+            SetPanZeroCommand =
+                new AsyncRelayCommand(
+                    SetPanZeroAsync);
+
+            SetTiltZeroCommand =
+                new AsyncRelayCommand(
+                    SetTiltZeroAsync);
+
+            MovePanAbsoluteCommand =
+                new AsyncRelayCommand(
+                    MovePanAbsoluteFromInputAsync);
+
+            MoveTiltAbsoluteCommand =
+                new RelayCommand(
+                    MoveTiltAbsoluteFromInput);
+
+            SetZoomPositionCommand =
+                new AsyncRelayCommand(
+                    SetZoomPositionFromInputAsync);
+
+            SetZoomRatioCommand =
+                new AsyncRelayCommand(
+                    SetZoomRatioFromInputAsync);
+
+            SetFocusPositionCommand =
+                new AsyncRelayCommand(
+                    SetFocusPositionFromInputAsync);
+
+            ResetPositionInputCommand =
+                new RelayCommand(
+                    ResetMoveControlInput);
+
+
+            AddOrUpdateLaPresetCommand =
+                new RelayCommand(
+                    AddOrUpdateLaPresetPoint);
+
+            ClearAllLaPresetsCommand =
+                new RelayCommand(
+                    ClearAllLaPresetPoints);
+
+            MoveToLaPresetCommand =
+                new AsyncRelayCommand(
+                    MoveToSelectedLaPresetPointAsync);
+
+            StartLaPresetScanCommand =
+                new AsyncRelayCommand(
+                    StartLaPresetScanAsync);
+
+            UpdateLaPresetScanCommand =
+                new RelayCommand(
+                    UpdateLaPresetScan);
+
+            StopLaPresetScanCommand =
+                new RelayCommand(
+                    StopLaPresetScan);
+
+            AddOrUpdatePresetCommand =
+                new RelayCommand(
+                    AddOrUpdatePresetPoint);
+
+            DeletePresetCommand =
+                new RelayCommand(
+                    DeletePresetPoint);
+
+            MoveToPresetCommand =
+                new RelayCommand(
+                    MoveToSelectedPresetPoint);
+
+            StartPresetScanCommand =
+                new RelayCommand(
+                    StartPresetScan);
+
+            UpdatePresetScanCommand =
+                new RelayCommand(
+                    UpdatePresetScan);
+
+            StopPresetScanCommand =
+                new RelayCommand(
+                    StopPresetScan);
+
+            #endregion
+
             #region [LRF Command Binding]
 
             /// <summary>
@@ -1505,6 +3267,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// [TORUSS] 제어 명령 서비스 생성
             /// </summary>
             _controlCommandService = new ControlCommandService(_laTcpService);
+
+            /// <summary>
+            /// MCB 유지보수 직접 명령 서비스 생성
+            /// </summary>
+            _mcbMaintenanceCommandService =
+                new McbMaintenanceCommandService();
+
+            /// <summary>
+            /// 환경장비 Web Agent Zoom Adapter 생성
+            /// </summary>
+            _webAgentZoomControlService =
+                new WebAgentZoomControlService(
+                    _controlCommandService);
 
             /// <summary>
             /// [옥상 GOP EO] CTEC CGI 직접 제어 서비스 생성
@@ -2587,6 +4362,2863 @@ namespace OpenCvWpfTracking.ViewModels.Main
             }
         }
 
+        #region [Equipment Status / Zoom Synchronization Methods]
+
+        private void SelectPreviousZoomSyncLevel()
+        {
+            int currentIndex =
+                ZoomSyncLevelOptions.IndexOf(
+                    SelectedZoomSyncLevel);
+
+            if (currentIndex > 0)
+            {
+                SelectedZoomSyncLevel =
+                    ZoomSyncLevelOptions[currentIndex - 1];
+            }
+        }
+
+        private void SelectNextZoomSyncLevel()
+        {
+            int currentIndex =
+                ZoomSyncLevelOptions.IndexOf(
+                    SelectedZoomSyncLevel);
+
+            if (currentIndex >= 0 &&
+                currentIndex < ZoomSyncLevelOptions.Count - 1)
+            {
+                SelectedZoomSyncLevel =
+                    ZoomSyncLevelOptions[currentIndex + 1];
+            }
+        }
+
+        /// <summary>
+        /// 선택한 10단계 Zoom Position을 현재 장비 구성에 적용한다.
+        ///
+        /// 환경장비:
+        /// - Web Agent 기준 EO / IR Position 0 ~ 1000을 동일하게 송신
+        ///
+        /// 옥상장비:
+        /// - IR은 0 ~ 1000 Position 그대로 송신
+        /// - EO는 표준 Position을 CTEC Raw 0 ~ 16384로 변환한 뒤
+        ///   현재 위치 피드백을 보면서 Tele / Wide / Stop으로 이동
+        /// </summary>
+        private async Task ApplySelectedZoomSyncLevelAsync()
+        {
+            ZoomSyncLevelOption selectedLevel =
+                SelectedZoomSyncLevel;
+
+            if (selectedLevel == null)
+            {
+                return;
+            }
+
+            await StopZoomSyncAsync();
+
+            short standardPosition =
+                selectedLevel.Position;
+
+            ZoomSyncStatusText =
+                $"APPLYING LEVEL {selectedLevel.Level}";
+
+            if (SelectedEquipmentStatusMode ==
+                EquipmentStatusMode.Environment)
+            {
+                bool result =
+                    _webAgentZoomControlService
+                        .ApplySynchronizedZoom(
+                            standardPosition);
+
+                ZoomSyncStatusText =
+                    result
+                        ? $"COMMAND SENT / {standardPosition}"
+                        : "COMMAND FAILED";
+
+                return;
+            }
+
+            bool irResult =
+                _webAgentZoomControlService
+                    .SetIrZoomPosition(
+                        standardPosition);
+
+            RtspSourceOption ctecSource =
+                _connectedEoCtecSource;
+
+            if (ctecSource == null)
+            {
+                ZoomSyncStatusText =
+                    irResult
+                        ? "IR SENT / EO CTEC NOT CONNECTED"
+                        : "EO / IR COMMAND FAILED";
+
+                return;
+            }
+
+            int eoRawTarget =
+                ConvertStandardZoomToCtecRaw(
+                    standardPosition);
+
+            CancellationTokenSource zoomSyncCts =
+                new CancellationTokenSource();
+
+            _rooftopZoomSyncCts =
+                zoomSyncCts;
+
+            bool eoResult;
+
+            try
+            {
+                eoResult =
+                    await MoveRooftopEoZoomToRawPositionAsync(
+                        ctecSource,
+                        eoRawTarget,
+                        zoomSyncCts.Token);
+            }
+            finally
+            {
+                /// <summary>
+                /// 현재 Apply 작업이 여전히 등록된 작업인 경우에만 해제한다.
+                ///
+                /// 사용자가 새 Level을 적용하거나 STOP을 누른 경우에는
+                /// StopZoomSyncAsync가 기존 Token을 먼저 취소 / 해제하므로
+                /// 새 작업의 Token을 잘못 지우지 않도록 참조를 비교한다.
+                /// </summary>
+                if (ReferenceEquals(
+                        _rooftopZoomSyncCts,
+                        zoomSyncCts))
+                {
+                    _rooftopZoomSyncCts =
+                        null;
+
+                    zoomSyncCts.Dispose();
+                }
+            }
+
+            ZoomSyncStatusText =
+                eoResult && irResult
+                    ? $"COMPLETED / LEVEL {selectedLevel.Level}"
+                    : "INCOMPLETE";
+        }
+
+        /// <summary>
+        /// 옥상장비 CTEC EO Zoom을 목표 Raw Position으로 직접 이동한다.
+        ///
+        /// 기존 TELE / WIDE 연속 이동 기반 Sync는 다음 문제가 있었다.
+        ///
+        /// 1. TCP Position 응답이 계단식으로 늦게 반영됨
+        /// 2. 프로그램이 목표 통과를 늦게 확인함
+        /// 3. 다음 단계에서 반대 방향 보정이 발생함
+        /// 4. 화면이 확대 → 축소 → 확대 형태로 왕복함
+        ///
+        /// 현재 방식은 VISCA Zoom Direct 명령으로 목표 Raw Position을
+        /// 한 번만 송신하고, 이후 Inquiry는 도착 확인 용도로만 사용한다.
+        /// 따라서 Sync 이동 중 TELE / WIDE 방향 전환 및 재보정은 수행하지 않는다.
+        /// </summary>
+        private async Task<bool> MoveRooftopEoZoomToRawPositionAsync(
+            RtspSourceOption ctecSource,
+            int targetRawPosition,
+            CancellationToken cancellationToken)
+        {
+            if (ctecSource == null)
+            {
+                return false;
+            }
+
+            int safeTargetRawPosition =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        CtecEoZoomPositionMax,
+                        targetRawPosition));
+
+            try
+            {
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+
+                ConsoleLogHelper.PrintLine();
+
+                Console.WriteLine(
+                    "[ROOFTOP ZOOM SYNC] DIRECT START");
+
+                Console.WriteLine(
+                    $"[ROOFTOP ZOOM SYNC] TARGET : {safeTargetRawPosition}");
+
+                ConsoleLogHelper.PrintLine();
+
+                bool commandResult =
+                    await _ctecCameraCommandService
+                        .MoveZoomPositionAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            (ushort)safeTargetRawPosition);
+
+                if (!commandResult)
+                {
+                    Console.WriteLine(
+                        "[ROOFTOP ZOOM SYNC] DIRECT COMMAND FAILED");
+
+                    ConsoleLogHelper.PrintLine();
+
+                    return false;
+                }
+
+                Stopwatch timeout =
+                    Stopwatch.StartNew();
+
+                while (timeout.ElapsedMilliseconds <
+                       RooftopZoomSyncTimeoutMs)
+                {
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+
+                    int? currentPosition =
+                        await RequestAndWaitCtecEoPositionAsync(
+                            ContinuousMoveType.EoZoom,
+                            ctecSource,
+                            cancellationToken);
+
+                    if (currentPosition.HasValue)
+                    {
+                        int error =
+                            Math.Abs(
+                                currentPosition.Value -
+                                safeTargetRawPosition);
+
+                        Console.WriteLine(
+                            "[ROOFTOP ZOOM SYNC] DIRECT CHECK " +
+                            $"/ POSITION={currentPosition.Value} " +
+                            $"/ TARGET={safeTargetRawPosition} " +
+                            $"/ ERROR={error}");
+
+                        if (error <=
+                            RooftopZoomSyncTolerance)
+                        {
+                            Console.WriteLine(
+                                "[ROOFTOP ZOOM SYNC] DIRECT COMPLETED");
+
+                            ConsoleLogHelper.PrintLine();
+
+                            return true;
+                        }
+                    }
+
+                    await Task.Delay(
+                        RooftopZoomSyncInquiryIntervalMs,
+                        cancellationToken);
+                }
+
+                Console.WriteLine(
+                    "[ROOFTOP ZOOM SYNC] DIRECT TIMEOUT");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine(
+                    "[ROOFTOP ZOOM SYNC] DIRECT CANCELED");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "[ROOFTOP ZOOM SYNC] DIRECT ERROR : " +
+                    ex.Message);
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+        }
+
+        private async Task StopZoomSyncAsync()
+        {
+            CancellationTokenSource cts =
+                _rooftopZoomSyncCts;
+
+            _rooftopZoomSyncCts =
+                null;
+
+            if (cts != null)
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+
+            RtspSourceOption ctecSource =
+                _connectedEoCtecSource;
+
+            if (ctecSource != null)
+            {
+                await _ctecCameraCommandService
+                    .StopZoomAsync(
+                        ctecSource.ControlIp,
+                        ctecSource.ControlUserName,
+                        ctecSource.ControlPassword,
+                        ctecSource.UseHttps);
+            }
+
+            ZoomSyncStatusText =
+                "STOPPED";
+        }
+
+        private static int ConvertStandardZoomToCtecRaw(
+            int standardPosition)
+        {
+            int safePosition =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        1000,
+                        standardPosition));
+
+            return (int)Math.Round(
+                safePosition *
+                CtecEoZoomPositionMax /
+                1000.0);
+        }
+
+        /// <summary>
+        /// Focus Sync 이전 단계 선택
+        /// </summary>
+        private void SelectPreviousFocusSyncLevel()
+        {
+            int currentIndex =
+                FocusSyncLevelOptions.IndexOf(
+                    SelectedFocusSyncLevel);
+
+            if (currentIndex > 0)
+            {
+                SelectedFocusSyncLevel =
+                    FocusSyncLevelOptions[
+                        currentIndex -
+                        1];
+            }
+        }
+
+        /// <summary>
+        /// Focus Sync 다음 단계 선택
+        /// </summary>
+        private void SelectNextFocusSyncLevel()
+        {
+            int currentIndex =
+                FocusSyncLevelOptions.IndexOf(
+                    SelectedFocusSyncLevel);
+
+            if (currentIndex >= 0 &&
+                currentIndex <
+                    FocusSyncLevelOptions.Count -
+                    1)
+            {
+                SelectedFocusSyncLevel =
+                    FocusSyncLevelOptions[
+                        currentIndex +
+                        1];
+            }
+        }
+
+        /// <summary>
+        /// 선택한 10단계 Focus Position을 현재 장비 구성에 적용한다.
+        ///
+        /// 표준 Focus 범위:
+        /// 0    = Far
+        /// 1000 = Near
+        ///
+        /// 환경장비:
+        /// - EO Focus 0 ~ 1000 Absolute 명령
+        /// - IR Focus 0 ~ 1000 Absolute 명령
+        ///
+        /// 옥상장비:
+        /// - IR Focus는 0 ~ 1000 Absolute 명령
+        /// - EO Focus는 표준값을 CTEC Raw 0 ~ 32768로 변환하여
+        ///   VISCA Focus Direct Position 명령으로 한 번에 이동한다.
+        /// </summary>
+        private async Task ApplySelectedFocusSyncLevelAsync()
+        {
+            ZoomSyncLevelOption selectedLevel =
+                SelectedFocusSyncLevel;
+
+            if (selectedLevel == null)
+            {
+                return;
+            }
+
+            /// <summary>
+            /// 이전 Focus Sync 확인 작업만 취소한다.
+            ///
+            /// 기존 구현처럼 APPLY 시작 시 StopFocusSyncAsync()를 호출하면
+            /// 매 단계마다 IR Focus Stop 및 CTEC Focus Stop 명령이 먼저 송신된다.
+            /// 새 명령 시작 전 불필요한 장비 명령을 보내지 않도록
+            /// 기존 Token만 취소 / 정리한다.
+            /// </summary>
+            CancellationTokenSource previousCts =
+                _rooftopFocusSyncCts;
+
+            _rooftopFocusSyncCts =
+                null;
+
+            if (previousCts != null)
+            {
+                previousCts.Cancel();
+                previousCts.Dispose();
+            }
+
+            short standardPosition =
+                selectedLevel.Position;
+
+            FocusSyncStatusText =
+                $"APPLYING LEVEL {selectedLevel.Level}";
+
+            CancellationTokenSource focusSyncCts =
+                new CancellationTokenSource();
+
+            _rooftopFocusSyncCts =
+                focusSyncCts;
+
+            bool eoResult =
+                false;
+
+            bool irResult =
+                false;
+
+            try
+            {
+                /// <summary>
+                /// IR Focus Raw 방향은 Web Agent 표준 방향과 반대다.
+                ///
+                /// 표준:
+                /// 0    = Far
+                /// 1000 = Near
+                ///
+                /// IR Raw:
+                /// 1000 = Far
+                /// 0    = Near
+                /// </summary>
+                int irRawTargetPosition =
+                    1000 -
+                    standardPosition;
+
+                Task<bool> irMoveTask =
+                    MoveIrFocusToPositionAsync(
+                        irRawTargetPosition,
+                        focusSyncCts.Token);
+
+                if (SelectedEquipmentStatusMode ==
+                    EquipmentStatusMode.Environment)
+                {
+                    /// <summary>
+                    /// 환경장비 EO Focus는 기존 Web Agent Absolute 명령을 사용한다.
+                    /// </summary>
+                    eoResult =
+                        _controlCommandService
+                            .EoFocusGoPosition(
+                                standardPosition);
+
+                    irResult =
+                        await irMoveTask;
+                }
+                else
+                {
+                    RtspSourceOption ctecSource =
+                        _connectedEoCtecSource;
+
+                    if (ctecSource == null)
+                    {
+                        irResult =
+                            await irMoveTask;
+
+                        FocusSyncStatusText =
+                            irResult
+                                ? "IR COMPLETED / EO CTEC NOT CONNECTED"
+                                : "EO / IR COMMAND FAILED";
+
+                        return;
+                    }
+
+                    int eoRawTarget =
+                        ConvertStandardFocusToCtecRaw(
+                            standardPosition);
+
+                    Task<bool> eoMoveTask =
+                        MoveRooftopEoFocusToRawPositionAsync(
+                            ctecSource,
+                            eoRawTarget,
+                            focusSyncCts.Token);
+
+                    bool[] moveResults =
+                        await Task.WhenAll(
+                            eoMoveTask,
+                            irMoveTask);
+
+                    eoResult =
+                        moveResults[0];
+
+                    irResult =
+                        moveResults[1];
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        _rooftopFocusSyncCts,
+                        focusSyncCts))
+                {
+                    _rooftopFocusSyncCts =
+                        null;
+
+                    focusSyncCts.Dispose();
+                }
+            }
+
+            FocusSyncStatusText =
+                eoResult && irResult
+                    ? $"COMPLETED / LEVEL {selectedLevel.Level}"
+                    : $"INCOMPLETE / EO={eoResult} / IR={irResult}";
+        }
+
+        /// <summary>
+        /// IR Focus를 목표 Position으로 이동한다.
+        ///
+        /// 사용 명령:
+        /// - Near Start : Command2 0x31 / Data1 0x03
+        /// - Far Start  : Command2 0x31 / Data1 0x04
+        /// - Focus Stop : Command2 0x31 / Data1 0x05
+        ///
+        /// 상태 확인:
+        /// - Function 0x07의 IR Focus Position 0 ~ 1000
+        ///
+        /// 기존의 0x28 Absolute 명령은 실장비에서 Pan / Tilt가 움직였으므로
+        /// 이 경로에서는 절대 사용하지 않는다.
+        /// </summary>
+        private async Task<bool> MoveIrFocusToPositionAsync(
+            int targetPosition,
+            CancellationToken cancellationToken)
+        {
+            int safeTargetPosition =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        1000,
+                        targetPosition));
+
+            int startPosition =
+                _currentIrFocus;
+
+            int initialError =
+                Math.Abs(
+                    safeTargetPosition -
+                    startPosition);
+
+            if (initialError <=
+                IrFocusSyncTolerance)
+            {
+                return true;
+            }
+
+            /// <summary>
+            /// IR Focus Raw 값은 Near 방향으로 이동할수록 감소한다.
+            ///
+            /// 현재값보다 목표값이 작으면 Near,
+            /// 현재값보다 목표값이 크면 Far 방향이다.
+            /// </summary>
+            bool moveNear =
+                safeTargetPosition <
+                startPosition;
+
+            bool commandResult =
+                moveNear
+                    ? _controlCommandService
+                        .StartIrFocusNear()
+                    : _controlCommandService
+                        .StartIrFocusFar();
+
+            if (!commandResult)
+            {
+                return false;
+            }
+
+            ConsoleLogHelper.PrintLine();
+
+            Console.WriteLine(
+                "[IR FOCUS SYNC] START " +
+                $"/ DIRECTION={(moveNear ? "NEAR" : "FAR")} " +
+                $"/ CURRENT={startPosition} " +
+                $"/ TARGET={safeTargetPosition}");
+
+            ConsoleLogHelper.PrintLine();
+
+            Stopwatch timeout =
+                Stopwatch.StartNew();
+
+            int previousPosition =
+                startPosition;
+
+            try
+            {
+                while (timeout.ElapsedMilliseconds <
+                       IrFocusSyncTimeoutMs)
+                {
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+
+                    int currentPosition =
+                        _currentIrFocus;
+
+                    int error =
+                        Math.Abs(
+                            safeTargetPosition -
+                            currentPosition);
+
+                    bool reachedTarget =
+                        error <=
+                        IrFocusSyncTolerance;
+
+                    /// <summary>
+                    /// Near는 Raw 값 감소 방향,
+                    /// Far는 Raw 값 증가 방향이다.
+                    /// </summary>
+                    bool passedTarget =
+                        moveNear
+                            ? previousPosition >
+                                  safeTargetPosition &&
+                              currentPosition <=
+                                  safeTargetPosition
+                            : previousPosition <
+                                  safeTargetPosition &&
+                              currentPosition >=
+                                  safeTargetPosition;
+
+                    if (reachedTarget ||
+                        passedTarget)
+                    {
+                        Console.WriteLine(
+                            "[IR FOCUS SYNC] COMPLETED " +
+                            $"/ POSITION={currentPosition} " +
+                            $"/ TARGET={safeTargetPosition} " +
+                            $"/ ERROR={error}");
+
+                        ConsoleLogHelper.PrintLine();
+
+                        return true;
+                    }
+
+                    previousPosition =
+                        currentPosition;
+
+                    await Task.Delay(
+                        IrFocusSyncPollingIntervalMs,
+                        cancellationToken);
+                }
+
+                Console.WriteLine(
+                    "[IR FOCUS SYNC] TIMEOUT " +
+                    $"/ POSITION={_currentIrFocus} " +
+                    $"/ TARGET={safeTargetPosition}");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            finally
+            {
+                /// <summary>
+                /// 성공 / 실패 / 취소 여부와 관계없이
+                /// IR Focus 연속 이동은 반드시 정지한다.
+                /// </summary>
+                _controlCommandService
+                    .StopIrFocus();
+            }
+        }
+
+        /// <summary>
+        /// 옥상장비 CTEC EO Focus를 목표 Raw Position으로 직접 이동한다.
+        ///
+        /// VISCA Focus Direct Position 명령을 한 번만 송신하고,
+        /// TCP Port 9000 Focus Position Inquiry 응답은
+        /// 목표 도착 확인 용도로만 사용한다.
+        /// </summary>
+        private async Task<bool> MoveRooftopEoFocusToRawPositionAsync(
+            RtspSourceOption ctecSource,
+            int targetRawPosition,
+            CancellationToken cancellationToken)
+        {
+            if (ctecSource == null)
+            {
+                return false;
+            }
+
+            int safeTargetRawPosition =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        CtecEoFocusPositionMax,
+                        targetRawPosition));
+
+            try
+            {
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+
+                ConsoleLogHelper.PrintLine();
+
+                Console.WriteLine(
+                    "[ROOFTOP FOCUS SYNC] DIRECT START");
+
+                Console.WriteLine(
+                    $"[ROOFTOP FOCUS SYNC] TARGET : " +
+                    $"{safeTargetRawPosition}");
+
+                ConsoleLogHelper.PrintLine();
+
+                bool commandResult =
+                    await _ctecCameraCommandService
+                        .MoveFocusPositionAsync(
+                            ctecSource.ControlIp,
+                            ctecSource.ControlUserName,
+                            ctecSource.ControlPassword,
+                            ctecSource.UseHttps,
+                            (ushort)safeTargetRawPosition);
+
+                if (!commandResult)
+                {
+                    Console.WriteLine(
+                        "[ROOFTOP FOCUS SYNC] " +
+                        "DIRECT COMMAND FAILED");
+
+                    ConsoleLogHelper.PrintLine();
+
+                    return false;
+                }
+
+                Stopwatch timeout =
+                    Stopwatch.StartNew();
+
+                while (timeout.ElapsedMilliseconds <
+                       RooftopFocusSyncTimeoutMs)
+                {
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+
+                    int? currentPosition =
+                        await RequestAndWaitCtecEoPositionAsync(
+                            ContinuousMoveType.EoFocus,
+                            ctecSource,
+                            cancellationToken);
+
+                    if (currentPosition.HasValue)
+                    {
+                        int error =
+                            Math.Abs(
+                                currentPosition.Value -
+                                safeTargetRawPosition);
+
+                        Console.WriteLine(
+                            "[ROOFTOP FOCUS SYNC] DIRECT CHECK " +
+                            $"/ POSITION={currentPosition.Value} " +
+                            $"/ TARGET={safeTargetRawPosition} " +
+                            $"/ ERROR={error}");
+
+                        if (error <=
+                            RooftopFocusSyncTolerance)
+                        {
+                            Console.WriteLine(
+                                "[ROOFTOP FOCUS SYNC] " +
+                                "DIRECT COMPLETED");
+
+                            ConsoleLogHelper.PrintLine();
+
+                            return true;
+                        }
+                    }
+
+                    await Task.Delay(
+                        RooftopFocusSyncInquiryIntervalMs,
+                        cancellationToken);
+                }
+
+                Console.WriteLine(
+                    "[ROOFTOP FOCUS SYNC] DIRECT TIMEOUT");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine(
+                    "[ROOFTOP FOCUS SYNC] DIRECT CANCELED");
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "[ROOFTOP FOCUS SYNC] DIRECT ERROR : " +
+                    ex.Message);
+
+                ConsoleLogHelper.PrintLine();
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 진행 중인 Focus Sync 확인 작업과 장비 이동을 정지한다.
+        /// </summary>
+        private async Task StopFocusSyncAsync()
+        {
+            CancellationTokenSource cts =
+                _rooftopFocusSyncCts;
+
+            _rooftopFocusSyncCts =
+                null;
+
+            if (cts != null)
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+
+            /// <summary>
+            /// IR Focus Sync는 Near / Far 연속 이동 방식이므로
+            /// 사용자 STOP 또는 취소 시 반드시 Focus Stop을 송신한다.
+            ///
+            /// Pan / Tilt 오동작을 발생시킨 0x28 명령은 사용하지 않는다.
+            /// </summary>
+            _controlCommandService
+                .StopIrFocus();
+
+            RtspSourceOption ctecSource =
+                _connectedEoCtecSource;
+
+            if (ctecSource != null)
+            {
+                await _ctecCameraCommandService
+                    .StopFocusAsync(
+                        ctecSource.ControlIp,
+                        ctecSource.ControlUserName,
+                        ctecSource.ControlPassword,
+                        ctecSource.UseHttps);
+            }
+
+            FocusSyncStatusText =
+                "STOPPED";
+        }
+
+        /// <summary>
+        /// Web Agent 표준 Focus Position 0 ~ 1000을
+        /// CTEC EO Focus Raw Position 0 ~ 32768로 변환한다.
+        /// </summary>
+        private static int ConvertStandardFocusToCtecRaw(
+            int standardPosition)
+        {
+            int safePosition =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        1000,
+                        standardPosition));
+
+            return (int)Math.Round(
+                safePosition *
+                CtecEoFocusPositionMax /
+                1000.0);
+        }
+
+        #endregion
+
+        #region [Move Control Methods]
+
+        /// <summary>
+        /// 이동 제어 입력값을 VertiportNexus 기본값으로 초기화한다.
+        ///
+        /// Pan Absolute  : 0 (-180 ~ 180)
+        /// Tilt Absolute : 0 (-90 ~ 90)
+        /// Zoom Position : 0
+        /// Zoom Ratio    : 1.0
+        /// Focus Position: 0
+        /// </summary>
+        private void ResetMoveControlInput()
+        {
+            PanAbsoluteValue =
+                0.0;
+
+            TiltAbsoluteValue =
+                0.0;
+
+            ZoomPositionValue =
+                0;
+
+            ZoomRatioValue =
+                1.0;
+
+            FocusPositionValue =
+                0;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[MOVE CONTROL] INPUT RESET");
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// Pan Absolute 이동 요청
+        ///
+        /// 입력 범위:
+        /// -180 ~ 180
+        ///
+        /// 기존처럼 현재각과 목표각을 이용해 앱에서
+        /// 최단거리 또는 원점 통과 경로를 직접 계산하지 않는다.
+        ///
+        /// UI RadioButton에서 선택한 PAN TURN MODE를
+        /// Pelco-D 확장 명령 0x4D로 먼저 설정한 뒤,
+        /// 목표 Pan 각도를 위치 이동 명령 0x45로 전송한다.
+        ///
+        /// SHORT:
+        /// 0x4D / Data1 0x02
+        ///
+        /// VIA 0:
+        /// 0x4D / Data1 0x01
+        /// </summary>
+        /// <summary>
+        /// LA 프로그램 실제 명령 0xB1로 Pan / Tilt Homing을 시작한다.
+        /// LA 연결이 없거나 송신에 실패하면 MCB 4001 직접 Home Script로 fallback한다.
+        /// </summary>
+        private async Task MoveHomePositionAsync()
+        {
+            HomeZeroStatusText =
+                "HOME POSITION SENDING...";
+
+            bool laResult =
+                _laTcpService.IsConnected &&
+                _controlCommandService
+                    .MoveHomePosition();
+
+            bool directResult =
+                false;
+
+            if (!laResult)
+            {
+                directResult =
+                    await _mcbMaintenanceCommandService
+                        .MoveHomePositionAsync(
+                            GetMcbMaintenanceIpAddress(),
+                            McbMaintenancePort);
+            }
+
+            bool result =
+                laResult ||
+                directResult;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[HOME / ZERO] HOME POSITION " +
+                $"/ LA_0xB1={laResult} " +
+                $"/ MCB_FALLBACK={directResult} " +
+                $"/ RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            HomeZeroStatusText =
+                result
+                    ? "HOME POSITION COMMAND SENT"
+                    : "HOME POSITION SEND FAILED";
+
+            await Task.Delay(1);
+        }
+
+        /// <summary>
+        /// Vertiport 방식으로 현재 Pan 각도를 Home Offset으로 저장한다.
+        /// MO=0;ui[6]=현재각도*100;sv;MO=1;
+        /// </summary>
+        private async Task SetPanZeroAsync()
+        {
+            HomeZeroStatusText =
+                "PAN ZERO SENDING...";
+
+            bool result =
+                await _mcbMaintenanceCommandService
+                    .SetPanZeroAsync(
+                        GetMcbMaintenanceIpAddress(),
+                        McbMaintenancePort,
+                        RoundAngleToProtocolScale(
+                            _currentPan));
+
+            if (result)
+            {
+                _lastPanAbsoluteTarget =
+                    null;
+            }
+
+            HomeZeroStatusText =
+                result
+                    ? "PAN ZERO COMMAND SENT"
+                    : "PAN ZERO SEND FAILED";
+        }
+
+        /// <summary>
+        /// Vertiport 방식으로 현재 Tilt 각도를 Home Offset으로 저장한다.
+        /// MO=0;ui[6]=현재각도*100;sv;MO=1;
+        /// </summary>
+        private async Task SetTiltZeroAsync()
+        {
+            HomeZeroStatusText =
+                "TILT ZERO SENDING...";
+
+            bool result =
+                await _mcbMaintenanceCommandService
+                    .SetTiltZeroAsync(
+                        GetMcbMaintenanceIpAddress(),
+                        McbMaintenancePort,
+                        RoundAngleToProtocolScale(
+                            _currentTilt));
+
+            HomeZeroStatusText =
+                result
+                    ? "TILT ZERO COMMAND SENT"
+                    : "TILT ZERO SEND FAILED";
+        }
+
+        /// <summary>
+        /// MCB는 LA와 동일 PC에서 127.0.0.1:4001을 기본 사용한다.
+        /// Control Agent IP가 입력된 경우 동일 IP를 우선 사용한다.
+        /// </summary>
+        private string GetMcbMaintenanceIpAddress()
+        {
+            string ipAddress =
+                ControlAgentIp?
+                    .Trim();
+
+            return string.IsNullOrWhiteSpace(
+                    ipAddress)
+                ? "127.0.0.1"
+                : ipAddress;
+        }
+
+        private Task MovePanAbsoluteFromInputAsync()
+        {
+            if (!PanAbsoluteValue.HasValue)
+            {
+                Console.WriteLine(
+                    "[MOVE CONTROL] PAN ABSOLUTE FAILED : EMPTY VALUE");
+
+                return Task.CompletedTask;
+            }
+
+            double targetPan =
+                Clamp(
+                    RoundAngleToProtocolScale(
+                        PanAbsoluteValue.Value),
+                    MoveControlPanMinimum,
+                    MoveControlPanMaximum);
+
+            CancelMoveControlPanOperation();
+
+            bool modeResult =
+                ApplySelectedPanTurnMode();
+
+            if (!modeResult)
+            {
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[MOVE CONTROL] PAN ABSOLUTE FAILED : " +
+                    "PAN TURN MODE COMMAND FAILED");
+
+                ConsoleLogHelper.PrintLine();
+
+                return Task.CompletedTask;
+            }
+
+            bool moveResult =
+                _controlCommandService
+                    .PanGoPosition(
+                        targetPan);
+
+            if (moveResult)
+            {
+                _lastPanAbsoluteTarget =
+                    targetPan;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[MOVE CONTROL] PAN ABSOLUTE / " +
+                $"MODE={_panTurnMode}");
+
+            Console.WriteLine(
+                $"[MOVE CONTROL] CURRENT={_currentPan:F2} / " +
+                $"TARGET={targetPan:F2} / " +
+                $"MODE COMMAND={modeResult} / " +
+                $"MOVE COMMAND={moveResult}");
+
+            ConsoleLogHelper.PrintLine();
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// 현재 RadioButton에서 선택한 Pan 회전 모드를
+        /// Pelco-D 확장 명령 0x4D로 장비에 적용한다.
+        /// </summary>
+        private bool ApplySelectedPanTurnMode()
+        {
+            bool result;
+
+            if (_panTurnMode ==
+                PanTurnMode.ViaZero)
+            {
+                result =
+                    _controlCommandService
+                        .SetPanViaZeroMode();
+
+                Console.WriteLine(
+                    "[MOVE CONTROL] PAN TURN MODE / " +
+                    "VIA ZERO / CMD=0x4D / DATA1=0x01 / " +
+                    $"RESULT={result}");
+            }
+            else
+            {
+                result =
+                    _controlCommandService
+                        .SetPanShortestPathMode();
+
+                Console.WriteLine(
+                    "[MOVE CONTROL] PAN TURN MODE / " +
+                    "SHORTEST PATH / CMD=0x4D / DATA1=0x02 / " +
+                    $"RESULT={result}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Tilt Absolute 이동 요청
+        /// </summary>
+        private void MoveTiltAbsoluteFromInput()
+        {
+            if (!TiltAbsoluteValue.HasValue)
+            {
+                Console.WriteLine(
+                    "[MOVE CONTROL] TILT ABSOLUTE FAILED : EMPTY VALUE");
+
+                return;
+            }
+
+            double targetTilt =
+                Clamp(
+                    RoundAngleToProtocolScale(
+                        TiltAbsoluteValue.Value),
+                    MoveControlTiltMinimum,
+                    MoveControlTiltMaximum);
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[MOVE CONTROL] TILT ABSOLUTE / TARGET={targetTilt:F2}");
+
+            ConsoleLogHelper.PrintLine();
+
+            _controlCommandService
+                .TiltGoPosition(
+                    targetTilt);
+        }
+
+
+        /// <summary>
+        /// PRESET 1 (LA TEST) 등록.
+        ///
+        /// LA 실제 구현 순서:
+        /// 0x19 ID -> 0x91 Pan -> 0x93 Tilt -> 0x95 Zoom
+        /// -> 0x97 Focus + AddPreset
+        /// </summary>
+        private void AddOrUpdateLaPresetPoint()
+        {
+            int presetNumber =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        99,
+                        LaPresetSlotNumber));
+
+            ushort zoom =
+                GetCurrentPresetStandardZoom();
+
+            ushort focus =
+                GetCurrentPresetStandardFocus();
+
+            int laInternalId =
+                presetNumber -
+                1;
+
+            bool idResult =
+                _controlCommandService
+                    .SetLaPresetId(
+                        (ushort)laInternalId);
+
+            bool panResult =
+                idResult &&
+                _controlCommandService
+                    .SetLaPresetPan(
+                        _currentPan);
+
+            bool tiltResult =
+                panResult &&
+                _controlCommandService
+                    .SetLaPresetTilt(
+                        _currentTilt);
+
+            bool zoomResult =
+                tiltResult &&
+                _controlCommandService
+                    .SetLaPresetZoom(
+                        zoom);
+
+            bool focusResult =
+                zoomResult &&
+                _controlCommandService
+                    .SetLaPresetFocusAndCommit(
+                        focus);
+
+            bool result =
+                idResult &&
+                panResult &&
+                tiltResult &&
+                zoomResult &&
+                focusResult;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / LA] ADD / UPDATE");
+
+            Console.WriteLine(
+                $"[PRESET 1 / LA] DISPLAY=P{presetNumber:00} / " +
+                $"INTERNAL_ID={laInternalId} / " +
+                $"PAN={_currentPan:F2} / " +
+                $"TILT={_currentTilt:F2} / " +
+                $"ZOOM={zoom} / FOCUS={focus} / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!result)
+            {
+                LaPresetCommandStatusText =
+                    $"P{presetNumber:00} REGISTER SEND FAILED";
+
+                return;
+            }
+
+            PresetPointOption newPreset =
+                new PresetPointOption(
+                    presetNumber,
+                    _currentPan,
+                    _currentTilt,
+                    zoom.ToString(),
+                    focus.ToString(),
+                    GetCurrentIrZoomStandardPosition().ToString(),
+                    GetCurrentIrFocusStandardPosition().ToString());
+
+            UpsertLaPresetPoint(
+                newPreset);
+
+            LaPresetCommandStatusText =
+                $"P{presetNumber:00} LA SCAN POINT REGISTERED";
+        }
+
+        /// <summary>
+        /// PRESET 1 선택 지점으로 WPF 저장값 기준 PTZF 전체를 직접 복원한다.
+        ///
+        /// LA 0x05 한 번에 의존하지 않고 Pan, Tilt, EO/IR Zoom,
+        /// EO/IR Focus를 현재 프로젝트의 실제 제어 경로로 각각 실행한다.
+        /// </summary>
+        private async Task MoveToSelectedLaPresetPointAsync()
+        {
+            PresetPointOption preset =
+                SelectedLaPresetPoint;
+
+            if (preset == null)
+            {
+                LaPresetCommandStatusText =
+                    "MOVE FAILED : SELECT LA PRESET";
+
+                return;
+            }
+
+            LaPresetCommandStatusText =
+                $"P{preset.Number:00} DIRECT PTZF MOVING";
+
+            bool result =
+                await MoveLaPresetPointDirectAsync(
+                    preset,
+                    CancellationToken.None);
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT] MOVE");
+
+            Console.WriteLine(
+                $"[PRESET 1 / WPF DIRECT] DISPLAY=P{preset.Number:00} / " +
+                $"PAN={preset.Pan:F2} / TILT={preset.Tilt:F2} / " +
+                $"EO_ZOOM={preset.EoZoomText} / " +
+                $"EO_FOCUS={preset.EoFocusText} / " +
+                $"IR_ZOOM={preset.IrZoomText} / " +
+                $"IR_FOCUS={preset.IrFocusText} / RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            LaPresetCommandStatusText =
+                result
+                    ? $"P{preset.Number:00} DIRECT PTZF MOVE COMPLETED"
+                    : $"P{preset.Number:00} DIRECT PTZF MOVE INCOMPLETE";
+        }
+
+        /// <summary>
+        /// 저장된 PRESET 1 한 지점의 PTZF 값을 직접 복원한다.
+        /// </summary>
+        private async Task<bool> MoveLaPresetPointDirectAsync(
+            PresetPointOption preset,
+            CancellationToken cancellationToken)
+        {
+            if (preset == null)
+            {
+                return false;
+            }
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            bool modeResult =
+                ApplySelectedPanTurnMode();
+
+            bool panResult =
+                modeResult &&
+                _controlCommandService
+                    .PanGoPosition(
+                        preset.Pan);
+
+            bool tiltResult =
+                _controlCommandService
+                    .TiltGoPosition(
+                        preset.Tilt);
+
+            if (panResult)
+            {
+                _lastPanAbsoluteTarget =
+                    preset.Pan;
+            }
+
+            int eoZoom =
+                ParsePresetPosition(
+                    preset.EoZoomText,
+                    GetCurrentPresetStandardZoom());
+
+            int eoFocus =
+                ParsePresetPosition(
+                    preset.EoFocusText,
+                    GetCurrentPresetStandardFocus());
+
+            int irZoom =
+                ParsePresetPosition(
+                    preset.IrZoomText,
+                    GetCurrentIrZoomStandardPosition());
+
+            int irFocus =
+                ParsePresetPosition(
+                    preset.IrFocusText,
+                    GetCurrentIrFocusStandardPosition());
+
+            bool zoomResult =
+                await MoveLaPresetZoomDirectAsync(
+                    eoZoom,
+                    irZoom,
+                    cancellationToken);
+
+            bool focusResult =
+                await MoveLaPresetFocusDirectAsync(
+                    eoFocus,
+                    irFocus,
+                    cancellationToken);
+
+            bool result =
+                modeResult &&
+                panResult &&
+                tiltResult &&
+                zoomResult &&
+                focusResult;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT] PTZF RESULT");
+
+            Console.WriteLine(
+                $"[PRESET 1 / WPF DIRECT] " +
+                $"P={panResult} / T={tiltResult} / " +
+                $"Z={zoomResult} / F={focusResult} / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            return result;
+        }
+
+        private static int ParsePresetPosition(
+            string text,
+            int fallback)
+        {
+            int parsed;
+
+            if (!int.TryParse(
+                    text,
+                    out parsed))
+            {
+                parsed =
+                    fallback;
+            }
+
+            return Math.Max(
+                MoveControlPositionMinimum,
+                Math.Min(
+                    MoveControlPositionMaximum,
+                    parsed));
+        }
+
+        /// <summary>
+        /// PRESET 1 저장값 기준 EO / IR Zoom을 각각 복원한다.
+        /// </summary>
+        private async Task<bool> MoveLaPresetZoomDirectAsync(
+            int eoStandardPosition,
+            int irPosition,
+            CancellationToken cancellationToken)
+        {
+            int safeEoPosition =
+                Clamp(
+                    eoStandardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            int safeIrPosition =
+                Clamp(
+                    irPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            await StopZoomSyncAsync();
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            bool irResult =
+                _webAgentZoomControlService
+                    .SetIrZoomPosition(
+                        (short)safeIrPosition);
+
+            bool eoResult;
+
+            if (SelectedEquipmentStatusMode ==
+                EquipmentStatusMode.Environment)
+            {
+                eoResult =
+                    _controlCommandService
+                        .EoZoomGoPosition(
+                            (short)safeEoPosition);
+            }
+            else
+            {
+                RtspSourceOption ctecSource =
+                    _connectedEoCtecSource;
+
+                if (ctecSource == null)
+                {
+                    eoResult =
+                        _controlCommandService
+                            .EoZoomGoPosition(
+                                (short)safeEoPosition);
+                }
+                else
+                {
+                    int eoRawTarget =
+                        ConvertStandardZoomToCtecRaw(
+                            safeEoPosition);
+
+                    eoResult =
+                        await MoveRooftopEoZoomToRawPositionAsync(
+                            ctecSource,
+                            eoRawTarget,
+                            cancellationToken);
+                }
+            }
+
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT] ZOOM " +
+                $"/ EO={safeEoPosition}:{eoResult} " +
+                $"/ IR={safeIrPosition}:{irResult}");
+
+            return eoResult &&
+                irResult;
+        }
+
+        /// <summary>
+        /// PRESET 1 저장값 기준 EO / IR Focus를 각각 복원한다.
+        /// </summary>
+        private async Task<bool> MoveLaPresetFocusDirectAsync(
+            int eoStandardPosition,
+            int irStandardPosition,
+            CancellationToken cancellationToken)
+        {
+            int safeEoPosition =
+                Clamp(
+                    eoStandardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            int safeIrStandardPosition =
+                Clamp(
+                    irStandardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            int irRawTargetPosition =
+                MoveControlPositionMaximum -
+                safeIrStandardPosition;
+
+            await StopFocusSyncAsync();
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            Task<bool> irMoveTask =
+                MoveIrFocusToPositionAsync(
+                    irRawTargetPosition,
+                    cancellationToken);
+
+            bool eoResult;
+
+            if (SelectedEquipmentStatusMode ==
+                EquipmentStatusMode.Environment)
+            {
+                eoResult =
+                    _controlCommandService
+                        .EoFocusGoPosition(
+                            (short)safeEoPosition);
+            }
+            else
+            {
+                RtspSourceOption ctecSource =
+                    _connectedEoCtecSource;
+
+                if (ctecSource == null)
+                {
+                    eoResult =
+                        _controlCommandService
+                            .EoFocusGoPosition(
+                                (short)safeEoPosition);
+                }
+                else
+                {
+                    int eoRawTarget =
+                        ConvertStandardFocusToCtecRaw(
+                            safeEoPosition);
+
+                    eoResult =
+                        await MoveRooftopEoFocusToRawPositionAsync(
+                            ctecSource,
+                            eoRawTarget,
+                            cancellationToken);
+                }
+            }
+
+            bool irResult =
+                await irMoveTask;
+
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT] FOCUS " +
+                $"/ EO={safeEoPosition}:{eoResult} " +
+                $"/ IR_STANDARD={safeIrStandardPosition} " +
+                $"/ IR_RAW_TARGET={irRawTargetPosition}:{irResult}");
+
+            return eoResult &&
+                irResult;
+        }
+
+        /// <summary>
+        /// 현재 EO Zoom 값을 프리셋 공통 범위 0~1000으로 변환한다.
+        /// </summary>
+        private ushort GetCurrentPresetStandardZoom()
+        {
+            if (_connectedEoCtecSource != null)
+            {
+                return (ushort)Math.Max(
+                    0,
+                    Math.Min(
+                        1000,
+                        (int)Math.Round(
+                            _currentCtecEoZoomPosition *
+                            1000.0 /
+                            CtecEoZoomPositionMax)));
+            }
+
+            return (ushort)Math.Max(
+                0,
+                Math.Min(
+                    1000,
+                    (int)_currentEoZoom));
+        }
+
+        /// <summary>
+        /// 현재 EO Focus 값을 프리셋 공통 범위 0~1000으로 변환한다.
+        /// </summary>
+        private ushort GetCurrentPresetStandardFocus()
+        {
+            if (_connectedEoCtecSource != null)
+            {
+                return (ushort)Math.Max(
+                    0,
+                    Math.Min(
+                        1000,
+                        (int)Math.Round(
+                            _currentCtecEoFocusPosition *
+                            1000.0 /
+                            CtecEoFocusPositionMax)));
+            }
+
+            return (ushort)Math.Max(
+                0,
+                Math.Min(
+                    1000,
+                    (int)_currentEoFocus));
+        }
+
+        /// <summary>
+        /// IR Zoom 상태 Raw를 EO와 동일한 표준 방향 0~1000으로 변환한다.
+        /// Raw 1000(Wide) -> Standard 0(Wide)
+        /// Raw 0(Tele)    -> Standard 1000(Tele)
+        /// </summary>
+        private int GetCurrentIrZoomStandardPosition()
+        {
+            int safeRaw =
+                Clamp(
+                    (int)_currentIrZoom,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            return MoveControlPositionMaximum -
+                safeRaw;
+        }
+
+        /// <summary>
+        /// IR Focus 상태 Raw를 EO와 동일한 표준 방향 0~1000으로 변환한다.
+        /// Raw 1000(Far) -> Standard 0(Far)
+        /// Raw 0(Near)   -> Standard 1000(Near)
+        /// </summary>
+        private int GetCurrentIrFocusStandardPosition()
+        {
+            int safeRaw =
+                Clamp(
+                    (int)_currentIrFocus,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            return MoveControlPositionMaximum -
+                safeRaw;
+        }
+
+        /// <summary>
+        /// PRESET 1 화면 목록에 같은 번호가 있으면 갱신하고,
+        /// 없으면 번호순으로 삽입한다.
+        /// </summary>
+        private void UpsertLaPresetPoint(
+            PresetPointOption newPreset)
+        {
+            PresetPointOption existingPreset =
+                LaPresetPoints
+                    .FirstOrDefault(
+                        preset =>
+                            preset.Number ==
+                            newPreset.Number);
+
+            if (existingPreset != null)
+            {
+                LaPresetPoints.Remove(
+                    existingPreset);
+            }
+
+            int insertIndex =
+                0;
+
+            while (insertIndex <
+                       LaPresetPoints.Count &&
+                   LaPresetPoints[insertIndex].Number <
+                       newPreset.Number)
+            {
+                insertIndex++;
+            }
+
+            LaPresetPoints.Insert(
+                insertIndex,
+                newPreset);
+
+            SelectedLaPresetPoint =
+                newPreset;
+        }
+
+        private void ClearAllLaPresetPoints()
+        {
+            StopLaPresetScan();
+
+            bool result =
+                _controlCommandService
+                    .ClearAllLaPresets();
+
+            if (result)
+            {
+                LaPresetPoints.Clear();
+                SelectedLaPresetPoint =
+                    null;
+
+                IsLaPresetScanRunning =
+                    false;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / LA] CLEAR ALL");
+
+            Console.WriteLine(
+                $"[PRESET 1 / LA] RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            LaPresetCommandStatusText =
+                result
+                    ? "LA PRESET DATA CLEAR COMMAND SENT"
+                    : "LA PRESET DATA CLEAR SEND FAILED";
+        }
+
+        /// <summary>
+        /// PRESET 1 저장 목록을 WPF가 직접 P01 -> P02 -> ... 순회한다.
+        /// 각 지점마다 PTZF 전체 직접 복원 루틴을 사용한다.
+        /// </summary>
+        private async Task StartLaPresetScanAsync()
+        {
+            if (LaPresetPoints.Count <
+                2)
+            {
+                LaPresetCommandStatusText =
+                    "SCAN START FAILED : REGISTER 2 OR MORE POINTS";
+
+                return;
+            }
+
+            CancellationTokenSource oldCts =
+                Interlocked.Exchange(
+                    ref _laPresetDirectScanCts,
+                    null);
+
+            if (oldCts != null)
+            {
+                oldCts.Cancel();
+                oldCts.Dispose();
+            }
+
+            CancellationTokenSource scanCts =
+                new CancellationTokenSource();
+
+            _laPresetDirectScanCts =
+                scanCts;
+
+            int delaySeconds =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        LaPresetScanDelay));
+
+            IsLaPresetScanRunning =
+                true;
+
+            LaPresetCommandStatusText =
+                $"WPF DIRECT SCAN START / {LaPresetPoints.Count} POINTS";
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT SCAN] START");
+
+            Console.WriteLine(
+                $"[PRESET 1 / WPF DIRECT SCAN] " +
+                $"POINTS={LaPresetPoints.Count} / " +
+                $"DELAY={delaySeconds}s");
+
+            ConsoleLogHelper.PrintLine();
+
+            try
+            {
+                while (!scanCts.IsCancellationRequested)
+                {
+                    PresetPointOption[] points =
+                        LaPresetPoints
+                            .OrderBy(
+                                point =>
+                                    point.Number)
+                            .ToArray();
+
+                    foreach (PresetPointOption point in points)
+                    {
+                        scanCts.Token
+                            .ThrowIfCancellationRequested();
+
+                        SelectedLaPresetPoint =
+                            point;
+
+                        LaPresetCommandStatusText =
+                            $"SCAN MOVING P{point.Number:00}";
+
+                        bool moveResult =
+                            await MoveLaPresetPointDirectAsync(
+                                point,
+                                scanCts.Token);
+
+                        Console.WriteLine(
+                            "[PRESET 1 / WPF DIRECT SCAN] " +
+                            $"P{point.Number:00} MOVE RESULT={moveResult}");
+
+                        await Task.Delay(
+                            TimeSpan.FromSeconds(
+                                delaySeconds),
+                            scanCts.Token);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine(
+                    "[PRESET 1 / WPF DIRECT SCAN] CANCELED");
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        _laPresetDirectScanCts,
+                        scanCts))
+                {
+                    _laPresetDirectScanCts =
+                        null;
+
+                    scanCts.Dispose();
+                }
+
+                IsLaPresetScanRunning =
+                    false;
+
+                LaPresetCommandStatusText =
+                    "WPF DIRECT SCAN STOPPED";
+
+                ConsoleLogHelper.PrintLine();
+            }
+        }
+
+        private void UpdateLaPresetScan()
+        {
+            int delay =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        LaPresetScanDelay));
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT SCAN] OPTION");
+
+            Console.WriteLine(
+                $"[PRESET 1 / WPF DIRECT SCAN] DELAY={delay}s");
+
+            ConsoleLogHelper.PrintLine();
+
+            LaPresetCommandStatusText =
+                $"DIRECT SCAN DELAY={delay}s / NEXT START APPLIED";
+        }
+
+        private void StopLaPresetScan()
+        {
+            CancellationTokenSource scanCts =
+                Interlocked.Exchange(
+                    ref _laPresetDirectScanCts,
+                    null);
+
+            if (scanCts != null)
+            {
+                scanCts.Cancel();
+            }
+
+            IsLaPresetScanRunning =
+                false;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET 1 / WPF DIRECT SCAN] STOP REQUEST");
+
+            ConsoleLogHelper.PrintLine();
+
+            LaPresetCommandStatusText =
+                "WPF DIRECT SCAN STOP REQUESTED";
+        }
+
+        private void AddOrUpdatePresetPoint()
+        {
+            int presetNumber =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        63,
+                        PresetSlotNumber));
+
+            bool slotResult =
+                _controlCommandService
+                    .AddPresetPoint(
+                        (byte)presetNumber);
+
+            ushort scanZoom =
+                GetCurrentPresetStandardZoom();
+
+            ushort scanFocus =
+                GetCurrentPresetStandardFocus();
+
+            /*
+             * PRESET 2는 문서 2.10 일반 슬롯 저장과 함께
+             * 문서 2.8 오토 스캔 포인트도 같은 번호로 등록한다.
+             *
+             * 이 등록이 있어야 START(0x99) 시
+             * P01 -> P02 -> P03 순회가 가능하다.
+             */
+            bool scanIdResult =
+                slotResult &&
+                _controlCommandService
+                    .SetLaPresetId(
+                        (ushort)presetNumber);
+
+            bool scanPanResult =
+                scanIdResult &&
+                _controlCommandService
+                    .SetLaPresetPan(
+                        _currentPan);
+
+            bool scanTiltResult =
+                scanPanResult &&
+                _controlCommandService
+                    .SetLaPresetTilt(
+                        _currentTilt);
+
+            bool scanZoomResult =
+                scanTiltResult &&
+                _controlCommandService
+                    .SetLaPresetZoom(
+                        scanZoom);
+
+            bool scanFocusResult =
+                scanZoomResult &&
+                _controlCommandService
+                    .SetLaPresetFocusAndCommit(
+                        scanFocus);
+
+            bool result =
+                slotResult &&
+                scanIdResult &&
+                scanPanResult &&
+                scanTiltResult &&
+                scanZoomResult &&
+                scanFocusResult;
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET] ADD / UPDATE");
+
+            Console.WriteLine(
+                $"[PRESET 2 / DEVICE] NUMBER={presetNumber} / " +
+                $"PAN={_currentPan:F2} / " +
+                $"TILT={_currentTilt:F2} / " +
+                $"SCAN_ZOOM={scanZoom} / " +
+                $"SCAN_FOCUS={scanFocus} / " +
+                $"SLOT_RESULT={slotResult} / " +
+                $"SCAN_RESULT={scanFocusResult} / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!result)
+            {
+                PresetCommandStatusText =
+                    $"P{presetNumber:00} ADD SEND FAILED";
+
+                return;
+            }
+
+            PresetPointOption newPreset =
+                new PresetPointOption(
+                    presetNumber,
+                    _currentPan,
+                    _currentTilt,
+                    CurrentEoZoomText,
+                    CurrentEoFocusText,
+                    GetCurrentIrZoomStandardPosition().ToString(),
+                    GetCurrentIrFocusStandardPosition().ToString());
+
+            UpsertPresetPoint(
+                newPreset);
+
+            PresetCommandStatusText =
+                $"P{presetNumber:00} SLOT + SCAN POINT REGISTERED";
+        }
+
+        /// <summary>
+        /// 선택 슬롯의 프리셋을 제거한다.
+        ///
+        /// TORUSS 명령:
+        /// Command2 = 0x05
+        /// Data1    = 0x00
+        /// Data2    = Preset Number (1 ~ 63)
+        /// </summary>
+        private void DeletePresetPoint()
+        {
+            int presetNumber =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        63,
+                        PresetSlotNumber));
+
+            bool result =
+                _controlCommandService
+                    .RemovePresetPoint(
+                        (byte)presetNumber);
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET] DELETE");
+
+            Console.WriteLine(
+                $"[PRESET] NUMBER={presetNumber} / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (!result)
+            {
+                PresetCommandStatusText =
+                    $"P{presetNumber:00} DELETE SEND FAILED";
+
+                return;
+            }
+
+            PresetPointOption existingPreset =
+                PresetPoints
+                    .FirstOrDefault(
+                        preset =>
+                            preset.Number ==
+                            presetNumber);
+
+            if (existingPreset != null)
+            {
+                PresetPoints.Remove(
+                    existingPreset);
+            }
+
+            SelectedPresetPoint =
+                PresetPoints.FirstOrDefault();
+
+            PresetCommandStatusText =
+                $"P{presetNumber:00} DELETE COMMAND SENT";
+        }
+
+        /// <summary>
+        /// ComboBox에서 선택한 프리셋으로 이동한다.
+        ///
+        /// 현재 UI의 PAN TURN MODE를 먼저 송신한 뒤
+        /// 프리셋 이동 명령을 송신한다.
+        ///
+        /// TORUSS 명령:
+        /// Command2 = 0x07
+        /// Data1    = 0x00
+        /// Data2    = Preset Number (1 ~ 63)
+        /// </summary>
+        private void MoveToSelectedPresetPoint()
+        {
+            if (SelectedPresetPoint == null)
+            {
+                PresetCommandStatusText =
+                    "MOVE FAILED : SELECT PRESET";
+
+                Console.WriteLine(
+                    "[PRESET] MOVE FAILED : " +
+                    "NO PRESET SELECTED");
+
+                return;
+            }
+
+            bool modeResult =
+                ApplySelectedPanTurnMode();
+
+            if (!modeResult)
+            {
+                PresetCommandStatusText =
+                    "MOVE FAILED : PAN MODE SEND";
+
+                return;
+            }
+
+            int presetNumber =
+                SelectedPresetPoint.Number;
+
+            bool moveResult =
+                _controlCommandService
+                    .MoveToPresetPoint(
+                        (byte)presetNumber);
+
+            if (moveResult)
+            {
+                /*
+                 * 프리셋 Snapshot의 Pan 부호를 보관하여
+                 * ±180 경계 상태 표시 시 기존 Absolute 명령과
+                 * 동일한 부호 유지 규칙을 적용한다.
+                 */
+                _lastPanAbsoluteTarget =
+                    SelectedPresetPoint.Pan;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET] MOVE");
+
+            Console.WriteLine(
+                $"[PRESET] NUMBER={presetNumber} / " +
+                $"MODE={_panTurnMode} / " +
+                $"MODE_RESULT={modeResult} / " +
+                $"MOVE_RESULT={moveResult}");
+
+            ConsoleLogHelper.PrintLine();
+
+            PresetCommandStatusText =
+                moveResult
+                    ? $"P{presetNumber:00} MOVE COMMAND SENT"
+                    : $"P{presetNumber:00} MOVE SEND FAILED";
+        }
+
+        /// <summary>
+        /// 프리셋 오토 스캔을 시작한다.
+        ///
+        /// TORUSS 명령:
+        /// Command2 = 0x99
+        /// Data1    = Speed (1 ~ 60)
+        /// Data2    = Delay (1 ~ 60)
+        /// </summary>
+        private void StartPresetScan()
+        {
+            bool modeResult =
+                ApplySelectedPanTurnMode();
+
+            if (!modeResult)
+            {
+                PresetCommandStatusText =
+                    "SCAN START FAILED : PAN MODE SEND";
+
+                return;
+            }
+
+            byte speed =
+                (byte)Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        PresetScanSpeed));
+
+            byte delay =
+                (byte)Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        PresetScanDelay));
+
+            bool result =
+                _controlCommandService
+                    .StartPresetScan(
+                        speed,
+                        delay);
+
+            if (result)
+            {
+                /*
+                 * 스캔 중에는 다음 Pan 목표 부호를 알 수 없으므로
+                 * 직전 Absolute / Preset 이동 목표 부호를 제거한다.
+                 */
+                _lastPanAbsoluteTarget =
+                    null;
+
+                IsPresetScanRunning =
+                    true;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET SCAN] START");
+
+            Console.WriteLine(
+                $"[PRESET SCAN] SPEED={speed} / " +
+                $"DELAY={delay}s / " +
+                $"MODE={_panTurnMode} / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            PresetCommandStatusText =
+                result
+                    ? $"SCAN START SENT / SPEED {speed} / DELAY {delay}s"
+                    : "SCAN START SEND FAILED";
+        }
+
+        /// <summary>
+        /// 실행 중인 스캔의 속도 / 정지시간을 변경한다.
+        ///
+        /// TORUSS 명령:
+        /// Command2 = 0x9D
+        /// Data1    = Speed (1 ~ 60)
+        /// Data2    = Delay (1 ~ 60)
+        /// </summary>
+        private void UpdatePresetScan()
+        {
+            byte speed =
+                (byte)Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        PresetScanSpeed));
+
+            byte delay =
+                (byte)Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        PresetScanDelay));
+
+            bool result =
+                _controlCommandService
+                    .UpdatePresetScan(
+                        speed,
+                        delay);
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET SCAN] UPDATE");
+
+            Console.WriteLine(
+                $"[PRESET SCAN] SPEED={speed} / " +
+                $"DELAY={delay}s / " +
+                $"RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            PresetCommandStatusText =
+                result
+                    ? $"SCAN UPDATE SENT / SPEED {speed} / DELAY {delay}s"
+                    : "SCAN UPDATE SEND FAILED";
+        }
+
+        /// <summary>
+        /// 프리셋 오토 스캔을 정지한다.
+        ///
+        /// TORUSS 명령:
+        /// Command2 = 0x9B
+        /// Data1    = 0x00
+        /// Data2    = 0x00
+        ///
+        /// Data2 = 0x01인 프리셋 데이터 초기화는
+        /// 오조작 위험이 있으므로 UI에 제공하지 않는다.
+        /// </summary>
+        private void StopPresetScan()
+        {
+            bool result =
+                _controlCommandService
+                    .StopPresetScan();
+
+            if (result)
+            {
+                IsPresetScanRunning =
+                    false;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[PRESET SCAN] STOP");
+
+            Console.WriteLine(
+                $"[PRESET SCAN] RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
+
+            PresetCommandStatusText =
+                result
+                    ? "SCAN STOP COMMAND SENT"
+                    : "SCAN STOP SEND FAILED";
+        }
+
+        /// <summary>
+        /// 화면 확인용 프리셋 목록에 슬롯을 추가하거나 갱신한다.
+        ///
+        /// 슬롯 번호 오름차순으로 유지하여
+        /// ComboBox에서 P01, P02, P03 순으로 표시한다.
+        /// </summary>
+        private void UpsertPresetPoint(
+            PresetPointOption newPreset)
+        {
+            PresetPointOption existingPreset =
+                PresetPoints
+                    .FirstOrDefault(
+                        preset =>
+                            preset.Number ==
+                            newPreset.Number);
+
+            if (existingPreset != null)
+            {
+                PresetPoints.Remove(
+                    existingPreset);
+            }
+
+            int insertIndex =
+                0;
+
+            while (insertIndex <
+                       PresetPoints.Count &&
+                   PresetPoints[insertIndex].Number <
+                       newPreset.Number)
+            {
+                insertIndex++;
+            }
+
+            PresetPoints.Insert(
+                insertIndex,
+                newPreset);
+
+            SelectedPresetPoint =
+                newPreset;
+        }
+
+        /// <summary>
+        /// Zoom Position 입력값 적용
+        /// </summary>
+        private async Task SetZoomPositionFromInputAsync()
+        {
+            if (!ZoomPositionValue.HasValue)
+            {
+                Console.WriteLine(
+                    "[MOVE CONTROL] ZOOM POSITION FAILED : EMPTY VALUE");
+
+                return;
+            }
+
+            int standardPosition =
+                Clamp(
+                    ZoomPositionValue.Value,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            await ApplyMoveControlZoomPositionAsync(
+                standardPosition,
+                "POSITION");
+        }
+
+        /// <summary>
+        /// Zoom Ratio 입력값 적용
+        ///
+        /// 입력값은 EO 광학 배율 1.0 ~ 50.0배 기준이다.
+        /// EO 배율을 공통 Position 0 ~ 1000으로 변환한 뒤
+        /// EO와 IR에 동일한 진행률을 적용한다.
+        ///
+        /// EO 1.0배  -> Position 0    -> IR 1.0배
+        /// EO 50.0배 -> Position 1000 -> IR 5.0배
+        /// </summary>
+        private async Task SetZoomRatioFromInputAsync()
+        {
+            if (!ZoomRatioValue.HasValue)
+            {
+                Console.WriteLine(
+                    "[MOVE CONTROL] ZOOM RATIO FAILED : EMPTY VALUE");
+
+                return;
+            }
+
+            double zoomRatio =
+                Clamp(
+                    ZoomRatioValue.Value,
+                    MoveControlMinimumZoomRatio,
+                    MoveControlEoMaximumZoomRatio);
+
+            int standardPosition =
+                ConvertEoZoomRatioToStandardPosition(
+                    zoomRatio);
+
+            await ApplyMoveControlZoomPositionAsync(
+                standardPosition,
+                $"RATIO {zoomRatio:F1}x");
+        }
+
+        /// <summary>
+        /// 이동 제어 Zoom Position을 현재 장비 구성에 적용한다.
+        ///
+        /// 환경장비:
+        /// EO / IR Control Agent Position 명령
+        ///
+        /// 옥상장비:
+        /// EO CTEC Direct Position + IR Control Agent Position 명령
+        /// </summary>
+        private async Task ApplyMoveControlZoomPositionAsync(
+            int standardPosition,
+            string requestType)
+        {
+            int safePosition =
+                Clamp(
+                    standardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            await StopZoomSyncAsync();
+
+            Console.WriteLine();
+            Console.WriteLine(
+                $"[MOVE CONTROL] ZOOM {requestType} " +
+                $"/ STANDARD POSITION={safePosition} " +
+                $"/ EO RATIO={ConvertStandardPositionToEoZoomRatio(safePosition):F1}x " +
+                $"/ IR RATIO={ConvertStandardPositionToIrZoomRatio(safePosition):F1}x");
+
+            ConsoleLogHelper.PrintLine();
+
+            if (SelectedEquipmentStatusMode ==
+                EquipmentStatusMode.Environment)
+            {
+                bool result =
+                    _webAgentZoomControlService
+                        .ApplySynchronizedZoom(
+                            (short)safePosition);
+
+                Console.WriteLine(
+                    $"[MOVE CONTROL] ENVIRONMENT ZOOM RESULT : {result}");
+
+                ConsoleLogHelper.PrintLine();
+
+                return;
+            }
+
+            bool irResult =
+                _webAgentZoomControlService
+                    .SetIrZoomPosition(
+                        (short)safePosition);
+
+            RtspSourceOption ctecSource =
+                _connectedEoCtecSource;
+
+            if (ctecSource == null)
+            {
+                bool eoFallbackResult =
+                    _controlCommandService
+                        .EoZoomGoPosition(
+                            (short)safePosition);
+
+                Console.WriteLine(
+                    "[MOVE CONTROL] ROOFTOP ZOOM FALLBACK " +
+                    $"/ EO={eoFallbackResult} / IR={irResult}");
+
+                ConsoleLogHelper.PrintLine();
+
+                return;
+            }
+
+            int eoRawTarget =
+                ConvertStandardZoomToCtecRaw(
+                    safePosition);
+
+            CancellationTokenSource zoomCts =
+                new CancellationTokenSource();
+
+            _rooftopZoomSyncCts =
+                zoomCts;
+
+            bool eoResult;
+
+            try
+            {
+                eoResult =
+                    await MoveRooftopEoZoomToRawPositionAsync(
+                        ctecSource,
+                        eoRawTarget,
+                        zoomCts.Token);
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        _rooftopZoomSyncCts,
+                        zoomCts))
+                {
+                    _rooftopZoomSyncCts =
+                        null;
+
+                    zoomCts.Dispose();
+                }
+            }
+
+            Console.WriteLine(
+                "[MOVE CONTROL] ROOFTOP ZOOM RESULT " +
+                $"/ EO={eoResult} / IR={irResult}");
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// Focus Position 입력값 적용
+        ///
+        /// 표준 방향:
+        /// 0    = Far
+        /// 1000 = Near
+        ///
+        /// IR Raw 방향:
+        /// 1000 = Far
+        /// 0    = Near
+        /// </summary>
+        private async Task SetFocusPositionFromInputAsync()
+        {
+            if (!FocusPositionValue.HasValue)
+            {
+                Console.WriteLine(
+                    "[MOVE CONTROL] FOCUS POSITION FAILED : EMPTY VALUE");
+
+                return;
+            }
+
+            int standardPosition =
+                Clamp(
+                    FocusPositionValue.Value,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            await ApplyMoveControlFocusPositionAsync(
+                standardPosition);
+        }
+
+        /// <summary>
+        /// 이동 제어 Focus Position을 EO / IR에 동시에 적용한다.
+        ///
+        /// IR Focus Absolute 0x28 명령은 Pan / Tilt 오동작 이력이 있으므로
+        /// 절대 사용하지 않고, 기존 검증된 Near / Far 연속 명령과
+        /// Function 0x07 상태 피드백을 사용한다.
+        /// </summary>
+        private async Task ApplyMoveControlFocusPositionAsync(
+            int standardPosition)
+        {
+            int safePosition =
+                Clamp(
+                    standardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            await StopFocusSyncAsync();
+
+            CancellationTokenSource focusCts =
+                new CancellationTokenSource();
+
+            _rooftopFocusSyncCts =
+                focusCts;
+
+            bool eoResult =
+                false;
+
+            bool irResult =
+                false;
+
+            try
+            {
+                int irRawTargetPosition =
+                    MoveControlPositionMaximum -
+                    safePosition;
+
+                Task<bool> irMoveTask =
+                    MoveIrFocusToPositionAsync(
+                        irRawTargetPosition,
+                        focusCts.Token);
+
+                if (SelectedEquipmentStatusMode ==
+                    EquipmentStatusMode.Environment)
+                {
+                    eoResult =
+                        _controlCommandService
+                            .EoFocusGoPosition(
+                                (short)safePosition);
+
+                    irResult =
+                        await irMoveTask;
+                }
+                else
+                {
+                    RtspSourceOption ctecSource =
+                        _connectedEoCtecSource;
+
+                    if (ctecSource == null)
+                    {
+                        eoResult =
+                            _controlCommandService
+                                .EoFocusGoPosition(
+                                    (short)safePosition);
+
+                        irResult =
+                            await irMoveTask;
+                    }
+                    else
+                    {
+                        int eoRawTarget =
+                            ConvertStandardFocusToCtecRaw(
+                                safePosition);
+
+                        Task<bool> eoMoveTask =
+                            MoveRooftopEoFocusToRawPositionAsync(
+                                ctecSource,
+                                eoRawTarget,
+                                focusCts.Token);
+
+                        bool[] moveResults =
+                            await Task.WhenAll(
+                                eoMoveTask,
+                                irMoveTask);
+
+                        eoResult =
+                            moveResults[0];
+
+                        irResult =
+                            moveResults[1];
+                    }
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        _rooftopFocusSyncCts,
+                        focusCts))
+                {
+                    _rooftopFocusSyncCts =
+                        null;
+
+                    focusCts.Dispose();
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[MOVE CONTROL] FOCUS POSITION RESULT " +
+                $"/ STANDARD={safePosition} " +
+                $"/ EO={eoResult} / IR={irResult}");
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// 기존 VIA 0 Pan 이동 작업 취소
+        /// </summary>
+        private void CancelMoveControlPanOperation()
+        {
+            CancellationTokenSource cts =
+                Interlocked.Exchange(
+                    ref _moveControlPanCts,
+                    null);
+
+            if (cts == null)
+            {
+                return;
+            }
+
+            cts.Cancel();
+        }
+
+        /// <summary>
+        /// Pan 위치를 LA / Pelco-D signed 각도 범위
+        /// -180 ~ 180으로 정규화한다.
+        ///
+        /// 예:
+        /// 181  -> -179
+        /// 270  -> -90
+        /// -181 -> 179
+        /// </summary>
+        private static double NormalizePanToSigned180(
+            double pan)
+        {
+            double normalized =
+                pan %
+                360.0;
+
+            if (normalized > 180.0)
+            {
+                normalized -=
+                    360.0;
+            }
+            else if (normalized < -180.0)
+            {
+                normalized +=
+                    360.0;
+            }
+
+            return normalized;
+        }
+
+        /// <summary>
+        /// EO 광학 배율 1.0 ~ 50.0을
+        /// 공통 표준 Position 0 ~ 1000으로 변환한다.
+        ///
+        /// 이 Position을 EO와 IR에 동일하게 적용하여
+        /// 두 렌즈의 기계적 Zoom 진행률을 맞춘다.
+        /// </summary>
+        private static int ConvertEoZoomRatioToStandardPosition(
+            double eoZoomRatio)
+        {
+            double safeRatio =
+                Clamp(
+                    eoZoomRatio,
+                    MoveControlMinimumZoomRatio,
+                    MoveControlEoMaximumZoomRatio);
+
+            double normalized =
+                (safeRatio -
+                 MoveControlMinimumZoomRatio) /
+                (MoveControlEoMaximumZoomRatio -
+                 MoveControlMinimumZoomRatio);
+
+            return (int)Math.Round(
+                normalized *
+                MoveControlPositionMaximum,
+                MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
+        /// 표준 Position 0 ~ 1000을
+        /// EO 광학 배율 1.0 ~ 50.0으로 변환한다.
+        /// </summary>
+        private static double ConvertStandardPositionToEoZoomRatio(
+            int standardPosition)
+        {
+            int safePosition =
+                Clamp(
+                    standardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            double normalized =
+                safePosition /
+                (double)MoveControlPositionMaximum;
+
+            return MoveControlMinimumZoomRatio +
+                   normalized *
+                   (MoveControlEoMaximumZoomRatio -
+                    MoveControlMinimumZoomRatio);
+        }
+
+        /// <summary>
+        /// 표준 Position 0 ~ 1000을
+        /// IR 광학 배율 1.0 ~ 5.0으로 변환한다.
+        ///
+        /// 실제 장비 명령은 기존과 동일하게 Position 기준으로 보내며,
+        /// 이 값은 UI 및 로그에 표시하는 예상 광학 배율이다.
+        /// </summary>
+        private static double ConvertStandardPositionToIrZoomRatio(
+            int standardPosition)
+        {
+            int safePosition =
+                Clamp(
+                    standardPosition,
+                    MoveControlPositionMinimum,
+                    MoveControlPositionMaximum);
+
+            double normalized =
+                safePosition /
+                (double)MoveControlPositionMaximum;
+
+            return MoveControlMinimumZoomRatio +
+                   normalized *
+                   (MoveControlIrMaximumZoomRatio -
+                    MoveControlMinimumZoomRatio);
+        }
+
+        /// <summary>
+        /// 각도 입력값을 프로토콜 소수점 둘째 자리 기준으로 반올림한다.
+        /// </summary>
+        private static double RoundAngleToProtocolScale(
+            double angle)
+        {
+            return Math.Round(
+                angle,
+                2,
+                MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
+        /// Nullable 각도 입력값 반올림
+        /// </summary>
+        private static double? RoundNullableAngle(
+            double? angle)
+        {
+            return angle.HasValue
+                ? RoundAngleToProtocolScale(
+                    angle.Value)
+                : (double?)null;
+        }
+
+        /// <summary>
+        /// double 범위 제한
+        /// </summary>
+        private static double Clamp(
+            double value,
+            double min,
+            double max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+
+            if (value > max)
+            {
+                return max;
+            }
+
+            return value;
+        }
+
+        /// <summary>
+        /// int 범위 제한
+        /// </summary>
+        private static int Clamp(
+            int value,
+            int min,
+            int max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+
+            if (value > max)
+            {
+                return max;
+            }
+
+            return value;
+        }
+
+        #endregion
+
         #region [Current Device Status Properties]
 
         /// <summary>
@@ -2603,35 +7235,69 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         /// <summary>
         /// 현재 EO Zoom 상태 표시 문자열
+        ///
+        /// 옥상 GOP EO CTEC 직접 제어 장비는
+        /// 원시 Position / 최대 Position / 퍼센트를 함께 표시한다.
+        ///
+        /// 예: 8192 / 16384 (50.0%)
+        ///
+        /// 그 외 장비는 기존 Control Agent 상태값을 그대로 표시한다.
         /// </summary>
         public string CurrentEoZoomText =>
-            _connectedEoCtecSource != null
-                ? _currentCtecEoZoomPosition.ToString()
-                : _currentEoZoom.ToString();
+            GetCurrentPresetStandardZoom()
+                .ToString();
 
         /// <summary>
-        /// 현재 EO Focus 상태 표시 문자열
-        ///
-        /// 옥상 GOP EO 직접 제어 연결 상태에서는
-        /// TCP Port 9000으로 수신한 CTEC Focus Position을 표시한다.
-        /// 그 외 장비는 기존 Control Agent 상태값을 표시한다.
+        /// 현재 EO Focus 표준 위치 0~1000 표시
         /// </summary>
         public string CurrentEoFocusText =>
-            _connectedEoCtecSource != null
-                ? _currentCtecEoFocusPosition.ToString()
-                : _currentEoFocus.ToString();
+            GetCurrentPresetStandardFocus()
+                .ToString();
 
         /// <summary>
-        /// 현재 IR Zoom 상태 표시 문자열
+        /// 현재 IR Zoom 표준 위치 표시.
+        /// LA 상태 Raw 방향이 반대이므로 1000 - Raw를 사용한다.
         /// </summary>
         public string CurrentIrZoomText =>
-            _currentIrZoom.ToString();
+            GetCurrentIrZoomStandardPosition()
+                .ToString();
 
         /// <summary>
-        /// 현재 IR Focus 상태 표시 문자열
+        /// 현재 IR Focus 표준 위치 표시.
+        /// LA 상태 Raw 방향이 반대이므로 1000 - Raw를 사용한다.
         /// </summary>
         public string CurrentIrFocusText =>
-            _currentIrFocus.ToString();
+            GetCurrentIrFocusStandardPosition()
+                .ToString();
+
+        /// <summary>
+        /// CTEC 원시 위치를 로그 확인용 현재값 / 최대값 / 퍼센트 문자열로 만든다.
+        /// 화면 표시는 0~1000으로 통일하지만 수신 로그에는 원시값을 유지한다.
+        /// </summary>
+        private static string BuildCtecPositionText(
+            int rawPosition,
+            int maxPosition)
+        {
+            if (maxPosition <= 0)
+            {
+                return rawPosition.ToString();
+            }
+
+            double percent =
+                rawPosition /
+                (double)maxPosition *
+                100.0;
+
+            percent =
+                Math.Max(
+                    0.0,
+                    Math.Min(
+                        100.0,
+                        percent));
+
+            return
+                $"{rawPosition} / {maxPosition} ({percent:F1}%)";
+        }
 
         /// <summary>
         /// 현재 주요 장비 상태 표시 문자열
@@ -3493,6 +8159,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             ConsoleLogHelper.PrintLine();
 
+            if (result &&
+                _activeEoCtecSource != null)
+            {
+                StartCtecEoPositionPolling(
+                    ContinuousMoveType.EoZoom,
+                    _activeEoCtecSource);
+            }
+
             if (!result &&
                 _currentMoveType ==
                     ContinuousMoveType.EoZoom)
@@ -3566,6 +8240,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 $"[CONTROL] EO ZOOM WIDE SEND RESULT : {result}");
 
             ConsoleLogHelper.PrintLine();
+
+            if (result &&
+                _activeEoCtecSource != null)
+            {
+                StartCtecEoPositionPolling(
+                    ContinuousMoveType.EoZoom,
+                    _activeEoCtecSource);
+            }
 
             if (!result &&
                 _currentMoveType ==
@@ -3657,6 +8339,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 $"[FOCUS COMMAND #{sequence}] " +
                 $"SEND RESULT={result}");
 
+            if (result &&
+                _activeEoCtecSource != null)
+            {
+                StartCtecEoPositionPolling(
+                    ContinuousMoveType.EoFocus,
+                    _activeEoCtecSource);
+            }
+
             if (!result &&
                 _currentMoveType ==
                     ContinuousMoveType.EoFocus)
@@ -3747,6 +8437,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 $"[FOCUS COMMAND #{sequence}] " +
                 $"SEND RESULT={result}");
 
+            if (result &&
+                _activeEoCtecSource != null)
+            {
+                StartCtecEoPositionPolling(
+                    ContinuousMoveType.EoFocus,
+                    _activeEoCtecSource);
+            }
+
             if (!result &&
                 _currentMoveType ==
                     ContinuousMoveType.EoFocus)
@@ -3835,6 +8533,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _connectedEoCtecSource =
                     null;
 
+                SelectedEquipmentStatusMode =
+                    EquipmentStatusMode.Environment;
+
                 _ctecCameraResponseService.Stop();
 
                 OnPropertyChanged(
@@ -3849,6 +8550,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _connectedEoCtecSource =
                 sourceOption;
 
+            SelectedEquipmentStatusMode =
+                EquipmentStatusMode.Rooftop;
+
             _currentCtecEoZoomPosition =
                 0;
 
@@ -3862,7 +8566,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 nameof(CurrentEoZoomText));
 
             OnPropertyChanged(
+                nameof(EnvironmentEoZoomStatusText));
+
+            OnPropertyChanged(
                 nameof(CurrentEoFocusText));
+
+            OnPropertyChanged(
+                nameof(EnvironmentEoFocusStatusText));
 
             Console.WriteLine();
             Console.WriteLine(
@@ -3989,9 +8699,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         OnPropertyChanged(
                             nameof(CurrentEoZoomText));
 
+                        OnPropertyChanged(
+                            nameof(RooftopEoZoomStatusText));
+
+                        OnPropertyChanged(
+                            nameof(CurrentPresetSnapshotText));
+
+                        OnPropertyChanged(
+                            nameof(CurrentLaPresetSnapshotText));
+
                         Console.WriteLine(
                             $"[CTEC RESPONSE] EO ZOOM POSITION : " +
-                            $"{zoomPosition} (0x{zoomPosition:X4})");
+                            $"{BuildCtecPositionText(zoomPosition, CtecEoZoomPositionMax)} " +
+                            $"/ HEX=0x{zoomPosition:X4}");
 
                         break;
                     }
@@ -4008,9 +8728,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         OnPropertyChanged(
                             nameof(CurrentEoFocusText));
 
+                        OnPropertyChanged(
+                            nameof(RooftopEoFocusStatusText));
+
+                        OnPropertyChanged(
+                            nameof(CurrentPresetSnapshotText));
+
+                        OnPropertyChanged(
+                            nameof(CurrentLaPresetSnapshotText));
+
                         Console.WriteLine(
                             $"[CTEC RESPONSE] EO FOCUS POSITION : " +
-                            $"{focusPosition} (0x{focusPosition:X4})");
+                            $"{BuildCtecPositionText(focusPosition, CtecEoFocusPositionMax)} " +
+                            $"/ HEX=0x{focusPosition:X4}");
 
                         break;
                     }
@@ -4179,6 +8909,287 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         #endregion
 
+        #region [CTEC EO Zoom / Focus Real-time Position Polling]
+
+        /// <summary>
+        /// [CTEC EO Zoom / Focus] 실시간 Position 조회 시작
+        ///
+        /// 기존 Polling이 남아 있으면 먼저 종료한 뒤,
+        /// 현재 이동 종류에 맞는 Inquiry를 200ms 간격으로 반복한다.
+        ///
+        /// 주의:
+        /// - Zoom / Focus 이동 명령을 반복 송신하지 않는다.
+        /// - Position Inquiry만 반복 송신한다.
+        /// - 실제 값 갱신은 TCP Port 9000 응답 수신부에서 처리한다.
+        /// </summary>
+        private void StartCtecEoPositionPolling(
+            ContinuousMoveType moveType,
+            RtspSourceOption sourceOption)
+        {
+            StopCtecEoPositionPolling();
+
+            if (sourceOption == null ||
+                (moveType != ContinuousMoveType.EoZoom &&
+                 moveType != ContinuousMoveType.EoFocus))
+            {
+                return;
+            }
+
+            CancellationTokenSource pollingCts =
+                new CancellationTokenSource();
+
+            _ctecEoPositionPollingCts =
+                pollingCts;
+
+            long operationGeneration =
+                Interlocked.Increment(
+                    ref _ctecEoPositionOperationGeneration);
+
+            Console.WriteLine(
+                $"[CTEC POLLING] START : {moveType} / " +
+                $"INTERVAL={CtecEoPositionPollingIntervalMs}ms");
+
+            ConsoleLogHelper.PrintLine();
+
+            _ = PollCtecEoPositionAsync(
+                moveType,
+                sourceOption,
+                operationGeneration,
+                pollingCts.Token);
+        }
+
+        /// <summary>
+        /// [CTEC EO Zoom / Focus] 실시간 Position 조회 Loop
+        /// </summary>
+        private async Task PollCtecEoPositionAsync(
+            ContinuousMoveType moveType,
+            RtspSourceOption sourceOption,
+            long operationGeneration,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (_currentMoveType != moveType ||
+                        !_ctecCameraResponseService.IsConnected ||
+                        operationGeneration !=
+                            Interlocked.Read(
+                                ref _ctecEoPositionOperationGeneration))
+                    {
+                        break;
+                    }
+
+                    int? position =
+                        await RequestAndWaitCtecEoPositionAsync(
+                            moveType,
+                            sourceOption,
+                            cancellationToken);
+
+                    if (!position.HasValue)
+                    {
+                        Console.WriteLine(
+                            $"[CTEC POLLING] RESPONSE TIMEOUT : {moveType}");
+                    }
+
+                    /*
+                     * 다음 Inquiry는 이전 TCP Position 응답을 받은 뒤에만 송신한다.
+                     * 따라서 Camera 내부 응답이 늦어져도 미응답 Inquiry가 누적되지 않는다.
+                     */
+                    await Task.Delay(
+                        CtecEoPositionPollingIntervalMs,
+                        cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // MouseUp / MouseLeave / Disconnect에 의한 정상 종료
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[CTEC POLLING] ERROR : {moveType} / {ex.Message}");
+
+                ConsoleLogHelper.PrintLine();
+            }
+            finally
+            {
+                Console.WriteLine(
+                    $"[CTEC POLLING] END : {moveType}");
+
+                ConsoleLogHelper.PrintLine();
+            }
+        }
+
+        /// <summary>
+        /// [CTEC Position Inquiry] CGI 송신 후 실제 TCP 9000 Position 응답까지 기다린다.
+        ///
+        /// HTTP 200 OK만으로 조회 완료 처리하지 않는다.
+        /// Zoom은 0x47, Focus는 0x48 응답이 도착해야 한 번의 Inquiry가 끝난다.
+        /// </summary>
+        private async Task<int?> RequestAndWaitCtecEoPositionAsync(
+            ContinuousMoveType moveType,
+            RtspSourceOption sourceOption,
+            CancellationToken cancellationToken)
+        {
+            await _ctecEoPositionQueryLock.WaitAsync(
+                cancellationToken);
+
+            try
+            {
+                /*
+                 * Query Lock을 획득한 뒤 송신된 Inquiry는
+                 * MouseUp Cancel이 발생해도 해당 TCP 응답 또는 Timeout까지 소비한다.
+                 *
+                 * 여기서 응답 대기까지 즉시 취소하면 이전 Inquiry 응답이
+                 * 다음 Stop 안정화 Inquiry를 잘못 완료시키는 문제가 다시 발생한다.
+                 */
+                Task<int?> responseTask;
+                bool inquiryResult;
+
+                if (moveType == ContinuousMoveType.EoZoom)
+                {
+                    responseTask =
+                        _ctecCameraResponseService
+                            .WaitForNextZoomPositionAsync(
+                                CtecEoPositionResponseTimeoutMs,
+                                CancellationToken.None);
+
+                    inquiryResult =
+                        await _ctecCameraCommandService
+                            .RequestZoomPositionAsync(
+                                sourceOption.ControlIp,
+                                sourceOption.ControlUserName,
+                                sourceOption.ControlPassword,
+                                sourceOption.UseHttps);
+                }
+                else if (moveType == ContinuousMoveType.EoFocus)
+                {
+                    responseTask =
+                        _ctecCameraResponseService
+                            .WaitForNextFocusPositionAsync(
+                                CtecEoPositionResponseTimeoutMs,
+                                CancellationToken.None);
+
+                    inquiryResult =
+                        await _ctecCameraCommandService
+                            .RequestFocusPositionAsync(
+                                sourceOption.ControlIp,
+                                sourceOption.ControlUserName,
+                                sourceOption.ControlPassword,
+                                sourceOption.UseHttps);
+                }
+                else
+                {
+                    return null;
+                }
+
+                if (!inquiryResult)
+                {
+                    Console.WriteLine(
+                        $"[CTEC INQUIRY] SEND FAILED : {moveType}");
+
+                    return null;
+                }
+
+                return await responseTask;
+            }
+            finally
+            {
+                _ctecEoPositionQueryLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// [CTEC Stop] Stop 송신 이후 실제 Position 값이 안정될 때까지 확인한다.
+        ///
+        /// 단일 조회값을 최종 위치로 확정하지 않는다.
+        /// 카메라 상태 갱신이 늦으면 이전 이동 방향의 값이 뒤늦게 반환될 수 있으므로,
+        /// 연속 두 값이 허용 오차 안에 들어올 때 최종 위치로 판단한다.
+        /// </summary>
+        private async Task WaitForCtecEoPositionStableAsync(
+            ContinuousMoveType moveType,
+            RtspSourceOption sourceOption,
+            long operationGeneration)
+        {
+            int? previousPosition = null;
+
+            for (int count = 0;
+                 count < CtecEoPositionSettleMaximumCount;
+                 count++)
+            {
+                if (operationGeneration !=
+                    Interlocked.Read(
+                        ref _ctecEoPositionOperationGeneration) ||
+                    !_ctecCameraResponseService.IsConnected)
+                {
+                    return;
+                }
+
+                int? currentPosition =
+                    await RequestAndWaitCtecEoPositionAsync(
+                        moveType,
+                        sourceOption,
+                        CancellationToken.None);
+
+                if (currentPosition.HasValue &&
+                    previousPosition.HasValue &&
+                    Math.Abs(
+                        currentPosition.Value -
+                        previousPosition.Value) <=
+                    CtecEoPositionStableTolerance)
+                {
+                    Console.WriteLine(
+                        $"[CTEC POSITION] STABLE : {moveType} / " +
+                        $"POSITION={currentPosition.Value} / " +
+                        $"COUNT={count + 1}");
+
+                    ConsoleLogHelper.PrintLine();
+
+                    return;
+                }
+
+                previousPosition =
+                    currentPosition;
+
+                await Task.Delay(
+                    CtecEoPositionPollingIntervalMs);
+            }
+
+            Console.WriteLine(
+                $"[CTEC POSITION] SETTLE LIMIT : {moveType} / " +
+                $"LAST={previousPosition?.ToString() ?? "NONE"}");
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// [CTEC EO Zoom / Focus] 실시간 Position 조회 종료
+        /// </summary>
+        private void StopCtecEoPositionPolling()
+        {
+            CancellationTokenSource pollingCts =
+                Interlocked.Exchange(
+                    ref _ctecEoPositionPollingCts,
+                    null);
+
+            if (pollingCts == null)
+            {
+                return;
+            }
+
+            try
+            {
+                pollingCts.Cancel();
+            }
+            finally
+            {
+                pollingCts.Dispose();
+            }
+        }
+
+        #endregion
+
         #region [Common Stop Continuous Move]
 
         /// <summary>
@@ -4191,6 +9202,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public async void StopContinuousMove()
         {
+            /*
+             * 이동 제어 VIA 0 Pan 작업이 실행 중이면
+             * Stop 버튼에서도 동일하게 취소되도록 먼저 종료한다.
+             */
+            CancelMoveControlPanOperation();
+
             ContinuousMoveType moveType =
                 _currentMoveType;
 
@@ -4199,6 +9216,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
             {
                 return;
             }
+
+            /*
+             * Zoom / Focus 위치 조회 Loop를 먼저 종료한다.
+             * 이후 Stop 명령과 최종 Inquiry가 Polling 요청 사이에 섞이지 않도록 한다.
+             */
+            StopCtecEoPositionPolling();
+
+            long stopOperationGeneration =
+                Interlocked.Increment(
+                    ref _ctecEoPositionOperationGeneration);
 
             /*
              * Stop 중복 호출을 방지하기 위해
@@ -4247,15 +9274,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                             if (stopResult &&
                                 _ctecCameraResponseService.IsConnected)
                             {
-                                await Task.Delay(
-                                    100);
-
-                                await _ctecCameraCommandService
-                                    .RequestZoomPositionAsync(
-                                        activeEoCtecSource.ControlIp,
-                                        activeEoCtecSource.ControlUserName,
-                                        activeEoCtecSource.ControlPassword,
-                                        activeEoCtecSource.UseHttps);
+                                await WaitForCtecEoPositionStableAsync(
+                                    ContinuousMoveType.EoZoom,
+                                    activeEoCtecSource,
+                                    stopOperationGeneration);
                             }
                         }
                         else
@@ -4314,15 +9336,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                             activeEoCtecSource != null &&
                             _ctecCameraResponseService.IsConnected)
                         {
-                            await Task.Delay(
-                                100);
-
-                            await _ctecCameraCommandService
-                                .RequestFocusPositionAsync(
-                                    activeEoCtecSource.ControlIp,
-                                    activeEoCtecSource.ControlUserName,
-                                    activeEoCtecSource.ControlPassword,
-                                    activeEoCtecSource.UseHttps);
+                            await WaitForCtecEoPositionStableAsync(
+                                ContinuousMoveType.EoFocus,
+                                activeEoCtecSource,
+                                stopOperationGeneration);
                         }
 
                         break;
@@ -4454,7 +9471,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             // VdStatusText = "[VD] Connecting...";
 
             EoStatusText = "[EO] Connecting...";
-            IrStatusText = "[IR] Connecting...";
+
+            /*
+             * 최초 RTSP 연결은 EO를 우선 처리한다.
+             *
+             * EO 연결 결과가 확정되고 영상 수신 Loop가 시작된 뒤
+             * IR 연결을 시작하므로, 초기 상태 표시 순서가
+             * EO -> IR 순서로 명확하게 유지된다.
+             */
+            IrStatusText = "[IR] Waiting for EO...";
 
             try
             {
@@ -4665,15 +9690,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 //             _cts.Token));
                 // }
 
-                /// <summary>
-                /// [EO / IR] 실제 RTSP 연결 시작 전
-                /// 화면에 연결 중 상태를 잠시 표시한다.
-                ///
-                /// 이 지연은 RTSP Timeout과 관계없는
-                /// UI 표시 목적의 의도적인 대기시간이다.
-                /// </summary>
-                await Task.Delay(500);
-
                 VideoConnectResult result =
                     await OpenVideoSourcesAsync();
 
@@ -4696,9 +9712,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 // EO / IR 개별 상태 Console 출력
                 WriteVideoConnectLog(result);
 
-                // EO / IR 최초 연결 결과 표시
-                UpdateVideoStatusText(result);
-
                 /// <summary>
                 /// [EO / IR] 영상 연결 성공 시 중앙 십자선 자동 활성화
                 ///
@@ -4715,11 +9728,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     IsCrosshairVisible =
                         true;
                 }
-
-                /*
-                 * 최초 연결에 성공한 영상만 Capture Loop 시작
-                 */
-                StartVideoLoops(result);
 
                 /*
                  * 최초 연결에 실패한 영상은 자동 재연결 시작
@@ -4783,6 +9791,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             _controlAgentReconnectCts?.Cancel();
             _videoReconnectCts?.Cancel();
+
+            /*
+             * CTEC EO Zoom / Focus 버튼을 누르고 있던 상태에서
+             * Disconnect하더라도 CGI Inquiry가 계속 송신되지 않도록 종료한다.
+             */
+            StopCtecEoPositionPolling();
+
+            /// <summary>
+            /// 진행 중인 이동 제어 VIA 0 Pan 작업 종료
+            /// </summary>
+            CancelMoveControlPanOperation();
+
+            /// <summary>
+            /// 진행 중인 EO / IR Zoom Sync 작업 종료
+            /// </summary>
+            _ = StopZoomSyncAsync();
+
+            /// <summary>
+            /// 진행 중인 EO / IR Focus Sync 작업 종료
+            /// </summary>
+            _ = StopFocusSyncAsync();
 
             // 1. 먼저 [Loop] 종료 요청
             _cts?.Cancel();
@@ -4864,6 +9893,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentPan =
                 0.0;
 
+            _lastPanAbsoluteTarget =
+                null;
+
+            IsPresetScanRunning =
+                false;
+
+            PresetCommandStatusText =
+                "CONTROL AGENT DISCONNECTED";
+
             _currentTilt =
                 0.0;
 
@@ -4878,6 +9916,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             _currentIrFocus =
                 0;
+
+            /// <summary>
+            /// CONTROL AGENT TCP 연결에서 남아 있을 수 있는
+            /// 분할 수신 Packet Buffer 초기화
+            /// </summary>
+            _laPacketParser.Reset();
 
             _currentPowerStatus =
                 0x00;
@@ -5034,31 +10078,36 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private async Task<VideoConnectResult> OpenVideoSourcesAsync()
         {
-            /// <summary>
-            /// [EO / IR] RTSP 연결을 순차 처리하면
-            /// 한쪽 Timeout 이후에 다른 Stream 연결을 시작하게 된다.
-            ///
-            /// 두 Stream을 동시에 연결하여 초기 화면 표시 시간을 단축한다.
-            /// </summary>
-            Task<bool> eoOpenTask =
-                Task.Run(() =>
+            bool eoResult =
+                false;
+
+            bool irResult =
+                false;
+
+            CancellationToken captureToken =
+                _cts?.Token ?? CancellationToken.None;
+
+            /*
+             * [1] EO RTSP 우선 연결
+             *
+             * VertiportNexus의 MCB -> SCB 순차 연결 방식과 동일하게
+             * 첫 번째 장비의 Connect 결과가 확정되기 전에는
+             * 다음 장비 연결을 시작하지 않는다.
+             */
+            eoResult =
+                await Task.Run(() =>
                     _eoDecoder.Open(
                         EoSourceAddress));
 
-            Task<bool> irOpenTask =
-                Task.Run(() =>
-                    _irDecoder.Open(
-                        IrSourceAddress));
-
-            await Task.WhenAll(
-                eoOpenTask,
-                irOpenTask);
-
-            bool eoResult =
-                eoOpenTask.Result;
-
-            bool irResult =
-                irOpenTask.Result;
+            if (!_isDeviceConnectionRequested ||
+                captureToken.IsCancellationRequested)
+            {
+                return new VideoConnectResult
+                {
+                    EoResult = false,
+                    IrResult = false
+                };
+            }
 
             if (eoResult)
             {
@@ -5067,6 +10116,86 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 EoVideoHeight =
                     _eoDecoder.VideoHeight;
+
+                EoStatusText =
+                    "[EO] Connected";
+
+                /*
+                 * EO 연결 완료 직후 Capture Loop를 먼저 시작한다.
+                 *
+                 * 기존처럼 EO / IR Open이 모두 끝날 때까지 기다리지 않으므로
+                 * EO Connected 상태와 영상이 IR보다 먼저 화면에 반영된다.
+                 */
+                _ = Task.Run(() =>
+                    FFmpegCaptureLoop(
+                        _eoDecoder,
+                        "EO",
+                        bitmap =>
+                        {
+                            EOCameraImage =
+                                bitmap;
+
+                            _isEoFrameDisplayed =
+                                true;
+                        },
+                        captureToken));
+            }
+            else
+            {
+                EoStatusText =
+                    "[EO] Connect Failed";
+            }
+
+            /*
+             * EO 상태 변경 및 첫 Frame이 UI에 먼저 반영될 시간을 확보한다.
+             *
+             * 연결 순서 자체는 위 await가 보장하며, 이 대기시간은
+             * VertiportNexus의 MCB -> SCB 연결 간격과 동일한 표시 목적이다.
+             */
+            try
+            {
+                await Task.Delay(
+                    500,
+                    captureToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return new VideoConnectResult
+                {
+                    EoResult = eoResult,
+                    IrResult = false
+                };
+            }
+
+            if (!_isDeviceConnectionRequested ||
+                captureToken.IsCancellationRequested)
+            {
+                return new VideoConnectResult
+                {
+                    EoResult = eoResult,
+                    IrResult = false
+                };
+            }
+
+            /*
+             * [2] EO 연결 처리 완료 후 IR RTSP 연결
+             */
+            IrStatusText =
+                "[IR] Connecting...";
+
+            irResult =
+                await Task.Run(() =>
+                    _irDecoder.Open(
+                        IrSourceAddress));
+
+            if (!_isDeviceConnectionRequested ||
+                captureToken.IsCancellationRequested)
+            {
+                return new VideoConnectResult
+                {
+                    EoResult = eoResult,
+                    IrResult = false
+                };
             }
 
             if (irResult)
@@ -5076,6 +10205,28 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 IrVideoHeight =
                     _irDecoder.VideoHeight;
+
+                IrStatusText =
+                    "[IR] Connected";
+
+                _ = Task.Run(() =>
+                    FFmpegCaptureLoop(
+                        _irDecoder,
+                        "IR",
+                        bitmap =>
+                        {
+                            IRCameraImage =
+                                bitmap;
+
+                            _isIrFrameDisplayed =
+                                true;
+                        },
+                        captureToken));
+            }
+            else
+            {
+                IrStatusText =
+                    "[IR] Connect Failed";
             }
 
             return new VideoConnectResult
@@ -6364,40 +11515,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 case 0x07:
                     /// <summary>
                     /// [Function] [0x07]
-                    /// 
-                    /// 기본적으로 [Alive] / [ACK] 계열 [Packet]이다.
-                    /// 
-                    /// 현재 장비에서 [FF 07 EF 05 ...] 형태의 [Packet]이
-                    /// 반복 수신되지만, 값이 고정되어 있어
-                    /// [IR] [Zoom] / [Focus] 상태값으로 사용하지 않는다.
+                    ///
+                    /// 열영상 카메라 [Zoom] / [Focus] 위치 상태 Packet
+                    ///
+                    /// Packet 구조:
+                    ///
+                    /// [0]  Header
+                    /// [1]  Function = 0x07
+                    /// [2]  IR Zoom Low Byte
+                    /// [3]  IR Zoom High Byte
+                    /// [4]  IR Focus Low Byte
+                    /// [5]  IR Focus High Byte
+                    /// [6] ~ [10] 상태 / 예약 영역
+                    /// [11] Checksum
+                    ///
+                    /// 장비에서 실제 수신되는 위치값은
+                    /// Little Endian 방식으로 확인된다.
+                    ///
+                    /// 예:
+                    /// D6 03 → 982
+                    /// E8 03 → 1000
                     /// </summary>
-                    if (packet.RawData.Length >= 12 &&
-                        packet.RawData[2] == 0xEF &&
-                        packet.RawData[3] == 0x05)
-                    {
-                        if (!CanPrintLaLog())
-                            break;
+                    ParseLaIrCameraStatusPacket(
+                        packet,
+                        canPrintExtendedStatusLog);
 
-                        ConsoleLogHelper.PrintLine();
-
-                        Console.WriteLine(
-                            "[LA PACKET] [IR] Response / Status Candidate");
-
-                        Console.WriteLine(
-                            "[IR RAW] " +
-                            BitConverter.ToString(packet.RawData)
-                                .Replace("-", " "));
-
-                        ConsoleLogHelper.PrintLine();
-                        break;
-                    }
-
-                    /// <summary>
-                    /// [Alive] / [ACK]
-                    /// 
-                    /// 정상 [Heartbeat] [Packet]
-                    /// [Console] 출력 생략
-                    /// </summary>
                     break;
 
                 case 0xA1:
@@ -6582,6 +11724,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
             double tiltDegree =
                 tiltRaw / 100.0;
 
+            /// <summary>
+            /// -180도와 +180도는 동일한 물리 위치다.
+            ///
+            /// LA가 -180 명령 후에도 상태값을 +180으로 반환할 수 있으므로,
+            /// 상태값이 경계 ±180도이고 마지막 목표도 경계값인 경우에는
+            /// 사용자가 마지막으로 입력한 목표 부호를 표시값에 유지한다.
+            ///
+            /// 일반 위치에서는 수신 상태값을 그대로 사용한다.
+            /// </summary>
+            if (Math.Abs(
+                    Math.Abs(
+                        panDegree) -
+                    180.0) <= 0.05 &&
+                _lastPanAbsoluteTarget.HasValue &&
+                Math.Abs(
+                    Math.Abs(
+                        _lastPanAbsoluteTarget.Value) -
+                    180.0) <= 0.05)
+            {
+                panDegree =
+                    _lastPanAbsoluteTarget.Value < 0.0
+                        ? -180.0
+                        : 180.0;
+            }
+
             /*
              * 모든 0x01 패킷에서 상태값 갱신
              */
@@ -6710,6 +11877,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     nameof(CurrentEoFocusText));
 
                 OnPropertyChanged(
+                    nameof(RooftopEoZoomStatusText));
+
+                OnPropertyChanged(
+                    nameof(RooftopEoFocusStatusText));
+
+                OnPropertyChanged(
+                    nameof(EnvironmentEoZoomStatusText));
+
+                OnPropertyChanged(
+                    nameof(EnvironmentEoFocusStatusText));
+
+                OnPropertyChanged(
+                    nameof(CurrentPresetSnapshotText));
+
+                OnPropertyChanged(
+                    nameof(CurrentLaPresetSnapshotText));
+
+                OnPropertyChanged(
                     nameof(CurrentPowerText));
 
                 /*
@@ -6752,7 +11937,25 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     nameof(CurrentIrZoomText));
 
                 OnPropertyChanged(
+                    nameof(RooftopIrZoomStatusText));
+
+                OnPropertyChanged(
+                    nameof(EnvironmentIrZoomStatusText));
+
+                OnPropertyChanged(
                     nameof(CurrentIrFocusText));
+
+                OnPropertyChanged(
+                    nameof(RooftopIrFocusStatusText));
+
+                OnPropertyChanged(
+                    nameof(EnvironmentIrFocusStatusText));
+
+                OnPropertyChanged(
+                    nameof(CurrentPresetSnapshotText));
+
+                OnPropertyChanged(
+                    nameof(CurrentLaPresetSnapshotText));
             }
 
             if (dispatcher.CheckAccess())
@@ -6766,50 +11969,134 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// [CONTROL AGENT] [Extended Status] Packet 파싱
+        /// [CONTROL AGENT] [IR Camera Status Packet] 파싱
         ///
-        /// Function 0xA1
+        /// Function 0x07
         ///
-        /// Value1 / Value2의 정확한 의미가 확정되기 전까지
-        /// IR Zoom / Focus 후보 Raw 값으로 표시한다.
+        /// 열영상 카메라의 Zoom / Focus 현재 위치값을 파싱한다.
+        ///
+        /// 수신 Packet 구조:
+        ///
+        /// [2] [3] : IR Zoom Position
+        /// [4] [5] : IR Focus Position
+        ///
+        /// 장비 제어 명령 문서의 Position 입력은 Big Endian이지만,
+        /// 현재 CONTROL AGENT에서 수신되는 0x07 상태 Packet은
+        /// 실제 로그 기준 Little Endian으로 확인된다.
+        ///
+        /// 예:
+        /// D6 03 → 982
+        /// E8 03 → 1000
+        ///
+        /// 정상 범위:
+        /// 0 ~ 1000
+        ///
+        /// 범위를 벗어난 값은 상태값에 반영하지 않고
+        /// 원본 Packet과 함께 Console에 출력한다.
         /// </summary>
-        private void ParseLaExtendedStatusPacket(
-            byte[] packet,
+        private void ParseLaIrCameraStatusPacket(
+            LaResponsePacket packet,
             bool printLog)
         {
-            const int requiredLength =
-                12;
-
             if (packet == null ||
-                packet.Length < requiredLength)
+                packet.RawData == null ||
+                packet.RawData.Length < 12)
             {
                 if (printLog)
                 {
                     Console.WriteLine(
-                        "[LA EXT STATUS] Invalid Packet Length : " +
-                        (packet?.Length ?? 0));
+                        "[LA IR STATUS] Invalid Packet Length : " +
+                        (packet?.RawData?.Length ?? 0));
                 }
 
                 return;
             }
 
-            ushort irValue1 =
-                BitConverter.ToUInt16(
-                    packet,
-                    2);
+            ushort irZoomPosition =
+                packet.IrZoomPosition;
 
-            ushort irValue2 =
-                BitConverter.ToUInt16(
-                    packet,
-                    4);
+            ushort irFocusPosition =
+                packet.IrFocusPosition;
+
+            bool isZoomInRange =
+                irZoomPosition <=
+                1000;
+
+            bool isFocusInRange =
+                irFocusPosition <=
+                1000;
+
+            if (!isZoomInRange ||
+                !isFocusInRange)
+            {
+                ConsoleLogHelper.PrintLine();
+
+                Console.WriteLine(
+                    "[LA IR STATUS] Invalid Position Range");
+
+                Console.WriteLine(
+                    $"[LA IR STATUS] Zoom  : {irZoomPosition} / 1000");
+
+                Console.WriteLine(
+                    $"[LA IR STATUS] Focus : {irFocusPosition} / 1000");
+
+                Console.WriteLine(
+                    "[LA IR STATUS RAW] " +
+                    BitConverter
+                        .ToString(
+                            packet.RawData)
+                        .Replace(
+                            "-",
+                            " "));
+
+                ConsoleLogHelper.PrintLine();
+
+                return;
+            }
+
+            ushort previousIrZoom =
+                _currentIrZoom;
+
+            ushort previousIrFocus =
+                _currentIrFocus;
 
             _currentIrZoom =
-                irValue1;
+                irZoomPosition;
 
             _currentIrFocus =
-                irValue2;
+                irFocusPosition;
 
+            /// <summary>
+            /// IR 상태값은 CONTROL AGENT TCP 수신 Thread에서 갱신된다.
+            ///
+            /// WPF UI Binding은 Dispatcher를 통해 갱신한다.
+            /// </summary>
             NotifyIrCurrentStatusChanged();
+
+            /// <summary>
+            /// 주기 상태 Packet 전체 로그는 제한하지만,
+            /// 실제 Zoom / Focus 값이 바뀐 경우에는 변화 로그를 출력한다.
+            ///
+            /// 장비 시험 시 어떤 값이 Zoom이고 Focus인지
+            /// 조작 방향과 함께 바로 확인할 수 있다.
+            /// </summary>
+            if (previousIrZoom !=
+                    _currentIrZoom ||
+                previousIrFocus !=
+                    _currentIrFocus)
+            {
+                Console.WriteLine();
+
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] " +
+                    "[IR STATUS CHANGED] " +
+                    $"ZOOM_RAW={previousIrZoom}→{_currentIrZoom} / " +
+                    $"ZOOM_STD={GetCurrentIrZoomStandardPosition()} / " +
+                    $"FOCUS_RAW={previousIrFocus}→{_currentIrFocus} / " +
+                    $"FOCUS_STD={GetCurrentIrFocusStandardPosition()}");
+
+                ConsoleLogHelper.PrintLine();
+            }
 
             if (!printLog)
             {
@@ -6819,23 +12106,70 @@ namespace OpenCvWpfTracking.ViewModels.Main
             ConsoleLogHelper.PrintLine();
 
             Console.WriteLine(
-                "[LA PACKET] [IR] Extended Status Packet");
+                "[LA PACKET] [IR] Zoom / Focus Status");
 
             Console.WriteLine();
 
             Console.WriteLine(
-                $"[LA EXT STATUS] [IR Zoom Raw]  : {_currentIrZoom}");
+                $"[LA IR STATUS] [Zoom]  : {_currentIrZoom} / 1000");
 
             Console.WriteLine(
-                $"[LA EXT STATUS] [IR Focus Raw] : {_currentIrFocus}");
+                $"[LA IR STATUS] [Focus] : {_currentIrFocus} / 1000");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "[LA IR STATUS RAW] " +
+                BitConverter
+                    .ToString(
+                        packet.RawData)
+                    .Replace(
+                        "-",
+                        " "));
+
+            ConsoleLogHelper.PrintLine();
+        }
+
+        /// <summary>
+        /// [CONTROL AGENT] [Extended Status] Packet 확인
+        ///
+        /// Function 0xA1
+        ///
+        /// 현재 문서에서 IR Zoom / Focus 상태 Packet으로
+        /// 확인되지 않았으므로 CURRENT STATUS에는 반영하지 않는다.
+        ///
+        /// 의미가 확정되지 않은 Packet 값을 IR 상태에 넣으면
+        /// 정상적으로 파싱된 Function 0x07 값이 잘못 덮어써질 수 있다.
+        /// </summary>
+        private void ParseLaExtendedStatusPacket(
+            byte[] packet,
+            bool printLog)
+        {
+            if (!printLog)
+            {
+                return;
+            }
+
+            ConsoleLogHelper.PrintLine();
+
+            Console.WriteLine(
+                "[LA PACKET] Unconfirmed Extended Status : 0xA1");
 
             Console.WriteLine();
 
             Console.WriteLine(
                 "[LA EXT STATUS RAW] " +
                 BitConverter
-                    .ToString(packet)
-                    .Replace("-", " "));
+                    .ToString(
+                        packet)
+                    .Replace(
+                        "-",
+                        " "));
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "[LA EXT STATUS] CURRENT STATUS not updated.");
 
             ConsoleLogHelper.PrintLine();
         }

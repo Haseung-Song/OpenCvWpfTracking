@@ -1,4 +1,5 @@
-﻿using OpenCvWpfTracking.ViewModels.Main;
+﻿using OpenCvWpfTracking.Common;
+using OpenCvWpfTracking.ViewModels.Main;
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,6 +23,25 @@ namespace OpenCvWpfTracking
         private readonly MainViewModel vm =
             new MainViewModel();
 
+        /// <summary>
+        /// EO 영상 분리 창.
+        ///
+        /// 동일 카메라 창이 중복으로 생성되지 않도록
+        /// 현재 열린 창 참조를 보관한다.
+        /// </summary>
+        private VideoPopoutWindow _eoVideoPopoutWindow;
+
+        /// <summary>
+        /// IR 영상 분리 창.
+        /// </summary>
+        private VideoPopoutWindow _irVideoPopoutWindow;
+
+        /// <summary>
+        /// 현재 메인 화면의 큰 영상으로 선택된 카메라.
+        /// </summary>
+        private VideoPopoutCameraType _primaryVideoType =
+            VideoPopoutCameraType.Eo;
+
         #endregion
 
         #region [Constructor]
@@ -37,6 +57,218 @@ namespace OpenCvWpfTracking
 
             DataContext =
                 vm;
+        }
+
+        #endregion
+
+        #region [Video Popout Window Events]
+
+        /// <summary>
+        /// EO 영상 영역 더블클릭 처리.
+        ///
+        /// 기존 RTSP 연결을 새로 생성하지 않고,
+        /// MainViewModel의 EOCameraImage Binding을 공유하는
+        /// EO 전용 분리 창을 연다.
+        /// </summary>
+        private void EoVideoBorder_PreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2)
+            {
+                return;
+            }
+
+            ShowVideoPopoutWindow(
+                VideoPopoutCameraType.Eo);
+
+            e.Handled =
+                true;
+        }
+
+        /// <summary>
+        /// IR 영상 영역 더블클릭 처리.
+        /// </summary>
+        private void IrVideoBorder_PreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2)
+            {
+                return;
+            }
+
+            ShowVideoPopoutWindow(
+                VideoPopoutCameraType.Ir);
+
+            e.Handled =
+                true;
+        }
+
+        /// <summary>
+        /// EO 또는 IR 영상 분리 창을 표시한다.
+        ///
+        /// 이미 열려 있는 경우 새 창을 만들지 않고
+        /// 기존 창을 복원한 뒤 앞으로 가져온다.
+        /// </summary>
+        private void ShowVideoPopoutWindow(
+            VideoPopoutCameraType cameraType)
+        {
+            VideoPopoutWindow currentWindow =
+                cameraType == VideoPopoutCameraType.Eo
+                    ? _eoVideoPopoutWindow
+                    : _irVideoPopoutWindow;
+
+            if (currentWindow != null)
+            {
+                if (currentWindow.WindowState ==
+                    WindowState.Minimized)
+                {
+                    currentWindow.WindowState =
+                        WindowState.Normal;
+                }
+
+                currentWindow.Activate();
+                currentWindow.Focus();
+
+                return;
+            }
+
+            VideoPopoutWindow popoutWindow =
+                new VideoPopoutWindow(
+                    vm,
+                    cameraType)
+                {
+                    Owner = this
+                };
+
+            popoutWindow.Closed +=
+                (sender, args) =>
+                {
+                    if (cameraType ==
+                        VideoPopoutCameraType.Eo)
+                    {
+                        _eoVideoPopoutWindow =
+                            null;
+                    }
+                    else
+                    {
+                        _irVideoPopoutWindow =
+                            null;
+                    }
+                };
+
+            if (cameraType ==
+                VideoPopoutCameraType.Eo)
+            {
+                _eoVideoPopoutWindow =
+                    popoutWindow;
+            }
+            else
+            {
+                _irVideoPopoutWindow =
+                    popoutWindow;
+            }
+
+            popoutWindow.Show();
+            popoutWindow.Activate();
+        }
+
+        /// <summary>
+        /// EO 또는 IR 영상을 메인 화면의 큰 영상으로 선택한다.
+        ///
+        /// 영상 Decoder, RTSP 연결, BitmapSource는 변경하지 않는다.
+        ///
+        /// EO / IR 영상 Container의 Grid.Column 위치만 교환하여
+        /// 선택한 영상이 폭 1.6*의 큰 주화면 영역에 배치되도록 한다.
+        ///
+        /// R:
+        /// EO  -> Grid.Column 0
+        /// IR  -> Grid.Column 1
+        ///
+        /// T:
+        /// IR  -> Grid.Column 0
+        /// EO  -> Grid.Column 1
+        /// </summary>
+        internal void SelectPrimaryVideo(
+            VideoPopoutCameraType cameraType)
+        {
+            if (_primaryVideoType ==
+                cameraType)
+            {
+                return;
+            }
+
+            _primaryVideoType =
+                cameraType;
+
+            bool isEoPrimary =
+                cameraType ==
+                VideoPopoutCameraType.Eo;
+
+            /// <summary>
+            /// Column 0:
+            /// Width 1.6*의 큰 주화면
+            ///
+            /// Column 1:
+            /// Width 1*의 보조 화면
+            /// </summary>
+            Grid.SetColumn(
+                EoVideoBorder,
+                isEoPrimary
+                    ? 0
+                    : 1);
+
+            Grid.SetColumn(
+                IrVideoContainer,
+                isEoPrimary
+                    ? 1
+                    : 0);
+
+            /// <summary>
+            /// 영상 위치가 교환되면 좌측 / 우측 Margin도 함께 교환한다.
+            ///
+            /// 좌측 영상:
+            /// 왼쪽 외곽 여백 5
+            ///
+            /// 우측 영상:
+            /// 왼쪽 외곽 여백 0
+            /// </summary>
+            EoVideoBorder.Margin =
+                isEoPrimary
+                    ? new Thickness(
+                        5,
+                        5,
+                        10,
+                        0)
+                    : new Thickness(
+                        0,
+                        5,
+                        10,
+                        0);
+
+            IrVideoContainer.Margin =
+                isEoPrimary
+                    ? new Thickness(
+                        0,
+                        5,
+                        10,
+                        0)
+                    : new Thickness(
+                        5,
+                        5,
+                        10,
+                        0);
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "[VIDEO SWITCH] PRIMARY VIDEO : " +
+                (isEoPrimary
+                    ? "EO"
+                    : "IR"));
+
+            ConsoleLogHelper.PrintLine();
         }
 
         #endregion
@@ -58,14 +290,15 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
-        /// [Window] 방향키 KeyDown 처리
+        /// [Window] Keyboard KeyDown 처리
         ///
-        /// 방향키 입력 상태를 ViewModel로 전달한다.
-        /// 두 개의 방향키를 동시에 누르면
-        /// ViewModel에서 대각선 이동으로 조합한다.
+        /// R / T:
+        /// EO 또는 IR 영상을 큰 주화면으로 선택한다.
         ///
-        /// TextBox 입력 중에는 커서 이동에 방향키가 필요하므로
-        /// Pan / Tilt 제어로 사용하지 않는다.
+        /// 방향키:
+        /// Pan / Tilt 이동 상태를 ViewModel로 전달한다.
+        ///
+        /// TextBox 입력 중에는 단축키를 처리하지 않는다.
         /// </summary>
         private void Window_PreviewKeyDown(
             object sender,
@@ -73,6 +306,32 @@ namespace OpenCvWpfTracking
         {
             if (IsTextBoxKeyboardFocus())
             {
+                return;
+            }
+
+            /// <summary>
+            /// R / T 영상 주화면 전환 처리
+            ///
+            /// KeyDown 자동 반복으로 동일 전환이 반복되지 않도록
+            /// 최초 KeyDown에서만 처리한다.
+            /// </summary>
+            if (IsVideoSwitchKey(
+                    e.Key))
+            {
+                if (!e.IsRepeat)
+                {
+                    VideoPopoutCameraType targetCameraType =
+                        e.Key == Key.R
+                            ? VideoPopoutCameraType.Eo
+                            : VideoPopoutCameraType.Ir;
+
+                    SelectPrimaryVideo(
+                        targetCameraType);
+                }
+
+                e.Handled =
+                    true;
+
                 return;
             }
 
@@ -140,6 +399,22 @@ namespace OpenCvWpfTracking
                    key == Key.Right ||
                    key == Key.Up ||
                    key == Key.Down;
+        }
+
+        /// <summary>
+        /// EO / IR 주화면 선택 단축키 여부 확인
+        ///
+        /// R:
+        /// EO 고배율 영상을 주화면으로 선택
+        ///
+        /// T:
+        /// IR 열영상을 주화면으로 선택
+        /// </summary>
+        private bool IsVideoSwitchKey(
+            Key key)
+        {
+            return key == Key.R ||
+                   key == Key.T;
         }
 
         /// <summary>

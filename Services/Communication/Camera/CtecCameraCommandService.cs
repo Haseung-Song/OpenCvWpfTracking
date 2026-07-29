@@ -49,6 +49,24 @@ namespace OpenCvWpfTracking.Services.Communication
         private const byte MaximumControlSpeed = 7;
 
         /// <summary>
+        /// [XV-Z4850HC] EO Optical Zoom Direct Position 최대값
+        ///
+        /// VISCA Zoom Direct 명령 범위:
+        /// 0x0000 ~ 0x4000
+        /// </summary>
+        private const ushort MaximumZoomDirectPosition =
+            0x4000;
+
+        /// <summary>
+        /// [XV-Z4850HC] EO Focus Direct Position 최대값
+        ///
+        /// VISCA Focus Direct 명령 범위:
+        /// 0x0000 ~ 0x8000
+        /// </summary>
+        private const ushort MaximumFocusDirectPosition =
+            0x8000;
+
+        /// <summary>
         /// [Focus Mode Manual] 적용 후
         /// 실제 Near / Far 명령 송신 전 대기시간
         /// </summary>
@@ -75,7 +93,17 @@ namespace OpenCvWpfTracking.Services.Communication
         /// Start 명령보다 Stop 명령이 먼저 전송되지 않도록
         /// Zoom / Focus CGI 요청을 한 번에 하나씩 처리한다.
         /// </summary>
-        private readonly SemaphoreSlim _sendLock =
+        private readonly SemaphoreSlim _controlSendLock =
+            new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// [CTEC Inquiry] 상태 조회 명령 순차 송신 보호
+        ///
+        /// Zoom / Focus Start 및 Stop과 분리된 Lock을 사용한다.
+        /// 따라서 Position Inquiry가 진행 중이어도
+        /// MouseUp에서 발생한 Stop 명령은 조회 완료를 기다리지 않고 송신할 수 있다.
+        /// </summary>
+        private readonly SemaphoreSlim _inquirySendLock =
             new SemaphoreSlim(1, 1);
 
         /// <summary>
@@ -107,7 +135,7 @@ namespace OpenCvWpfTracking.Services.Communication
             speed = ClampControlSpeed(
                 speed);
 
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -135,7 +163,7 @@ namespace OpenCvWpfTracking.Services.Communication
             speed = ClampControlSpeed(
                 speed);
 
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -159,7 +187,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -172,6 +200,146 @@ namespace OpenCvWpfTracking.Services.Communication
                     0x07,
                     0x00,
                     0xFF));
+        }
+
+        #endregion
+
+        #region [Zoom Direct Position Control]
+
+        /// <summary>
+        /// [EO] 주간 카메라 Optical Zoom 목표 위치 직접 이동
+        ///
+        /// 연속 TELE / WIDE 이동 후 Stop 시점을 추정하는 방식이 아니라,
+        /// 카메라에 최종 Zoom Raw Position을 한 번에 지정한다.
+        ///
+        /// VISCA:
+        /// 81 01 04 47 0P 0Q 0R 0S FF
+        ///
+        /// Position 범위:
+        /// 0x0000 = Wide
+        /// 0x4000 = Tele
+        ///
+        /// 전달되는 Position은 4개의 4bit Nibble로 분리한다.
+        /// </summary>
+        public Task<bool> MoveZoomPositionAsync(
+            string cameraIp,
+            string userName,
+            string password,
+            bool useHttps,
+            ushort position)
+        {
+            ushort safePosition =
+                (ushort)Math.Min(
+                    MaximumZoomDirectPosition,
+                    position);
+
+            byte positionNibble1 =
+                (byte)((safePosition >> 12) & 0x0F);
+
+            byte positionNibble2 =
+                (byte)((safePosition >> 8) & 0x0F);
+
+            byte positionNibble3 =
+                (byte)((safePosition >> 4) & 0x0F);
+
+            byte positionNibble4 =
+                (byte)(safePosition & 0x0F);
+
+            return ExecuteControlLockedAsync(
+                () => SendCameraCommandCoreAsync(
+                    cameraIp,
+                    userName,
+                    password,
+                    useHttps,
+                    $"EO ZOOM DIRECT / {safePosition}",
+                    0x81,
+                    0x01,
+                    0x04,
+                    0x47,
+                    positionNibble1,
+                    positionNibble2,
+                    positionNibble3,
+                    positionNibble4,
+                    0xFF));
+        }
+
+        #endregion
+
+        #region [Focus Direct Position Control]
+
+        /// <summary>
+        /// [EO] 주간 카메라 Focus 목표 위치 직접 이동
+        ///
+        /// Focus Mode를 Manual로 적용한 뒤
+        /// 최종 Focus Raw Position을 한 번에 지정한다.
+        ///
+        /// VISCA:
+        /// 81 01 04 48 0P 0Q 0R 0S FF
+        ///
+        /// Position 범위:
+        /// 0x0000 = Far
+        /// 0x8000 = Near
+        ///
+        /// 전달되는 Position은 4개의 4bit Nibble로 분리한다.
+        /// </summary>
+        public Task<bool> MoveFocusPositionAsync(
+            string cameraIp,
+            string userName,
+            string password,
+            bool useHttps,
+            ushort position)
+        {
+            ushort safePosition =
+                (ushort)Math.Min(
+                    MaximumFocusDirectPosition,
+                    position);
+
+            byte positionNibble1 =
+                (byte)((safePosition >> 12) & 0x0F);
+
+            byte positionNibble2 =
+                (byte)((safePosition >> 8) & 0x0F);
+
+            byte positionNibble3 =
+                (byte)((safePosition >> 4) & 0x0F);
+
+            byte positionNibble4 =
+                (byte)(safePosition & 0x0F);
+
+            return ExecuteControlLockedAsync(
+                async () =>
+                {
+                    bool manualResult =
+                        await SendFocusManualCoreAsync(
+                            cameraIp,
+                            userName,
+                            password,
+                            useHttps);
+
+                    if (!manualResult)
+                    {
+                        return false;
+                    }
+
+                    await Task.Delay(
+                        FocusManualApplyDelayMs);
+
+                    return await SendCameraCommandCoreAsync(
+                        cameraIp,
+                        userName,
+                        password,
+                        useHttps,
+                        $"EO FOCUS DIRECT / {safePosition}",
+                        0x81,
+                        0x01,
+                        0x04,
+                        0x48,
+                        positionNibble1,
+                        positionNibble2,
+                        positionNibble3,
+                        positionNibble4,
+                        0xFF);
+                });
         }
 
         #endregion
@@ -194,7 +362,7 @@ namespace OpenCvWpfTracking.Services.Communication
             speed = ClampControlSpeed(
                 speed);
 
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 async () =>
                 {
                     bool manualResult =
@@ -243,7 +411,7 @@ namespace OpenCvWpfTracking.Services.Communication
             speed = ClampControlSpeed(
                 speed);
 
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 async () =>
                 {
                     bool manualResult =
@@ -285,7 +453,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -309,7 +477,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteControlLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -367,7 +535,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteInquiryLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -393,7 +561,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteInquiryLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -423,7 +591,7 @@ namespace OpenCvWpfTracking.Services.Communication
             string password,
             bool useHttps)
         {
-            return ExecuteLockedAsync(
+            return ExecuteInquiryLockedAsync(
                 () => SendCameraCommandCoreAsync(
                     cameraIp,
                     userName,
@@ -444,10 +612,10 @@ namespace OpenCvWpfTracking.Services.Communication
         /// <summary>
         /// CTEC 명령 송신 순서 보호 실행
         /// </summary>
-        private async Task<bool> ExecuteLockedAsync(
+        private async Task<bool> ExecuteControlLockedAsync(
             Func<Task<bool>> action)
         {
-            await _sendLock.WaitAsync();
+            await _controlSendLock.WaitAsync();
 
             try
             {
@@ -455,7 +623,28 @@ namespace OpenCvWpfTracking.Services.Communication
             }
             finally
             {
-                _sendLock.Release();
+                _controlSendLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// [CTEC Inquiry] 상태 조회 명령 순서 보호 실행
+        ///
+        /// 제어 명령 Lock과 분리되어 있으므로
+        /// 실행 중인 Inquiry가 Stop 명령 송신을 막지 않는다.
+        /// </summary>
+        private async Task<bool> ExecuteInquiryLockedAsync(
+            Func<Task<bool>> action)
+        {
+            await _inquirySendLock.WaitAsync();
+
+            try
+            {
+                return await action();
+            }
+            finally
+            {
+                _inquirySendLock.Release();
             }
         }
 

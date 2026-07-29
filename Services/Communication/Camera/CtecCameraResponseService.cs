@@ -39,6 +39,17 @@ namespace OpenCvWpfTracking.Services.Communication
         private const byte ResponseEnd = 0xFF;
 
         /// <summary>
+        /// CTEC Camera Response 고정 Packet 길이
+        ///
+        /// 구조:
+        /// 99 55 CMD 00 DATA1 DATA2 FF
+        ///
+        /// DATA1 또는 DATA2에도 0xFF가 들어올 수 있으므로
+        /// 종료 Byte 검색 방식이 아니라 고정 7 Byte 기준으로 분리한다.
+        /// </summary>
+        private const int ResponsePacketLength = 7;
+
+        /// <summary>
         /// TCP 연결 제한시간
         /// </summary>
         private const int ConnectTimeoutMs = 3000;
@@ -90,6 +101,22 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         private readonly SemaphoreSlim _connectionLock =
             new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// Zoom / Focus Position 응답 대기 작업 보호
+        /// </summary>
+        private readonly object _positionWaitLock =
+            new object();
+
+        /// <summary>
+        /// 다음 Zoom Position 응답 대기 작업
+        /// </summary>
+        private TaskCompletionSource<int> _zoomPositionWaitSource;
+
+        /// <summary>
+        /// 다음 Focus Position 응답 대기 작업
+        /// </summary>
+        private TaskCompletionSource<int> _focusPositionWaitSource;
 
         #endregion
 
@@ -361,6 +388,163 @@ namespace OpenCvWpfTracking.Services.Communication
 
         #endregion
 
+        #region [Position Response Wait]
+
+        /// <summary>
+        /// [EO Zoom] 다음 TCP 9000 Position 응답을 기다린다.
+        ///
+        /// 반드시 CGI Inquiry 송신 전에 호출해야 한다.
+        /// 그래야 빠르게 도착한 응답도 놓치지 않는다.
+        /// </summary>
+        public Task<int?> WaitForNextZoomPositionAsync(
+            int timeoutMs,
+            CancellationToken cancellationToken)
+        {
+            return WaitForNextPositionAsync(
+                true,
+                timeoutMs,
+                cancellationToken);
+        }
+
+        /// <summary>
+        /// [EO Focus] 다음 TCP 9000 Position 응답을 기다린다.
+        /// </summary>
+        public Task<int?> WaitForNextFocusPositionAsync(
+            int timeoutMs,
+            CancellationToken cancellationToken)
+        {
+            return WaitForNextPositionAsync(
+                false,
+                timeoutMs,
+                cancellationToken);
+        }
+
+        /// <summary>
+        /// Position 응답 대기 작업 생성 및 Timeout 처리
+        ///
+        /// 동일 종류의 이전 대기 작업이 남아 있으면 취소하고
+        /// 항상 가장 최근 Inquiry 한 건만 대기한다.
+        /// </summary>
+        private async Task<int?> WaitForNextPositionAsync(
+            bool isZoom,
+            int timeoutMs,
+            CancellationToken cancellationToken)
+        {
+            TaskCompletionSource<int> waitSource =
+                new TaskCompletionSource<int>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+            lock (_positionWaitLock)
+            {
+                TaskCompletionSource<int> previousSource =
+                    isZoom
+                        ? _zoomPositionWaitSource
+                        : _focusPositionWaitSource;
+
+                previousSource?.TrySetCanceled();
+
+                if (isZoom)
+                {
+                    _zoomPositionWaitSource = waitSource;
+                }
+                else
+                {
+                    _focusPositionWaitSource = waitSource;
+                }
+            }
+
+            using (CancellationTokenSource timeoutCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken))
+            {
+                timeoutCts.CancelAfter(
+                    Math.Max(1, timeoutMs));
+
+                using (timeoutCts.Token.Register(
+                    () => waitSource.TrySetCanceled()))
+                {
+                    try
+                    {
+                        return await waitSource.Task;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return null;
+                    }
+                    finally
+                    {
+                        lock (_positionWaitLock)
+                        {
+                            if (isZoom &&
+                                ReferenceEquals(
+                                    _zoomPositionWaitSource,
+                                    waitSource))
+                            {
+                                _zoomPositionWaitSource = null;
+                            }
+                            else if (!isZoom &&
+                                     ReferenceEquals(
+                                         _focusPositionWaitSource,
+                                         waitSource))
+                            {
+                                _focusPositionWaitSource = null;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 수신된 Position을 현재 대기 중인 Inquiry에 전달한다.
+        /// </summary>
+        private void CompletePositionWait(
+            byte commandCode,
+            int position)
+        {
+            TaskCompletionSource<int> waitSource = null;
+
+            lock (_positionWaitLock)
+            {
+                if (commandCode == 0x47)
+                {
+                    waitSource = _zoomPositionWaitSource;
+                    _zoomPositionWaitSource = null;
+                }
+                else if (commandCode == 0x48)
+                {
+                    waitSource = _focusPositionWaitSource;
+                    _focusPositionWaitSource = null;
+                }
+            }
+
+            waitSource?.TrySetResult(
+                position);
+        }
+
+        /// <summary>
+        /// 연결 종료 시 남아 있는 Position 대기 작업을 취소한다.
+        /// </summary>
+        private void CancelPositionWaits()
+        {
+            TaskCompletionSource<int> zoomSource;
+            TaskCompletionSource<int> focusSource;
+
+            lock (_positionWaitLock)
+            {
+                zoomSource = _zoomPositionWaitSource;
+                focusSource = _focusPositionWaitSource;
+
+                _zoomPositionWaitSource = null;
+                _focusPositionWaitSource = null;
+            }
+
+            zoomSource?.TrySetCanceled();
+            focusSource?.TrySetCanceled();
+        }
+
+        #endregion
+
         #region [Receive / Packet Parsing]
 
         /// <summary>
@@ -419,7 +603,7 @@ namespace OpenCvWpfTracking.Services.Communication
         private void ExtractPackets(
             List<byte> packetBuffer)
         {
-            while (packetBuffer.Count >= 3)
+            while (packetBuffer.Count >= 2)
             {
                 int headerIndex =
                     FindHeaderIndex(
@@ -427,10 +611,6 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 if (headerIndex < 0)
                 {
-                    /*
-                     * 다음 수신 데이터와 Header가 이어질 수 있으므로
-                     * 마지막 0x99 한 Byte만 남기고 불필요 데이터는 제거한다.
-                     */
                     bool keepLastHeaderByte =
                         packetBuffer[packetBuffer.Count - 1] ==
                         ResponseHeader1;
@@ -453,28 +633,36 @@ namespace OpenCvWpfTracking.Services.Communication
                         headerIndex);
                 }
 
-                int endIndex =
-                    packetBuffer.IndexOf(
-                        ResponseEnd,
-                        2);
-
-                if (endIndex < 0)
+                /*
+                 * TCP 수신이 6 Byte + 1 Byte처럼 분할될 수 있으므로
+                 * 정확히 7 Byte가 누적될 때까지 기다린다.
+                 */
+                if (packetBuffer.Count <
+                    ResponsePacketLength)
                 {
                     return;
                 }
 
-                int packetLength =
-                    endIndex + 1;
+                /*
+                 * 7번째 Byte가 종료값이 아니면 현재 Header를 잘못 잡은 것이다.
+                 * 첫 Byte만 제거한 뒤 다음 Header를 다시 검색한다.
+                 */
+                if (packetBuffer[ResponsePacketLength - 1] !=
+                    ResponseEnd)
+                {
+                    packetBuffer.RemoveAt(0);
+                    continue;
+                }
 
                 byte[] packet =
                     packetBuffer.GetRange(
                         0,
-                        packetLength)
+                        ResponsePacketLength)
                     .ToArray();
 
                 packetBuffer.RemoveRange(
                     0,
-                    packetLength);
+                    ResponsePacketLength);
 
                 OnPacketReceived(
                     packet);
@@ -520,6 +708,19 @@ namespace OpenCvWpfTracking.Services.Communication
 
             ConsoleLogHelper.PrintLine();
 
+            if (packet.Length == ResponsePacketLength &&
+                (packet[2] == 0x47 ||
+                 packet[2] == 0x48))
+            {
+                int position =
+                    (packet[4] << 8) |
+                     packet[5];
+
+                CompletePositionWait(
+                    packet[2],
+                    position);
+            }
+
             PacketReceived?.Invoke(
                 packet);
         }
@@ -560,6 +761,8 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         private void StopCore()
         {
+            CancelPositionWaits();
+
             _isConnectionRequested =
                 false;
 

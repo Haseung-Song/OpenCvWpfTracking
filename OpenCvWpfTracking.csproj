@@ -108,6 +108,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Services\Communication\MCB\McbMaintenanceCommandService.cs" />
+    <Compile Include="Views\Main\MainWindow.MoveControlInput.cs" />
+    <Compile Include="Views\Video\VideoPopoutWindow.xaml.cs">
+      <DependentUpon>VideoPopoutWindow.xaml</DependentUpon>
+    </Compile>
     <Page Include="Views\Main\MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -135,6 +140,7 @@
     <Compile Include="Services\Communication\LA\LAPacketParser.cs" />
     <Compile Include="Services\Communication\LA\LaResponsePacket.cs" />
     <Compile Include="Services\Communication\LA\TcpClientService.cs" />
+    <Compile Include="Services\Communication\WebAgent\WebAgentZoomControlService.cs" />
     <Compile Include="Services\Video\FFmpegDecoderService.cs" />
     <Compile Include="Services\Video\VideoCaptureService.cs" />
     <Compile Include="ViewModels\Main\MainViewModel.cs" />
@@ -142,6 +148,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="Views\Video\VideoPopoutWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
