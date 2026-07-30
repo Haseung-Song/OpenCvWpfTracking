@@ -145,7 +145,8 @@ namespace OpenCvWpfTracking.Services.Video
             /// [RTSP] 연결 대상 주소 로그
             /// </summary>
             Console.WriteLine(
-                $"[{_streamName}] [FFmpeg RTSP] Source : {rtspUrl}");
+                $"[{_streamName}] [FFmpeg RTSP] Source : " +
+                $"{ConsoleLogHelper.MaskRtspPassword(rtspUrl)}");
 
             ConsoleLogHelper.PrintLine();
 
@@ -611,19 +612,6 @@ namespace OpenCvWpfTracking.Services.Video
 
             }
 
-        }
-
-        /// <summary>
-        /// [Packet]을 [Decoder]로 전달
-        /// </summary>
-        private bool SendPacketToDecoder()
-        {
-            int result =
-                ffmpeg.avcodec_send_packet(
-                    _codecContext,
-                    _packet);
-
-            return result >= 0;
         }
 
         /// <summary>

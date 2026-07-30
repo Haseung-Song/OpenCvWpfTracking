@@ -38,14 +38,6 @@ namespace OpenCvWpfTracking.Services.Communication.AI
         /// </summary>
         private const byte Etx = 0x03;
 
-        /// <summary>
-        /// 요청 [Payload] 파라미터 구분자
-        /// 
-        /// 현재 [RTSP] / [Mapping] 설정 [Payload]는
-        /// [US] [Unit Separator] 기준으로 생성하므로 현재는 사용하지 않는다.
-        /// </summary>
-        private const char RequestSeparator = ' ';
-
         #endregion
 
         #region [Request Packet Builder]

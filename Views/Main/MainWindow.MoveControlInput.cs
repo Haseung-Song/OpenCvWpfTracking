@@ -88,10 +88,7 @@ namespace OpenCvWpfTracking
             object sender,
             TextCompositionEventArgs e)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 e.Handled =
                     true;
@@ -126,10 +123,7 @@ namespace OpenCvWpfTracking
             object sender,
             TextCompositionEventArgs e)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 e.Handled =
                     true;
@@ -159,10 +153,7 @@ namespace OpenCvWpfTracking
             object sender,
             TextCompositionEventArgs e)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 e.Handled =
                     true;
@@ -200,10 +191,7 @@ namespace OpenCvWpfTracking
             object sender,
             TextCompositionEventArgs e)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 e.Handled =
                     true;
@@ -345,10 +333,7 @@ namespace OpenCvWpfTracking
             double maximum,
             int decimalDigits)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 return;
             }
@@ -393,10 +378,7 @@ namespace OpenCvWpfTracking
             int minimum,
             int maximum)
         {
-            TextBox textBox =
-                sender as TextBox;
-
-            if (textBox == null)
+            if (!(sender is TextBox textBox))
             {
                 return;
             }
@@ -443,7 +425,7 @@ namespace OpenCvWpfTracking
 
             bindingExpression.UpdateSource();
         }
-
         #endregion
     }
+
 }

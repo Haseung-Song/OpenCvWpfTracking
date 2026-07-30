@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace OpenCvWpfTracking.Services.Communication
 {
@@ -164,8 +163,8 @@ namespace OpenCvWpfTracking.Services.Communication
                     _receiveBuffer.RemoveAt(
                         0);
                 }
-            }
 
+            }
             return packets;
         }
 
@@ -183,8 +182,8 @@ namespace OpenCvWpfTracking.Services.Communication
                 {
                     return index;
                 }
-            }
 
+            }
             return -1;
         }
 
@@ -198,6 +197,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _receiveBuffer.Clear();
             }
+
         }
 
         #endregion

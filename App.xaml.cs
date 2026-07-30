@@ -143,6 +143,7 @@ namespace OpenCvWpfTracking
             InitializeFFmpeg();
 
 #if DEBUG
+
             /// <summary>
             /// [Debug] 콘솔 창 생성
             /// </summary>
@@ -221,9 +222,12 @@ namespace OpenCvWpfTracking
             /// </summary>
             Console.SetError(consoleWriter);
 
-            ConsoleLogHelper.PrintLine();
-            Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console Start");
+            ConsoleLogHelper.PrintSection(
+                "[CONSOLE]",
+                "OpenCV WPF Debug Console Start");
+
 #endif
+
         }
 
         #endregion
@@ -237,17 +241,21 @@ namespace OpenCvWpfTracking
         /// </summary>
         protected override void OnExit(ExitEventArgs e)
         {
-            ConsoleLogHelper.PrintLine();
-            Console.WriteLine("[CONSOLE] OpenCV WPF Debug Console End");
+            ConsoleLogHelper.PrintSection(
+                "[CONSOLE]",
+                "OpenCV WPF Debug Console End");
 
 #if DEBUG
+
             /// <summary>
             /// [Debug] 콘솔 창 해제
             /// </summary>
             FreeConsole();
 
             base.OnExit(e);
+
 #endif
+
         }
         #endregion
     }

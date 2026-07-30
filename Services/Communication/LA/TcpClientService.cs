@@ -115,10 +115,11 @@ namespace OpenCvWpfTracking.Services.Communication
                 return true;
             }
 
-            ConsoleLogHelper.PrintLine();
-            Console.WriteLine("[TCP] Connect Try...");
-            Console.WriteLine($"[TCP] Target : {ip}:{port}");
-            ConsoleLogHelper.PrintLine();
+            ConsoleLogHelper.InfoSection(
+                "TCP",
+                "Connect Try...",
+                string.Empty,
+                $"TARGET : {ip}:{port}");
 
             TcpClient newClient =
                 new TcpClient
@@ -144,13 +145,16 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 if (completedTask != connectTask)
                 {
-                    Console.WriteLine(
-                        "[TCP ERROR] Connect Failed : Timeout");
+                    ConsoleLogHelper.StateSection(
+                        "TCP",
+                        "Connect Failed",
+                        string.Empty,
+                        "REASON : Timeout",
+                        $"TARGET : {ip}:{port}");
 
                     newClient.Close();
                     newClient.Dispose();
 
-                    ConsoleLogHelper.PrintLine();
                     return false;
                 }
 
@@ -177,8 +181,11 @@ namespace OpenCvWpfTracking.Services.Communication
                     ReceiveLoopAsync(
                         _cts.Token));
 
-                Console.WriteLine("[TCP] Connect Success.");
-                ConsoleLogHelper.PrintLine();
+                ConsoleLogHelper.StateSection(
+                    "TCP",
+                    "Connect Success",
+                    string.Empty,
+                    $"TARGET : {ip}:{port}");
 
                 return true;
             }
@@ -187,11 +194,12 @@ namespace OpenCvWpfTracking.Services.Communication
                 newClient.Close();
                 newClient.Dispose();
 
-                Console.WriteLine(
-                    "[TCP ERROR] Connect Failed : " +
-                    ex.Message);
-
-                ConsoleLogHelper.PrintLine();
+                ConsoleLogHelper.StateSection(
+                    "TCP",
+                    "Connect Failed",
+                    string.Empty,
+                    $"REASON : {ex.Message}",
+                    $"TARGET : {ip}:{port}");
 
                 return false;
             }

@@ -88,8 +88,6 @@ namespace OpenCvWpfTracking.Services.Communication
                 0x00);
         }
 
-
-
         /// <summary>
         /// [Pan] 이동 시 원점 통과 모드 설정
         ///

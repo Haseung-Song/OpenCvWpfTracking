@@ -625,6 +625,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _controlSendLock.Release();
             }
+
         }
 
         /// <summary>
@@ -646,6 +647,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _inquirySendLock.Release();
             }
+
         }
 
         /// <summary>
@@ -984,9 +986,13 @@ namespace OpenCvWpfTracking.Services.Communication
 
                                 return true;
                             }
+
                         }
+
                     }
+
                 }
+
             }
             catch (TaskCanceledException)
             {
@@ -1015,6 +1021,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 return false;
             }
+
         }
 
         /// <summary>
@@ -1431,9 +1438,9 @@ namespace OpenCvWpfTracking.Services.Communication
                             "x2",
                             CultureInfo.InvariantCulture));
                 }
-
                 return builder.ToString();
             }
+
         }
 
         /// <summary>
@@ -1594,7 +1601,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
             return speed;
         }
-
         #endregion
     }
+
 }

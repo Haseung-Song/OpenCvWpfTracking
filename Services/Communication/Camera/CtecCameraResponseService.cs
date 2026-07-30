@@ -222,6 +222,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _connectionLock.Release();
             }
+
         }
 
         /// <summary>
@@ -239,6 +240,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _connectionLock.Release();
             }
+
         }
 
         #endregion
@@ -310,6 +312,7 @@ namespace OpenCvWpfTracking.Services.Communication
                     await DelayReconnectAsync(
                         cancellationToken);
                 }
+
             }
 
             RaiseConnectionStatus(
@@ -384,6 +387,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
                 return false;
             }
+
         }
 
         #endregion
@@ -451,6 +455,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 {
                     _focusPositionWaitSource = waitSource;
                 }
+
             }
 
             using (CancellationTokenSource timeoutCts =
@@ -489,10 +494,15 @@ namespace OpenCvWpfTracking.Services.Communication
                             {
                                 _focusPositionWaitSource = null;
                             }
+
                         }
+
                     }
+
                 }
+
             }
+
         }
 
         /// <summary>
@@ -516,6 +526,7 @@ namespace OpenCvWpfTracking.Services.Communication
                     waitSource = _focusPositionWaitSource;
                     _focusPositionWaitSource = null;
                 }
+
             }
 
             waitSource?.TrySetResult(
@@ -595,6 +606,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 ExtractPackets(
                     packetBuffer);
             }
+
         }
 
         /// <summary>
@@ -667,6 +679,7 @@ namespace OpenCvWpfTracking.Services.Communication
                 OnPacketReceived(
                     packet);
             }
+
         }
 
         /// <summary>
@@ -686,8 +699,8 @@ namespace OpenCvWpfTracking.Services.Communication
                 {
                     return index;
                 }
-            }
 
+            }
             return -1;
         }
 
@@ -744,6 +757,7 @@ namespace OpenCvWpfTracking.Services.Communication
             catch (OperationCanceledException)
             {
             }
+
         }
 
         /// <summary>
@@ -817,7 +831,7 @@ namespace OpenCvWpfTracking.Services.Communication
             _tcpClient =
                 null;
         }
-
         #endregion
     }
+
 }

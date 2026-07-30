@@ -10,8 +10,7 @@ namespace OpenCvWpfTracking.Services.Communication
     /// <summary>
     /// LA가 내부적으로 연결하는 MCB의 유지보수 명령을 직접 송신한다.
     ///
-    /// Packet:
-    /// AA AA Cmd1 Length ASCII-Data XOR
+    /// Packet: AA AA Cmd1 Length ASCII-Data XOR
     ///
     /// Pan  Cmd1 = 0x01
     /// Tilt Cmd1 = 0x02
@@ -97,51 +96,6 @@ namespace OpenCvWpfTracking.Services.Communication
                 20);
         }
 
-        /// <summary>
-        /// Pan / Tilt Home Script를 순차 실행한다.
-        /// LA 0xB1 명령을 사용할 수 없는 경우의 직접 MCB fallback이다.
-        /// </summary>
-        public async Task<bool> MoveHomePositionAsync(
-            string ipAddress,
-            int port)
-        {
-            byte[][] packets =
-            {
-                BuildTextPacket(
-                    0x01,
-                    "XQ##START;"),
-
-                BuildTextPacket(
-                    0x02,
-                    "XQ##START;")
-            };
-
-            return await SendPacketsAsync(
-                ipAddress,
-                port,
-                packets,
-                "HOME POSITION");
-        }
-
-        private async Task<bool> SendSingleCommandAsync(
-            string ipAddress,
-            int port,
-            byte command1,
-            string commandText,
-            string commandName)
-        {
-            return await SendPacketsAsync(
-                ipAddress,
-                port,
-                new[]
-                {
-                    BuildTextPacket(
-                        command1,
-                        commandText)
-                },
-                commandName);
-        }
-
         private async Task<bool> SendPacketsAsync(
             string ipAddress,
             int port,
@@ -225,8 +179,11 @@ namespace OpenCvWpfTracking.Services.Communication
                                 await Task.Delay(
                                     interPacketDelayMs);
                             }
+
                         }
+
                     }
+
                 }
 
                 Console.WriteLine(
@@ -248,6 +205,7 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _sendLock.Release();
             }
+
         }
 
         /// <summary>
@@ -320,5 +278,7 @@ namespace OpenCvWpfTracking.Services.Communication
 
             Console.WriteLine();
         }
+
     }
+
 }

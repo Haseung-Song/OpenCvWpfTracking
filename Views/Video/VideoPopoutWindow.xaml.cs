@@ -452,7 +452,6 @@ namespace OpenCvWpfTracking
 
                         break;
                 }
-
                 return;
             }
 
@@ -486,6 +485,7 @@ namespace OpenCvWpfTracking
 
                     break;
             }
+
         }
 
         private void StopActiveLensMove()
@@ -521,8 +521,9 @@ namespace OpenCvWpfTracking
                 _viewModel
                     .StopIrFocusMove();
             }
-        }
 
+        }
         #endregion
     }
+
 }
