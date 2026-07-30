@@ -2645,7 +2645,7 @@
                                                         Background="#5F666D"
                                                         BorderBrush="#95A5B0"
                                                         BorderThickness="1.5"
-                                                        Padding="6">
+                                                        Padding="7">
 
                                                     <Grid>
                                                         <Grid.RowDefinitions>
@@ -2727,11 +2727,11 @@
 
                                                 <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
                                                 <Border Grid.Row="2"
-                                                        Margin="0,5,5,0"
+                                                        Margin="0,8,5,0"
                                                         Background="#5F666D"
                                                         BorderBrush="#95A5B0"
                                                         BorderThickness="1.5"
-                                                        Padding="6">
+                                                        Padding="7">
 
                                                     <Grid>
                                                         <Grid.RowDefinitions>
