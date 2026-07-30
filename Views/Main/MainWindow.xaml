@@ -332,8 +332,8 @@
 
                         <Border
                             x:Name="TabBorder"
-                            Width="72"
-                            Height="36"
+                            Width="78"
+                            Height="33"
                             Background="#4F5860"
                             BorderBrush="#95A5B0"
                             BorderThickness="1,1,1,0"
@@ -381,6 +381,166 @@
                             </Trigger>
 
                         </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+            </Setter>
+
+        </Style>
+
+        <!-- [상단 우측 패널] 통신 설정 / 운용 제어 전용 50:50 Tab Header 스타일 -->
+        <Style
+            x:Key="TopRightPanelTabItemStyle"
+            TargetType="TabItem">
+
+            <Setter
+                Property="Foreground"
+                Value="#D0D7DE"/>
+
+            <Setter
+                Property="FontWeight"
+                Value="Bold"/>
+
+            <Setter
+                Property="FontSize"
+                Value="12"/>
+
+            <Setter
+                Property="Margin"
+                Value="0,0,1,0"/>
+
+            <Setter
+                Property="HorizontalAlignment"
+                Value="Stretch"/>
+
+            <Setter
+                Property="HorizontalContentAlignment"
+                Value="Stretch"/>
+
+            <Setter
+                Property="Template">
+                <Setter.Value>
+
+                    <ControlTemplate
+                        TargetType="TabItem">
+
+                        <Border
+                            x:Name="TabBorder"
+                            HorizontalAlignment="Stretch"
+                            Height="33"
+                            Background="#4F5860"
+                            BorderBrush="#95A5B0"
+                            BorderThickness="1,1,1,0"
+                            CornerRadius="5,5,0,0"
+                            Padding="8,8">
+
+                            <ContentPresenter
+                                ContentSource="Header"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger
+                                Property="IsSelected"
+                                Value="True">
+
+                                <Setter
+                                    TargetName="TabBorder"
+                                    Property="Background"
+                                    Value="#5F666D"/>
+
+                                <Setter
+                                    TargetName="TabBorder"
+                                    Property="BorderBrush"
+                                    Value="#AAB4BE"/>
+
+                                <Setter
+                                    Property="Foreground"
+                                    Value="White"/>
+
+                            </Trigger>
+
+                            <Trigger
+                                Property="IsMouseOver"
+                                Value="True">
+
+                                <Setter
+                                    TargetName="TabBorder"
+                                    Property="Background"
+                                    Value="#3B5F70"/>
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+            </Setter>
+
+        </Style>
+
+        <!--
+            상단 통신 설정 / 운용 제어 전용 TabControl Template
+
+            기본 WPF TabControl은 Header 영역에 TabPanel을 사용하므로
+            ItemsPanel을 UniformGrid로 지정해도 Header가 내용 크기만큼만 표시될 수 있다.
+
+            상단 TabControl만 전용 Template을 사용하여
+            Header Host 자체를 UniformGrid 2열로 구성한다.
+        -->
+        <Style
+            x:Key="TopRightPanelTabControlStyle"
+            TargetType="TabControl">
+
+            <Setter
+                Property="Template">
+                <Setter.Value>
+
+                    <ControlTemplate
+                        TargetType="TabControl">
+
+                        <Grid
+                            KeyboardNavigation.TabNavigation="Local">
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition
+                                    Height="Auto"/>
+                                <RowDefinition
+                                    Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 상단 탭 Header를 전체 너비 기준 정확히 50:50 배치 -->
+                            <UniformGrid
+                                Grid.Row="0"
+                                Rows="1"
+                                Columns="2"
+                                IsItemsHost="True"
+                                HorizontalAlignment="Stretch"
+                                KeyboardNavigation.TabIndex="1"/>
+
+                            <!-- 선택된 탭 내용 -->
+                            <Border
+                                Grid.Row="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+
+                                <ContentPresenter
+                                    x:Name="PART_SelectedContentHost"
+                                    ContentSource="SelectedContent"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+
+                            </Border>
+
+                        </Grid>
 
                     </ControlTemplate>
 
@@ -475,7 +635,7 @@
             <RowDefinition
                 Height="3.0*"/>
             <RowDefinition
-                Height="1.15*"/>
+                Height="1.12*"/>
         </Grid.RowDefinitions>
 
         <!-- 상단 영역 -->
@@ -484,14 +644,14 @@
             <Grid.ColumnDefinitions>
                 <!-- [EO] 영상 영역 -->
                 <ColumnDefinition
-                    Width="1.6*"/>
+                    Width="1.8*"/>
 
                 <ColumnDefinition
-                    Width="1*"/>
+                    Width="1.2*"/>
 
                 <!-- 장비 제어 패널 -->
                 <ColumnDefinition
-                    Width="420"/>
+                    Width="450"/>
             </Grid.ColumnDefinitions>
 
             <!-- [좌측] 큰 영상 -->
@@ -780,7 +940,9 @@
                     Padding="4,4,6,4"
                     Margin="0"
                     HorizontalContentAlignment="Stretch"
-                    ItemContainerStyle="{StaticResource RightPanelTabItemStyle}">
+                    VerticalContentAlignment="Stretch"
+                    Style="{StaticResource TopRightPanelTabControlStyle}"
+                    ItemContainerStyle="{StaticResource TopRightPanelTabItemStyle}">
 
                     <!-- Control Agent 통신 연결 설정 -->
                     <TabItem
@@ -1575,7 +1737,7 @@
                             SYNC   : Web Agent 기준 EO / IR Zoom / Focus 단계 동기화 -->
                             <TabControl
                                 Grid.Row="1"
-                                Margin="0,6,0,0"
+                                Margin="0,8,0,0"
                                 Background="#5F666D"
                                 BorderBrush="#95A5B0"
                                 BorderThickness="1"
@@ -1590,14 +1752,14 @@
                                         VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel
-                                            Margin="4,2,2,6">
+                                            Margin="4,2,2,5">
                                             <!-- [EO / IR] 영상 Overlay 표시 제어 -->
                                             <Border
                                                 Margin="0,5,5,0"
                                                 Background="#5F666D"
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
@@ -1843,7 +2005,7 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1"
                                                 CornerRadius="5"
-                                                Padding="10"
+                                                Padding="12"
                                                 Margin="0,0,0,7">
 
                                                 <StackPanel>
@@ -1899,7 +2061,7 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1"
                                                 CornerRadius="5"
-                                                Padding="10"
+                                                Padding="12"
                                                 Margin="0,0,0,7">
 
                                                 <StackPanel>
@@ -1986,7 +2148,7 @@
                                                     <Button
                                                         Content="PAN GO"
                                                         Height="30"
-                                                        Margin="0,0,0,10"
+                                                        Margin="0,0,0,20"
                                                         Style="{StaticResource EoControlButtonStyle}"
                                                         Command="{Binding MovePanAbsoluteCommand}"/>
 
@@ -2042,7 +2204,7 @@
                                                         Margin="0,0,0,7"/>
 
                                                     <TextBlock
-                                                        Text="Zoom Position"
+                                                        Text="Zoom Position (0 ~ 1000)"
                                                         Foreground="White"
                                                         FontSize="12"/>
 
@@ -2124,7 +2286,7 @@
                                                         Margin="0,0,0,7"/>
 
                                                     <TextBlock
-                                                        Text="Focus Position"
+                                                        Text="Focus Position (0 ~ 1000)"
                                                         Foreground="White"
                                                         FontSize="12"/>
 
@@ -2150,7 +2312,7 @@
 
                                             <!-- [입력값 초기화] 영역 -->
                                             <Border
-                                                Margin="0,0,0,5"
+                                                Margin="0,3,0,5"
                                                 Background="#6A7178"
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1"
@@ -2164,7 +2326,7 @@
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
-                                                        Margin="0,0,0,10"/>
+                                                        Margin="0,0,0,15"/>
 
                                                     <Button
                                                         Content="RESET INPUT"
@@ -2183,12 +2345,12 @@
 
                                 <!-- [PRESET] 프리셋 등록 / 이동 / 오토 스캔 제어 -->
                                 <TabItem
-                                    Header="PRESET 1&#x0a;(LA TEST)">
+                                    Header="PRESET L&#x0a;(LA TEST)">
                                     <ScrollViewer
                                         VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel
-                                            Margin="4,2,2,6">
+                                            Margin="4,2,2,5">
 
                                             <!-- 프리셋 추가 / 갱신 / 제거 -->
                                             <Border
@@ -2197,12 +2359,12 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
                                                     <TextBlock
-                                                        Text="PRESET 1 / LA IMPLEMENTATION"
+                                                        Text="PRESET L / LA AGENT Ver."
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
@@ -2267,7 +2429,7 @@
 
                                                         <Button
                                                             Grid.Column="1"
-                                                            Content="CLEAR ALL"
+                                                            Content="DELETE"
                                                             Height="30"
                                                             Margin="4,0,0,0"
                                                             Background="#8A3D3D"
@@ -2298,7 +2460,7 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
@@ -2307,7 +2469,7 @@
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
-                                                        Margin="0,0,0,8"/>
+                                                        Margin="0,0,0,10"/>
 
                                                     <ComboBox
                                                         ItemsSource="{Binding LaPresetPoints}"
@@ -2335,18 +2497,18 @@
                                                     </Border>
 
                                                     <Button
-                                                        Content="MOVE TO LA PRESET"
+                                                        Content="MOVE TO PRESET"
                                                         Height="32"
                                                         Style="{StaticResource EoControlButtonStyle}"
                                                         Command="{Binding MoveToLaPresetCommand}"/>
 
                                                     <TextBlock
-                                                        Text="※ LA 실제 구현: 0x19 → 0x91 → 0x93 → 0x95 → 0x97 순서로 등록합니다."
+                                                        Text="※ 선택한 프리셋으로 카메라가 이동합니다."
                                                         Foreground="#F6E05E"
                                                         FontSize="9.2"
                                                         TextWrapping="Wrap"
                                                         TextAlignment="Center"
-                                                        Margin="0,7,0,0"/>
+                                                        Margin="0,10,0,0"/>
 
                                                 </StackPanel>
 
@@ -2359,12 +2521,12 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
                                                     <TextBlock
-                                                        Text="AUTO SCAN / LA scan OBJECT"
+                                                        Text="AUTO SCAN / LA SCAN OBJECT"
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
@@ -2487,7 +2649,7 @@
                                                     </Border>
 
                                                     <TextBlock
-                                                        Text="※ START는 위에 REGISTER한 P00, P01, P02... 지점을 LA 내부 순서대로 반복합니다."
+                                                        Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 LA AGENT 내부 순서대로 반복합니다."
                                                         Foreground="#D0D7DE"
                                                         FontSize="9.2"
                                                         TextWrapping="Wrap"
@@ -2503,12 +2665,12 @@
                                 </TabItem>
 
                                 <TabItem
-                                    Header="PRESET 2&#x0a;(DEVICE)">
+                                    Header="PRESET W&#x0a;(DEVICE)">
                                     <ScrollViewer
                                         VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel
-                                            Margin="4,2,2,6">
+                                            Margin="4,2,2,5">
 
                                             <!-- 프리셋 추가 / 갱신 / 제거 -->
                                             <Border
@@ -2517,12 +2679,12 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
                                                     <TextBlock
-                                                        Text="PRESET 2 / DEVICE DOCUMENT"
+                                                        Text="PRESET W / WEB AGENT Ver."
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
@@ -2579,7 +2741,7 @@
 
                                                         <Button
                                                             Grid.Column="0"
-                                                            Content="ADD / UPDATE"
+                                                            Content="REGISTER / UPDATE"
                                                             Height="30"
                                                             Margin="0,0,4,0"
                                                             Style="{StaticResource EoControlButtonStyle}"
@@ -2618,7 +2780,7 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
@@ -2627,7 +2789,7 @@
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
-                                                        Margin="0,0,0,8"/>
+                                                        Margin="0,0,0,10"/>
 
                                                     <ComboBox
                                                         ItemsSource="{Binding PresetPoints}"
@@ -2661,12 +2823,12 @@
                                                         Command="{Binding MoveToPresetCommand}"/>
 
                                                     <TextBlock
-                                                        Text="※ 규격상 프리셋 목록 조회 응답이 없어, 이 목록은 현재 프로그램에서 ADD한 슬롯만 표시합니다."
+                                                        Text="※ 선택한 프리셋으로 카메라가 이동합니다."
                                                         Foreground="#F6E05E"
                                                         FontSize="9.2"
                                                         TextWrapping="Wrap"
                                                         TextAlignment="Center"
-                                                        Margin="0,7,0,0"/>
+                                                        Margin="0,10,0,0"/>
 
                                                 </StackPanel>
 
@@ -2679,12 +2841,12 @@
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
                                                 CornerRadius="5"
-                                                Padding="10">
+                                                Padding="12">
 
                                                 <StackPanel>
 
                                                     <TextBlock
-                                                        Text="AUTO SCAN / DOCUMENT 2.8"
+                                                        Text="AUTO SCAN / WEB SCAN OBJECT"
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
@@ -2807,7 +2969,7 @@
                                                     </Border>
 
                                                     <TextBlock
-                                                        Text="※ STOP은 스캔만 정지하며 프리셋 데이터는 삭제하지 않습니다."
+                                                        Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 WEB AGENT 내부 순서대로 반복합니다."
                                                         Foreground="#D0D7DE"
                                                         FontSize="9.2"
                                                         TextWrapping="Wrap"
@@ -2829,7 +2991,7 @@
                                         VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel
-                                            Margin="4,2,2,6">
+                                            Margin="5,0,0,5">
                                             <!-- [EO] [ZOOM] / [FOCUS] 제어 -->
                                             <Border
                                                 Grid.Row="2"
@@ -2853,7 +3015,7 @@
 
                                                     <!-- 제목 -->
                                                     <TextBlock
-                                                        Text="EO ZOOM / FOCUS CONTROL"
+                                                        Text="EO CAM ZOOM / FOCUS CONTROL"
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
@@ -2864,7 +3026,7 @@
                                                         Grid.Row="1"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
-                                                        Margin="0,0,0,10">
+                                                        Margin="0,5,0,10">
 
                                                         <!-- [EO] [ZOOM] 확대 -->
                                                         <Button
@@ -2941,7 +3103,7 @@
                                             <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
                                             <Border
                                                 Grid.Row="2"
-                                                Margin="0,5,5,0"
+                                                Margin="0,10,5,0"
                                                 Background="#5F666D"
                                                 BorderBrush="#95A5B0"
                                                 BorderThickness="1.5"
@@ -2963,11 +3125,11 @@
 
                                                     <!-- 제목 -->
                                                     <TextBlock
-                                                        Text="IR ZOOM / FOCUS CONTROL"
+                                                        Text="IR CAM ZOOM / FOCUS CONTROL"
                                                         HorizontalAlignment="Center"
                                                         Foreground="White"
                                                         FontWeight="Bold"
-                                                        Margin="0,0,0,5"/>
+                                                        Margin="0,0,0,10"/>
 
                                                     <!-- [IR] [ZOOM] 제어 -->
                                                     <StackPanel
@@ -3000,6 +3162,41 @@
 
                                                     </StackPanel>
 
+                                                    <!-- [IR] [DIGITAL ZOOM] 제어 -->
+                                                    <StackPanel
+                                                        Grid.Row="3"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        Margin="0,0,0,10">
+
+                                                        <!--
+                                                            문서 2.6 열영상 카메라 제어 명령
+                                                            D+ ZOOM : Command2=0x31, Data1=0x07
+                                                            D- ZOOM : Command2=0x31, Data1=0x08
+                                                            Button Up / Mouse Leave 시 Data1=0x06 Stop
+                                                        -->
+                                                        <Button
+                                                            Content="D+ ZOOM"
+                                                            Width="85"
+                                                            Margin="5"
+                                                            Focusable="False"
+                                                            Style="{StaticResource IrControlButtonStyle}"
+                                                            PreviewMouseDown="IrDigitalZoomIn_MouseDown"
+                                                            PreviewMouseUp="MoveStop_MouseUp"
+                                                            MouseLeave="MoveStop_MouseUp"/>
+
+                                                        <Button
+                                                            Content="D- ZOOM"
+                                                            Width="85"
+                                                            Margin="5"
+                                                            Focusable="False"
+                                                            Style="{StaticResource IrControlButtonStyle}"
+                                                            PreviewMouseDown="IrDigitalZoomOut_MouseDown"
+                                                            PreviewMouseUp="MoveStop_MouseUp"
+                                                            MouseLeave="MoveStop_MouseUp"/>
+
+                                                    </StackPanel>
+
                                                     <!-- [IR] [FOCUS] 제어 -->
                                                     <StackPanel
                                                         Grid.Row="2"
@@ -3007,25 +3204,28 @@
                                                         HorizontalAlignment="Center"
                                                         Margin="0,0,0,10">
 
-                                                        <!-- [IR] [FOCUS] [Far] -->
+                                                        <!--
+                                                            [IR] FOCUS 표시값은 장비 Raw 값과 반대 방향이다.
+                                                            FOCUS + : 표시값 0 → 1000 = Raw 감소 = Near
+                                                            FOCUS - : 표시값 1000 → 0 = Raw 증가 = Far
+                                                        -->
                                                         <Button
                                                             Content="FOCUS +"
                                                             Width="85"
                                                             Margin="5"
                                                             Focusable="False"
                                                             Style="{StaticResource IrControlButtonStyle}"
-                                                            PreviewMouseDown="IrFocusFar_MouseDown"
+                                                            PreviewMouseDown="IrFocusNear_MouseDown"
                                                             PreviewMouseUp="MoveStop_MouseUp"
                                                             MouseLeave="MoveStop_MouseUp"/>
 
-                                                        <!-- [IR] [FOCUS] [Near] -->
                                                         <Button
                                                             Content="FOCUS -"
                                                             Width="85"
                                                             Margin="5"
                                                             Focusable="False"
                                                             Style="{StaticResource IrControlButtonStyle}"
-                                                            PreviewMouseDown="IrFocusNear_MouseDown"
+                                                            PreviewMouseDown="IrFocusFar_MouseDown"
                                                             PreviewMouseUp="MoveStop_MouseUp"
                                                             MouseLeave="MoveStop_MouseUp"/>
 
@@ -3036,7 +3236,7 @@
                                                         Grid.Row="4"
                                                         Content="AUTO FOCUS"
                                                         Width="180"
-                                                        Margin="5"
+                                                        Margin="3"
                                                         HorizontalAlignment="Center"
                                                         Style="{StaticResource IrControlButtonStyle}"
                                                         PreviewMouseDown="IrAutoFocus_MouseDown"/>
@@ -3060,7 +3260,7 @@
                                                 Background="#2F363D"
                                                 BorderBrush="#8A9BA8"
                                                 BorderThickness="1"
-                                                Padding="8">
+                                                Padding="12">
                                                 <StackPanel>
                                                     <TextBlock
                                                         Text="EO / IR ZOOM SYNC"
@@ -3145,7 +3345,7 @@
                                                 Background="#2F363D"
                                                 BorderBrush="#8A9BA8"
                                                 BorderThickness="1"
-                                                Padding="8"
+                                                Padding="12"
                                                 Margin="0,8,0,0">
                                                 <StackPanel>
                                                     <TextBlock

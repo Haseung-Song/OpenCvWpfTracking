@@ -501,7 +501,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// LA Connect.ini 기본 MCB Port
         /// </summary>
         private const int McbMaintenancePort =
-            4001;
+            4002;
 
         /// <summary>
         /// 환경장비 Web Agent 기준 EO / IR Zoom 동기화 Adapter
@@ -838,19 +838,55 @@ namespace OpenCvWpfTracking.ViewModels.Main
             15000;
 
         /// <summary>
-        /// [IR Focus Sync] 목표 위치 허용 오차
+        /// [IR Focus Sync] 최종 완료 허용 오차
         ///
-        /// IR Focus 상태값은 정지 상태에서도 약 ±1 정도 흔들릴 수 있으므로
-        /// 목표값 기준 ±5 이내를 도착으로 판단한다.
+        /// IR Focus는 Near / Far 연속 구동 후 Stop 방식이므로
+        /// 상태 수신 지연과 정지 지연을 고려해 최종 ±12 이내를 정상으로 판단한다.
         /// </summary>
         private const int IrFocusSyncTolerance =
-            5;
+            12;
 
         /// <summary>
-        /// [IR Focus Sync] 상태 확인 주기
+        /// [IR Focus Sync] 이동 상태 확인 주기
         /// </summary>
         private const int IrFocusSyncPollingIntervalMs =
-            80;
+            20;
+
+        /// <summary>
+        /// [IR Focus Sync] Stop 명령 이후 위치 안정화 확인 주기
+        /// </summary>
+        private const int IrFocusSyncSettlePollingIntervalMs =
+            40;
+
+        /// <summary>
+        /// [IR Focus Sync] Stop 이후 최대 안정화 대기시간
+        /// </summary>
+        private const int IrFocusSyncSettleTimeoutMs =
+            700;
+
+        /// <summary>
+        /// [IR Focus Sync] 위치가 연속으로 동일 범위에 들어와야 하는 횟수
+        /// </summary>
+        private const int IrFocusSyncStableSampleCount =
+            3;
+
+        /// <summary>
+        /// [IR Focus Sync] 1차 이동 시 기본 선행 정지 거리
+        /// </summary>
+        private const int IrFocusSyncInitialStopLead =
+            38;
+
+        /// <summary>
+        /// [IR Focus Sync] 보정 이동 시 최소 선행 정지 거리
+        /// </summary>
+        private const int IrFocusSyncCorrectionStopLead =
+            10;
+
+        /// <summary>
+        /// [IR Focus Sync] 최대 보정 횟수
+        /// </summary>
+        private const int IrFocusSyncMaxMoveAttempts =
+            3;
 
         /// <summary>
         /// [IR Focus Sync] 최대 이동 대기시간
@@ -936,6 +972,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// Control Agent 제어 TCP 연결 IP 입력값
         /// </summary>
         private string _controlControlAgentIp;
+
+        /// <summary>
+        /// 옥상 MCB 유지보수 직접 연결 IP 입력값
+        ///
+        /// Control Agent(Local LA) 주소와 MCB 장비 주소는 서로 다르므로
+        /// 별도 값으로 관리한다.
+        /// </summary>
+        private string _mcbMaintenanceIpAddress;
 
         /// <summary>
         /// Control Agent 제어 TCP 연결 Port 입력 문자열
@@ -1250,6 +1294,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// PRESET 1 WPF 직접 오토 스캔 작업 취소 토큰
         /// </summary>
         private CancellationTokenSource _laPresetDirectScanCts;
+
+        /// <summary>
+        /// PRESET 2 WEB AGENT Pelco-D 슬롯 순회 취소 토큰
+        /// </summary>
+        private CancellationTokenSource _presetDirectScanCts;
 
         #endregion
 
@@ -2281,7 +2330,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         public string SelectedLaPresetDetailText =>
             SelectedLaPresetPoint == null
-                ? "NO PRESET SELECTED"
+                ? "프리셋 미등록 상태. 등록된 프리셋을 선택하세요."
                 : SelectedLaPresetPoint.DetailText;
 
         public int LaPresetScanSpeed
@@ -2513,7 +2562,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public string SelectedPresetDetailText =>
             SelectedPresetPoint == null
-                ? "등록된 프리셋을 선택하세요."
+                ? "프리셋 미등록 상태. 등록된 프리셋을 선택하세요."
                 : SelectedPresetPoint.DetailText;
 
         /// <summary>
@@ -3117,7 +3166,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// VertiportNexus 이동 제어 기능을 현재 프로젝트 구조에 맞춰 연결한다.
             ///
             /// 포함 기능:
-            /// - Home Position : LA 실제 0xB1 명령
+            /// - Home Position : 현재 좌표계 기준 Pan 0° / Tilt 0° 절대 이동
             /// - Pan Zero / Tilt Zero : MCB 직접 Set0 명령
             /// </summary>
             MoveHomePositionCommand =
@@ -3504,6 +3553,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged();
             }
 
+        }
+
+        /// <summary>
+        /// 옥상 MCB 유지보수 직접 연결 IP
+        ///
+        /// Control Agent IP와 독립적으로 관리하며,
+        /// Pan/Tilt Zero 및 Home fallback 직접 명령에 사용한다.
+        /// </summary>
+        public string McbMaintenanceIpAddress
+        {
+            get => _mcbMaintenanceIpAddress;
+
+            set
+            {
+                if (_mcbMaintenanceIpAddress ==
+                    value)
+                {
+                    return;
+                }
+
+                _mcbMaintenanceIpAddress =
+                    value;
+
+                OnPropertyChanged();
+            }
         }
 
         /// <summary>
@@ -4908,137 +4982,282 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         1000,
                         targetPosition));
 
-            int startPosition =
-                _currentIrFocus;
-
-            int initialError =
-                Math.Abs(
-                    safeTargetPosition -
-                    startPosition);
-
-            if (initialError <=
-                IrFocusSyncTolerance)
-            {
-                return true;
-            }
-
-            /// <summary>
-            /// IR Focus Raw 값은 Near 방향으로 이동할수록 감소한다.
-            ///
-            /// 현재값보다 목표값이 작으면 Near,
-            /// 현재값보다 목표값이 크면 Far 방향이다.
-            /// </summary>
-            bool moveNear =
-                safeTargetPosition <
-                startPosition;
-
-            bool commandResult =
-                moveNear
-                    ? _controlCommandService
-                        .StartIrFocusNear()
-                    : _controlCommandService
-                        .StartIrFocusFar();
-
-            if (!commandResult)
-            {
-                return false;
-            }
-
-            ConsoleLogHelper.PrintLine();
-
-            Console.WriteLine(
-                "[IR FOCUS SYNC] START " +
-                $"/ DIRECTION={(moveNear ? "NEAR" : "FAR")} " +
-                $"/ CURRENT={startPosition} " +
-                $"/ TARGET={safeTargetPosition}");
-
-            ConsoleLogHelper.PrintLine();
-
-            Stopwatch timeout =
+            Stopwatch totalTimeout =
                 Stopwatch.StartNew();
 
-            int previousPosition =
-                startPosition;
+            int lastFinalPosition =
+                _currentIrFocus;
 
-            try
+            for (int attempt = 1;
+                 attempt <= IrFocusSyncMaxMoveAttempts;
+                 attempt++)
             {
-                while (timeout.ElapsedMilliseconds <
-                       IrFocusSyncTimeoutMs)
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+
+                int startPosition =
+                    _currentIrFocus;
+
+                int initialError =
+                    Math.Abs(
+                        safeTargetPosition -
+                        startPosition);
+
+                if (initialError <=
+                    IrFocusSyncTolerance)
                 {
-                    cancellationToken
-                        .ThrowIfCancellationRequested();
+                    Console.WriteLine(
+                        "[IR FOCUS SYNC] COMPLETED " +
+                        $"/ ATTEMPT={attempt - 1} " +
+                        $"/ POSITION={startPosition} " +
+                        $"/ TARGET={safeTargetPosition} " +
+                        $"/ ERROR={initialError}");
 
-                    int currentPosition =
-                        _currentIrFocus;
+                    ConsoleLogHelper.PrintLine();
 
-                    int error =
-                        Math.Abs(
-                            safeTargetPosition -
-                            currentPosition);
-
-                    bool reachedTarget =
-                        error <=
-                        IrFocusSyncTolerance;
-
-                    /// <summary>
-                    /// Near는 Raw 값 감소 방향,
-                    /// Far는 Raw 값 증가 방향이다.
-                    /// </summary>
-                    bool passedTarget =
-                        moveNear
-                            ? previousPosition >
-                                  safeTargetPosition &&
-                              currentPosition <=
-                                  safeTargetPosition
-                            : previousPosition <
-                                  safeTargetPosition &&
-                              currentPosition >=
-                                  safeTargetPosition;
-
-                    if (reachedTarget ||
-                        passedTarget)
-                    {
-                        Console.WriteLine(
-                            "[IR FOCUS SYNC] COMPLETED " +
-                            $"/ POSITION={currentPosition} " +
-                            $"/ TARGET={safeTargetPosition} " +
-                            $"/ ERROR={error}");
-
-                        ConsoleLogHelper.PrintLine();
-
-                        return true;
-                    }
-
-                    previousPosition =
-                        currentPosition;
-
-                    await Task.Delay(
-                        IrFocusSyncPollingIntervalMs,
-                        cancellationToken);
+                    return true;
                 }
 
-                Console.WriteLine(
-                    "[IR FOCUS SYNC] TIMEOUT " +
-                    $"/ POSITION={_currentIrFocus} " +
-                    $"/ TARGET={safeTargetPosition}");
+                bool moveNear =
+                    safeTargetPosition <
+                    startPosition;
+
+                bool commandResult =
+                    moveNear
+                        ? _controlCommandService
+                            .StartIrFocusNear()
+                        : _controlCommandService
+                            .StartIrFocusFar();
+
+                if (!commandResult)
+                {
+                    return false;
+                }
+
+                int stopLead =
+                    attempt == 1
+                        ? IrFocusSyncInitialStopLead
+                        : IrFocusSyncCorrectionStopLead;
+
+                int previousPosition =
+                    startPosition;
+
+                int largestObservedStep =
+                    0;
+
+                bool stopRequested =
+                    false;
 
                 ConsoleLogHelper.PrintLine();
 
-                return false;
+                Console.WriteLine(
+                    "[IR FOCUS SYNC] START " +
+                    $"/ ATTEMPT={attempt} " +
+                    $"/ DIRECTION={(moveNear ? "NEAR" : "FAR")} " +
+                    $"/ CURRENT={startPosition} " +
+                    $"/ TARGET={safeTargetPosition} " +
+                    $"/ BASE_LEAD={stopLead}");
+
+                ConsoleLogHelper.PrintLine();
+
+                try
+                {
+                    while (totalTimeout.ElapsedMilliseconds <
+                           IrFocusSyncTimeoutMs)
+                    {
+                        cancellationToken
+                            .ThrowIfCancellationRequested();
+
+                        int currentPosition =
+                            _currentIrFocus;
+
+                        int movementStep =
+                            Math.Abs(
+                                currentPosition -
+                                previousPosition);
+
+                        if (movementStep >
+                            largestObservedStep)
+                        {
+                            largestObservedStep =
+                                movementStep;
+                        }
+
+                        int dynamicStopLead =
+                            Math.Max(
+                                stopLead,
+                                Math.Min(
+                                    55,
+                                    largestObservedStep +
+                                    8));
+
+                        int remainingDistance =
+                            moveNear
+                                ? currentPosition -
+                                  safeTargetPosition
+                                : safeTargetPosition -
+                                  currentPosition;
+
+                        bool reachedStopZone =
+                            remainingDistance <=
+                            dynamicStopLead;
+
+                        bool passedTarget =
+                            moveNear
+                                ? currentPosition <=
+                                  safeTargetPosition
+                                : currentPosition >=
+                                  safeTargetPosition;
+
+                        if (reachedStopZone ||
+                            passedTarget)
+                        {
+                            stopRequested =
+                                _controlCommandService
+                                    .StopIrFocus();
+
+                            Console.WriteLine(
+                                "[IR FOCUS SYNC] EARLY STOP " +
+                                $"/ ATTEMPT={attempt} " +
+                                $"/ POSITION={currentPosition} " +
+                                $"/ TARGET={safeTargetPosition} " +
+                                $"/ REMAIN={remainingDistance} " +
+                                $"/ STEP={largestObservedStep} " +
+                                $"/ LEAD={dynamicStopLead} " +
+                                $"/ STOP={stopRequested}");
+
+                            ConsoleLogHelper.PrintLine();
+
+                            break;
+                        }
+
+                        previousPosition =
+                            currentPosition;
+
+                        await Task.Delay(
+                            IrFocusSyncPollingIntervalMs,
+                            cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _controlCommandService
+                        .StopIrFocus();
+
+                    return false;
+                }
+                finally
+                {
+                    if (!stopRequested)
+                    {
+                        _controlCommandService
+                            .StopIrFocus();
+                    }
+                }
+
+                int settledPosition =
+                    await WaitForIrFocusSettledPositionAsync(
+                        cancellationToken);
+
+                lastFinalPosition =
+                    settledPosition;
+
+                int finalError =
+                    Math.Abs(
+                        safeTargetPosition -
+                        settledPosition);
+
+                Console.WriteLine(
+                    "[IR FOCUS SYNC] SETTLED " +
+                    $"/ ATTEMPT={attempt} " +
+                    $"/ POSITION={settledPosition} " +
+                    $"/ TARGET={safeTargetPosition} " +
+                    $"/ ERROR={finalError}");
+
+                ConsoleLogHelper.PrintLine();
+
+                if (finalError <=
+                    IrFocusSyncTolerance)
+                {
+                    Console.WriteLine(
+                        "[IR FOCUS SYNC] COMPLETED " +
+                        $"/ ATTEMPT={attempt} " +
+                        $"/ POSITION={settledPosition} " +
+                        $"/ TARGET={safeTargetPosition} " +
+                        $"/ ERROR={finalError}");
+
+                    ConsoleLogHelper.PrintLine();
+
+                    return true;
+                }
+
+                await Task.Delay(
+                    80,
+                    cancellationToken);
             }
-            catch (OperationCanceledException)
+
+            Console.WriteLine(
+                "[IR FOCUS SYNC] INCOMPLETE " +
+                $"/ POSITION={lastFinalPosition} " +
+                $"/ TARGET={safeTargetPosition} " +
+                $"/ ERROR={Math.Abs(safeTargetPosition - lastFinalPosition)}");
+
+            ConsoleLogHelper.PrintLine();
+
+            return false;
+        }
+
+        /// <summary>
+        /// IR Focus Stop 이후 실제 위치가 안정될 때까지 기다린다.
+        /// </summary>
+        private async Task<int> WaitForIrFocusSettledPositionAsync(
+            CancellationToken cancellationToken)
+        {
+            Stopwatch settleTimeout =
+                Stopwatch.StartNew();
+
+            int previousPosition =
+                _currentIrFocus;
+
+            int stableCount =
+                0;
+
+            while (settleTimeout.ElapsedMilliseconds <
+                   IrFocusSyncSettleTimeoutMs)
             {
-                return false;
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+
+                await Task.Delay(
+                    IrFocusSyncSettlePollingIntervalMs,
+                    cancellationToken);
+
+                int currentPosition =
+                    _currentIrFocus;
+
+                if (Math.Abs(
+                        currentPosition -
+                        previousPosition) <= 1)
+                {
+                    stableCount++;
+                }
+                else
+                {
+                    stableCount =
+                        0;
+                }
+
+                previousPosition =
+                    currentPosition;
+
+                if (stableCount >=
+                    IrFocusSyncStableSampleCount)
+                {
+                    break;
+                }
             }
-            finally
-            {
-                /// <summary>
-                /// 성공 / 실패 / 취소 여부와 관계없이
-                /// IR Focus 연속 이동은 반드시 정지한다.
-                /// </summary>
-                _controlCommandService
-                    .StopIrFocus();
-            }
+
+            return _currentIrFocus;
         }
 
         /// <summary>
@@ -5295,40 +5514,59 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 0x4D / Data1 0x01
         /// </summary>
         /// <summary>
-        /// LA 프로그램 실제 명령 0xB1로 Pan / Tilt Homing을 시작한다.
-        /// LA 연결이 없거나 송신에 실패하면 MCB 4001 직접 Home Script로 fallback한다.
+        /// 현재 설정된 Pan / Tilt 좌표계의 0°, 0° 위치로 절대 이동한다.
+        ///
+        /// 기존 LA 0xB1 명령은 기계식 Homing(StartHoming) 명령이므로
+        /// 카메라가 홈 센서 방향으로 이동한 뒤 해당 위치를 원점으로 잡는다.
+        /// UI의 HOME POSITION은 사용자가 설정한 좌표 원점으로 복귀하는 기능이므로
+        /// Pan 0°(0x45), Tilt 0°(0x47) 절대 이동 명령을 사용한다.
         /// </summary>
         private async Task MoveHomePositionAsync()
         {
             HomeZeroStatusText =
-                "HOME POSITION SENDING...";
+                "HOME POSITION MOVING...";
 
-            bool laResult =
-                _laTcpService.IsConnected &&
+            bool stopResult =
                 _controlCommandService
-                    .MoveHomePosition();
+                    .StopMove();
 
-            bool directResult =
-                false;
+            await Task.Delay(
+                150);
 
-            if (!laResult)
-            {
-                directResult =
-                    await _mcbMaintenanceCommandService
-                        .MoveHomePositionAsync(
-                            GetMcbMaintenanceIpAddress(),
-                            McbMaintenancePort);
-            }
+            bool modeResult =
+                ApplySelectedPanTurnMode();
+
+            bool panResult =
+                modeResult &&
+                _controlCommandService
+                    .PanGoPosition(
+                        0.0);
+
+            await Task.Delay(
+                100);
+
+            bool tiltResult =
+                _controlCommandService
+                    .TiltGoPosition(
+                        0.0);
 
             bool result =
-                laResult ||
-                directResult;
+                panResult &&
+                tiltResult;
+
+            if (panResult)
+            {
+                _lastPanAbsoluteTarget =
+                    0.0;
+            }
 
             Console.WriteLine();
             Console.WriteLine(
-                "[HOME / ZERO] HOME POSITION " +
-                $"/ LA_0xB1={laResult} " +
-                $"/ MCB_FALLBACK={directResult} " +
+                "[HOME / ZERO] HOME POSITION ABSOLUTE " +
+                $"/ STOP={stopResult} " +
+                $"/ PAN_MODE={modeResult} " +
+                $"/ PAN=0.00:{panResult} " +
+                $"/ TILT=0.00:{tiltResult} " +
                 $"/ RESULT={result}");
 
             ConsoleLogHelper.PrintLine();
@@ -5337,32 +5575,34 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 result
                     ? "HOME POSITION COMMAND SENT"
                     : "HOME POSITION SEND FAILED";
-
-            await Task.Delay(1);
         }
 
         /// <summary>
-        /// Vertiport 방식으로 현재 Pan 각도를 Home Offset으로 저장한다.
-        /// MO=0;ui[6]=현재각도*100;sv;MO=1;
+        /// 현재 Pan Encoder 위치를 즉시 0으로 설정한다.
+        /// MCB Set0 명령: MO=0;PX=0;MO=1;
         /// </summary>
         private async Task SetPanZeroAsync()
         {
             HomeZeroStatusText =
                 "PAN ZERO SENDING...";
 
+            string mcbIpAddress =
+                GetMcbMaintenanceIpAddress();
+
             bool result =
                 await _mcbMaintenanceCommandService
                     .SetPanZeroAsync(
-                        GetMcbMaintenanceIpAddress(),
-                        McbMaintenancePort,
-                        RoundAngleToProtocolScale(
-                            _currentPan));
+                        mcbIpAddress,
+                        McbMaintenancePort);
 
-            if (result)
-            {
-                _lastPanAbsoluteTarget =
-                    null;
-            }
+            Console.WriteLine();
+            Console.WriteLine(
+                "[HOME / ZERO] PAN SET ORIGIN " +
+                $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
+                $"/ SEQUENCE=],),|2,( " +
+                $"/ RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
 
             HomeZeroStatusText =
                 result
@@ -5371,21 +5611,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// Vertiport 방식으로 현재 Tilt 각도를 Home Offset으로 저장한다.
-        /// MO=0;ui[6]=현재각도*100;sv;MO=1;
+        /// 현재 Tilt Encoder 위치를 즉시 0으로 설정한다.
+        /// MCB Set0 명령: MO=0;PX=0;MO=1;
         /// </summary>
         private async Task SetTiltZeroAsync()
         {
             HomeZeroStatusText =
                 "TILT ZERO SENDING...";
 
+            string mcbIpAddress =
+                GetMcbMaintenanceIpAddress();
+
             bool result =
                 await _mcbMaintenanceCommandService
                     .SetTiltZeroAsync(
-                        GetMcbMaintenanceIpAddress(),
-                        McbMaintenancePort,
-                        RoundAngleToProtocolScale(
-                            _currentTilt));
+                        mcbIpAddress,
+                        McbMaintenancePort);
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "[HOME / ZERO] TILT SET ORIGIN " +
+                $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
+                $"/ SEQUENCE=],),|2,( " +
+                $"/ RESULT={result}");
+
+            ConsoleLogHelper.PrintLine();
 
             HomeZeroStatusText =
                 result
@@ -5394,18 +5644,21 @@ namespace OpenCvWpfTracking.ViewModels.Main
         }
 
         /// <summary>
-        /// MCB는 LA와 동일 PC에서 127.0.0.1:4001을 기본 사용한다.
-        /// Control Agent IP가 입력된 경우 동일 IP를 우선 사용한다.
+        /// 옥상 MCB 유지보수 직접 연결 IP를 반환한다.
+        ///
+        /// Control Agent는 Local LA(기본 127.0.0.1:5001),
+        /// MCB는 실장비(기본 192.168.0.122:4002)이므로
+        /// 두 주소를 서로 공유하지 않는다.
         /// </summary>
         private string GetMcbMaintenanceIpAddress()
         {
             string ipAddress =
-                ControlAgentIp?
+                McbMaintenanceIpAddress?
                     .Trim();
 
             return string.IsNullOrWhiteSpace(
                     ipAddress)
-                ? "127.0.0.1"
+                ? "192.168.0.122"
                 : ipAddress;
         }
 
@@ -6284,82 +6537,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         63,
                         PresetSlotNumber));
 
-            bool slotResult =
+            /*
+             * PRESET 2는 WEB AGENT Pelco-D 프리셋 검증 모드다.
+             * LA 전용 Scan Point(0x19/0x91/0x93/0x95/0x97)는 절대 등록하지 않는다.
+             *
+             * 문서 2.10:
+             * Command2 = 0x03 : SET PRESET
+             * Data2    = Preset Number
+             */
+            bool result =
                 _controlCommandService
                     .AddPresetPoint(
                         (byte)presetNumber);
 
-            ushort scanZoom =
-                GetCurrentPresetStandardZoom();
-
-            ushort scanFocus =
-                GetCurrentPresetStandardFocus();
-
-            /*
-             * PRESET 2는 문서 2.10 일반 슬롯 저장과 함께
-             * 문서 2.8 오토 스캔 포인트도 같은 번호로 등록한다.
-             *
-             * 이 등록이 있어야 START(0x99) 시
-             * P01 -> P02 -> P03 순회가 가능하다.
-             */
-            bool scanIdResult =
-                slotResult &&
-                _controlCommandService
-                    .SetLaPresetId(
-                        (ushort)presetNumber);
-
-            bool scanPanResult =
-                scanIdResult &&
-                _controlCommandService
-                    .SetLaPresetPan(
-                        _currentPan);
-
-            bool scanTiltResult =
-                scanPanResult &&
-                _controlCommandService
-                    .SetLaPresetTilt(
-                        _currentTilt);
-
-            bool scanZoomResult =
-                scanTiltResult &&
-                _controlCommandService
-                    .SetLaPresetZoom(
-                        scanZoom);
-
-            bool scanFocusResult =
-                scanZoomResult &&
-                _controlCommandService
-                    .SetLaPresetFocusAndCommit(
-                        scanFocus);
-
-            bool result =
-                slotResult &&
-                scanIdResult &&
-                scanPanResult &&
-                scanTiltResult &&
-                scanZoomResult &&
-                scanFocusResult;
-
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET] ADD / UPDATE");
+                "[PRESET 2 / WEB AGENT] SET PRESET");
 
             Console.WriteLine(
-                $"[PRESET 2 / DEVICE] NUMBER={presetNumber} / " +
-                $"PAN={_currentPan:F2} / " +
-                $"TILT={_currentTilt:F2} / " +
-                $"SCAN_ZOOM={scanZoom} / " +
-                $"SCAN_FOCUS={scanFocus} / " +
-                $"SLOT_RESULT={slotResult} / " +
-                $"SCAN_RESULT={scanFocusResult} / " +
-                $"RESULT={result}");
+                $"[PRESET 2 / WEB AGENT] NUMBER={presetNumber} / " +
+                $"PELCO_D=0x03 / RESULT={result}");
 
             ConsoleLogHelper.PrintLine();
 
             if (!result)
             {
                 PresetCommandStatusText =
-                    $"P{presetNumber:00} ADD SEND FAILED";
+                    $"P{presetNumber:00} SET PRESET FAILED";
 
                 return;
             }
@@ -6378,7 +6582,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 newPreset);
 
             PresetCommandStatusText =
-                $"P{presetNumber:00} SLOT + SCAN POINT REGISTERED";
+                $"P{presetNumber:00} SET PRESET SENT";
         }
 
         /// <summary>
@@ -6391,13 +6595,22 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void DeletePresetPoint()
         {
-            int presetNumber =
-                Math.Max(
-                    1,
-                    Math.Min(
-                        63,
-                        PresetSlotNumber));
+            if (SelectedPresetPoint == null)
+            {
+                PresetCommandStatusText =
+                    "DELETE FAILED : SELECT PRESET";
 
+                return;
+            }
+
+            int presetNumber =
+                SelectedPresetPoint.Number;
+
+            /*
+             * PRESET 2 WEB AGENT Pelco-D:
+             * Command2 = 0x05 : CLEAR PRESET
+             * Data2    = Preset Number
+             */
             bool result =
                 _controlCommandService
                     .RemovePresetPoint(
@@ -6405,40 +6618,33 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET] DELETE");
+                "[PRESET 2 / WEB AGENT] CLEAR PRESET");
 
             Console.WriteLine(
-                $"[PRESET] NUMBER={presetNumber} / " +
-                $"RESULT={result}");
+                $"[PRESET 2 / WEB AGENT] NUMBER={presetNumber} / " +
+                $"PELCO_D=0x05 / RESULT={result}");
 
             ConsoleLogHelper.PrintLine();
 
             if (!result)
             {
                 PresetCommandStatusText =
-                    $"P{presetNumber:00} DELETE SEND FAILED";
+                    $"P{presetNumber:00} CLEAR PRESET FAILED";
 
                 return;
             }
 
-            PresetPointOption existingPreset =
-                PresetPoints
-                    .FirstOrDefault(
-                        preset =>
-                            preset.Number ==
-                            presetNumber);
+            PresetPointOption removed =
+                SelectedPresetPoint;
 
-            if (existingPreset != null)
-            {
-                PresetPoints.Remove(
-                    existingPreset);
-            }
+            PresetPoints.Remove(
+                removed);
 
             SelectedPresetPoint =
                 PresetPoints.FirstOrDefault();
 
             PresetCommandStatusText =
-                $"P{presetNumber:00} DELETE COMMAND SENT";
+                $"P{presetNumber:00} CLEAR PRESET SENT";
         }
 
         /// <summary>
@@ -6460,19 +6666,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     "MOVE FAILED : SELECT PRESET";
 
                 Console.WriteLine(
-                    "[PRESET] MOVE FAILED : " +
-                    "NO PRESET SELECTED");
-
-                return;
-            }
-
-            bool modeResult =
-                ApplySelectedPanTurnMode();
-
-            if (!modeResult)
-            {
-                PresetCommandStatusText =
-                    "MOVE FAILED : PAN MODE SEND";
+                    "[PRESET 2 / WEB AGENT] GOTO FAILED : " +
+                    "프리셋 미선택 상태");
 
                 return;
             }
@@ -6480,6 +6675,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             int presetNumber =
                 SelectedPresetPoint.Number;
 
+            /*
+             * PRESET 2 WEB AGENT Pelco-D 검증:
+             * Command2 = 0x07 : GOTO PRESET
+             * Data2    = Preset Number
+             *
+             * 0x4D Pan Turn Mode는 Pan 절대 위치 제어용이며
+             * 프리셋 이동 명령에 포함되지 않으므로 전송하지 않는다.
+             */
             bool moveResult =
                 _controlCommandService
                     .MoveToPresetPoint(
@@ -6487,31 +6690,24 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             if (moveResult)
             {
-                /*
-                 * 프리셋 Snapshot의 Pan 부호를 보관하여
-                 * ±180 경계 상태 표시 시 기존 Absolute 명령과
-                 * 동일한 부호 유지 규칙을 적용한다.
-                 */
                 _lastPanAbsoluteTarget =
                     SelectedPresetPoint.Pan;
             }
 
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET] MOVE");
+                "[PRESET 2 / WEB AGENT] GOTO PRESET");
 
             Console.WriteLine(
-                $"[PRESET] NUMBER={presetNumber} / " +
-                $"MODE={_panTurnMode} / " +
-                $"MODE_RESULT={modeResult} / " +
-                $"MOVE_RESULT={moveResult}");
+                $"[PRESET 2 / WEB AGENT] NUMBER={presetNumber} / " +
+                $"PELCO_D=0x07 / RESULT={moveResult}");
 
             ConsoleLogHelper.PrintLine();
 
             PresetCommandStatusText =
                 moveResult
-                    ? $"P{presetNumber:00} MOVE COMMAND SENT"
-                    : $"P{presetNumber:00} MOVE SEND FAILED";
+                    ? $"P{presetNumber:00} GOTO PRESET SENT"
+                    : $"P{presetNumber:00} GOTO PRESET FAILED";
         }
 
         /// <summary>
@@ -6524,66 +6720,152 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void StartPresetScan()
         {
-            bool modeResult =
-                ApplySelectedPanTurnMode();
-
-            if (!modeResult)
+            if (PresetPoints.Count <= 0)
             {
                 PresetCommandStatusText =
-                    "SCAN START FAILED : PAN MODE SEND";
+                    "START FAILED : NO PRESET";
 
                 return;
             }
 
-            byte speed =
-                (byte)Math.Max(
-                    1,
-                    Math.Min(
-                        60,
-                        PresetScanSpeed));
+            // 기존 PRESET 2 루프만 취소한다.
+            // START 시 장비 Stop 명령을 먼저 보내지 않는다.
+            CancelPreset2DirectScan();
 
-            byte delay =
-                (byte)Math.Max(
+            CancellationTokenSource scanCts =
+                new CancellationTokenSource();
+
+            _presetDirectScanCts =
+                scanCts;
+
+            IsPresetScanRunning =
+                true;
+
+            int delaySeconds =
+                Math.Max(
                     1,
                     Math.Min(
                         60,
                         PresetScanDelay));
 
-            bool result =
-                _controlCommandService
-                    .StartPresetScan(
-                        speed,
-                        delay);
-
-            if (result)
-            {
-                /*
-                 * 스캔 중에는 다음 Pan 목표 부호를 알 수 없으므로
-                 * 직전 Absolute / Preset 이동 목표 부호를 제거한다.
-                 */
-                _lastPanAbsoluteTarget =
-                    null;
-
-                IsPresetScanRunning =
-                    true;
-            }
-
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET SCAN] START");
+                "[PRESET 2 / WEB AGENT] LOOP START");
 
             Console.WriteLine(
-                $"[PRESET SCAN] SPEED={speed} / " +
-                $"DELAY={delay}s / " +
-                $"MODE={_panTurnMode} / " +
-                $"RESULT={result}");
+                $"[PRESET 2 / WEB AGENT] COUNT={PresetPoints.Count} / " +
+                $"DELAY={delaySeconds}s / " +
+                "COMMAND=GOTO_PRESET_0x07_ONLY");
 
             ConsoleLogHelper.PrintLine();
 
             PresetCommandStatusText =
-                result
-                    ? $"SCAN START SENT / SPEED {speed} / DELAY {delay}s"
-                    : "SCAN START SEND FAILED";
+                "WEB AGENT PRESET LOOP STARTED";
+
+            _ =
+                RunPreset2DirectScanAsync(
+                    scanCts.Token);
+        }
+
+        /// <summary>
+        /// 실행 중인 PRESET 2 WPF 순회 Task만 취소한다.
+        /// 장비 제어 명령은 전송하지 않는다.
+        /// </summary>
+        private bool CancelPreset2DirectScan()
+        {
+            CancellationTokenSource scanCts =
+                Interlocked.Exchange(
+                    ref _presetDirectScanCts,
+                    null);
+
+            if (scanCts == null)
+            {
+                return false;
+            }
+
+            scanCts.Cancel();
+            scanCts.Dispose();
+
+            return true;
+        }
+
+        /// <summary>
+        /// PRESET 2는 LA Auto Scan(0x99)을 사용하지 않는다.
+        /// WPF가 등록 목록을 순회하며 WEB AGENT에 Pelco-D GOTO PRESET(0x07)을 반복 송신한다.
+        /// </summary>
+        private async Task RunPreset2DirectScanAsync(
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    PresetPointOption[] snapshot =
+                        PresetPoints
+                            .OrderBy(
+                                preset =>
+                                    preset.Number)
+                            .ToArray();
+
+                    foreach (PresetPointOption preset in snapshot)
+                    {
+                        cancellationToken
+                            .ThrowIfCancellationRequested();
+
+                        bool result =
+                            _controlCommandService
+                                .MoveToPresetPoint(
+                                    (byte)preset.Number);
+
+                        Console.WriteLine();
+                        Console.WriteLine(
+                            "[PRESET 2 / WEB AGENT] LOOP GOTO PRESET");
+
+                        Console.WriteLine(
+                            $"[PRESET 2 / WEB AGENT] NUMBER={preset.Number} / " +
+                            $"PELCO_D=0x07 / RESULT={result}");
+
+                        ConsoleLogHelper.PrintLine();
+
+                        if (!result)
+                        {
+                            PresetCommandStatusText =
+                                $"P{preset.Number:00} GOTO FAILED";
+
+                            return;
+                        }
+
+                        PresetCommandStatusText =
+                            $"P{preset.Number:00} GOTO SENT";
+
+                        int delaySeconds =
+                            Math.Max(
+                                1,
+                                Math.Min(
+                                    60,
+                                    PresetScanDelay));
+
+                        await Task.Delay(
+                            TimeSpan.FromSeconds(
+                                delaySeconds),
+                            cancellationToken);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        _presetDirectScanCts,
+                        null) ||
+                    cancellationToken.IsCancellationRequested)
+                {
+                    IsPresetScanRunning =
+                        false;
+                }
+            }
         }
 
         /// <summary>
@@ -6596,41 +6878,39 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void UpdatePresetScan()
         {
-            byte speed =
-                (byte)Math.Max(
+            int speed =
+                Math.Max(
                     1,
                     Math.Min(
                         60,
                         PresetScanSpeed));
 
-            byte delay =
-                (byte)Math.Max(
+            int delay =
+                Math.Max(
                     1,
                     Math.Min(
                         60,
                         PresetScanDelay));
 
-            bool result =
-                _controlCommandService
-                    .UpdatePresetScan(
-                        speed,
-                        delay);
-
+            /*
+             * PRESET 2는 0x99/0x9D LA Auto Scan을 사용하지 않는다.
+             * 따라서 APPLY는 WPF 반복 주기의 Delay만 즉시 반영한다.
+             * Pelco-D GOTO PRESET(0x07)에는 이동 속도 필드가 없으므로
+             * Speed 값은 화면 표시용으로만 유지한다.
+             */
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET SCAN] UPDATE");
+                "[PRESET 2 / WEB AGENT] LOOP OPTION APPLY");
 
             Console.WriteLine(
-                $"[PRESET SCAN] SPEED={speed} / " +
-                $"DELAY={delay}s / " +
-                $"RESULT={result}");
+                $"[PRESET 2 / WEB AGENT] DELAY={delay}s / " +
+                $"SPEED_UI={speed} / " +
+                "TCP_SEND=NONE / NO_LA_0x9D=True");
 
             ConsoleLogHelper.PrintLine();
 
             PresetCommandStatusText =
-                result
-                    ? $"SCAN UPDATE SENT / SPEED {speed} / DELAY {delay}s"
-                    : "SCAN UPDATE SEND FAILED";
+                $"LOOP DELAY APPLIED : {delay}s";
         }
 
         /// <summary>
@@ -6646,29 +6926,43 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void StopPresetScan()
         {
-            bool result =
-                _controlCommandService
-                    .StopPresetScan();
+            bool hadRunningLoop =
+                CancelPreset2DirectScan();
 
-            if (result)
+            bool stopResult =
+                true;
+
+            /*
+             * 실행 중인 루프가 있었을 때만 현재 진행 중일 수 있는
+             * GOTO PRESET 이동을 일반 PTZ Stop으로 한 번 정지한다.
+             * LA Auto Scan Stop/Clear(0x9B)는 사용하지 않는다.
+             */
+            if (hadRunningLoop)
             {
-                IsPresetScanRunning =
-                    false;
+                stopResult =
+                    _controlCommandService
+                        .StopMove();
             }
+
+            IsPresetScanRunning =
+                false;
 
             Console.WriteLine();
             Console.WriteLine(
-                "[PRESET SCAN] STOP");
+                "[PRESET 2 / WEB AGENT] LOOP STOP");
 
             Console.WriteLine(
-                $"[PRESET SCAN] RESULT={result}");
+                $"[PRESET 2 / WEB AGENT] ACTIVE={hadRunningLoop} / " +
+                $"PELCO_STOP_SENT={hadRunningLoop} / " +
+                $"STOP_RESULT={stopResult} / " +
+                "NO_LA_0x9B=True");
 
             ConsoleLogHelper.PrintLine();
 
             PresetCommandStatusText =
-                result
-                    ? "SCAN STOP COMMAND SENT"
-                    : "SCAN STOP SEND FAILED";
+                hadRunningLoop
+                    ? "WEB AGENT PRESET LOOP STOPPED"
+                    : "WEB AGENT PRESET LOOP ALREADY STOPPED";
         }
 
         /// <summary>
@@ -7506,13 +7800,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
             //ControlAgentPortText =
             //    "5005";
 
-            // 2-1. 옥상 GOP 장비 Local PC IP
+            // 2-1. 옥상 GOP 장비 Local Control Agent(LA) IP
             ControlAgentIp =
                 "127.0.0.1";
 
             // 2-2. 옥상 GOP 장비 Control Agent(LA) Port
             ControlAgentPortText =
                 "5001";
+
+            // 2-3. 옥상 GOP MCB 실장비 IP
+            McbMaintenanceIpAddress =
+                "192.168.0.122";
 
             ControlAgentConnectionStatusText =
                 "Disconnected";

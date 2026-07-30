@@ -30,15 +30,13 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public Task<bool> SetPanZeroAsync(
             string ipAddress,
-            int port,
-            double currentPan)
+            int port)
         {
-            return SendHomeOffsetCommandAsync(
+            return SendSetOriginSequenceAsync(
                 ipAddress,
                 port,
                 0x01,
-                currentPan,
-                "PAN ZERO OFFSET");
+                "PAN SET ORIGIN");
         }
 
         /// <summary>
@@ -46,15 +44,57 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public Task<bool> SetTiltZeroAsync(
             string ipAddress,
-            int port,
-            double currentTilt)
+            int port)
         {
-            return SendHomeOffsetCommandAsync(
+            return SendSetOriginSequenceAsync(
                 ipAddress,
                 port,
                 0x02,
-                currentTilt,
-                "TILT ZERO OFFSET");
+                "TILT SET ORIGIN");
+        }
+
+        /// <summary>
+        /// LA의 COOL::SetOrigin() 동작을 MCB 직접 통신으로 동일하게 수행한다.
+        ///
+        /// 원본 C++:
+        /// Stop();              -> "]"
+        /// SendCommand(")");    -> CRLF 포함
+        /// SendCommand("|2");   -> CRLF 포함
+        /// SendCommand("(");    -> CRLF 포함
+        ///
+        /// 각 명령은 AA AA Cmd1 Length ASCII-Data XOR 패킷으로 전송한다.
+        /// </summary>
+        private Task<bool> SendSetOriginSequenceAsync(
+            string ipAddress,
+            int port,
+            byte command1,
+            string commandName)
+        {
+            byte[][] packets =
+            {
+                BuildCoolPacket(
+                    command1,
+                    "]"),
+
+                BuildCoolPacket(
+                    command1,
+                    ")"),
+
+                BuildCoolPacket(
+                    command1,
+                    "|2"),
+
+                BuildCoolPacket(
+                    command1,
+                    "(")
+            };
+
+            return SendPacketsAsync(
+                ipAddress,
+                port,
+                packets,
+                commandName,
+                20);
         }
 
         /// <summary>
@@ -83,32 +123,6 @@ namespace OpenCvWpfTracking.Services.Communication
                 "HOME POSITION");
         }
 
-        private Task<bool> SendHomeOffsetCommandAsync(
-            string ipAddress,
-            int port,
-            byte command1,
-            double currentAngle,
-            string commandName)
-        {
-            int offsetValue =
-                Convert.ToInt32(
-                    Math.Round(
-                        currentAngle * 100.0,
-                        MidpointRounding.AwayFromZero));
-
-            string commandText =
-                "MO=0;ui[6]=" +
-                offsetValue +
-                ";sv;MO=1;";
-
-            return SendSingleCommandAsync(
-                ipAddress,
-                port,
-                command1,
-                commandText,
-                commandName);
-        }
-
         private async Task<bool> SendSingleCommandAsync(
             string ipAddress,
             int port,
@@ -132,7 +146,8 @@ namespace OpenCvWpfTracking.Services.Communication
             string ipAddress,
             int port,
             byte[][] packets,
-            string commandName)
+            string commandName,
+            int interPacketDelayMs = InterPacketDelayMs)
         {
             if (string.IsNullOrWhiteSpace(
                     ipAddress) ||
@@ -208,7 +223,7 @@ namespace OpenCvWpfTracking.Services.Communication
                                 packets.Length - 1)
                             {
                                 await Task.Delay(
-                                    InterPacketDelayMs);
+                                    interPacketDelayMs);
                             }
                         }
                     }
@@ -233,6 +248,19 @@ namespace OpenCvWpfTracking.Services.Communication
             {
                 _sendLock.Release();
             }
+        }
+
+        /// <summary>
+        /// COOL::SendCommand()와 동일하게 명령 문자열 뒤에 CR/LF를 붙인 후
+        /// MCB TCP 프레임으로 감싼다.
+        /// </summary>
+        private static byte[] BuildCoolPacket(
+            byte command1,
+            string commandText)
+        {
+            return BuildTextPacket(
+                command1,
+                commandText + "\r\n");
         }
 
         private static byte[] BuildTextPacket(
