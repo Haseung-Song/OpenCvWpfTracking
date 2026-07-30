@@ -1216,6 +1216,46 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private string _homeZeroStatusText =
             "READY";
 
+        /// <summary>
+        /// HOME POSITION 이동 진행 여부.
+        ///
+        /// true인 동안에는 우측의 모든 버튼/탭과
+        /// 키보드 제어를 차단한다.
+        /// HOME / ZERO 기능은 LA AGENT(ROOFTOP) 전용이며,
+        /// WEB AGENT(ENVIRONMENT) 선택 상태에서는 실행하지 않는다.
+        /// </summary>
+        private bool _isHomePositionMoving;
+
+        /// <summary>
+        /// HOME POSITION 완료 판정 최대 대기시간.
+        /// </summary>
+        private const int HomePositionTimeoutMs =
+            30000;
+
+        /// <summary>
+        /// HOME POSITION 상태 확인 주기.
+        /// </summary>
+        private const int HomePositionPollingIntervalMs =
+            100;
+
+        /// <summary>
+        /// HOME POSITION 목표 위치 허용 오차.
+        /// </summary>
+        private const double HomePositionTargetTolerance =
+            0.50;
+
+        /// <summary>
+        /// HOME POSITION 정지 상태 판정용 연속 안정 샘플 수.
+        /// </summary>
+        private const int HomePositionStableSampleCount =
+            5;
+
+        /// <summary>
+        /// HOME POSITION 연속 상태값 변화 허용 오차.
+        /// </summary>
+        private const double HomePositionStableTolerance =
+            0.05;
+
 
         /// <summary>
         /// PRESET 1 (LA TEST) 선택 ID
@@ -1888,6 +1928,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged(nameof(IsRooftopStatusSelected));
                 OnPropertyChanged(nameof(IsEnvironmentStatusSelected));
                 OnPropertyChanged(nameof(CurrentStatusEquipmentText));
+                OnPropertyChanged(nameof(IsHomeZeroVisible));
             }
         }
 
@@ -1901,6 +1942,43 @@ namespace OpenCvWpfTracking.ViewModels.Main
             IsRooftopStatusSelected
                 ? "ROOFTOP EQUIPMENT / LA AGENT"
                 : "ENVIRONMENT EQUIPMENT / WEB AGENT";
+
+        /// <summary>
+        /// HOME / ZERO UI 표시 여부.
+        ///
+        /// HOME / ZERO는 MCB/LA 전용 기능이므로
+        /// ROOFTOP / LA AGENT 선택 상태에서만 표시한다.
+        /// </summary>
+        public bool IsHomeZeroVisible =>
+            IsRooftopStatusSelected;
+
+        /// <summary>
+        /// HOME POSITION 이동 진행 여부.
+        /// </summary>
+        public bool IsHomePositionMoving
+        {
+            get => _isHomePositionMoving;
+            private set
+            {
+                if (_isHomePositionMoving == value)
+                {
+                    return;
+                }
+
+                _isHomePositionMoving = value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsMainControlEnabled));
+            }
+        }
+
+        /// <summary>
+        /// 우측 운용 UI 전체 활성 여부.
+        /// HOME POSITION 이동 중에는 다른 명령이 끼어들지 않도록
+        /// 통신 설정/운용 제어 탭과 내부 버튼을 모두 비활성화한다.
+        /// </summary>
+        public bool IsMainControlEnabled =>
+            !IsHomePositionMoving;
 
         /// <summary>
         /// 현재 선택된 Zoom Sync Level
@@ -5523,58 +5601,266 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private async Task MoveHomePositionAsync()
         {
-            HomeZeroStatusText =
-                "HOME POSITION MOVING...";
-
-            bool stopResult =
-                _controlCommandService
-                    .StopMove();
-
-            await Task.Delay(
-                150);
-
-            bool modeResult =
-                ApplySelectedPanTurnMode();
-
-            bool panResult =
-                modeResult &&
-                _controlCommandService
-                    .PanGoPosition(
-                        0.0);
-
-            await Task.Delay(
-                100);
-
-            bool tiltResult =
-                _controlCommandService
-                    .TiltGoPosition(
-                        0.0);
-
-            bool result =
-                panResult &&
-                tiltResult;
-
-            if (panResult)
+            // HOME / ZERO는 LA AGENT 전용 기능이다.
+            // WEB AGENT 상태에서는 UI를 숨기지만,
+            // Command가 코드에서 직접 호출되는 경우도 방어한다.
+            if (!IsRooftopStatusSelected)
             {
-                _lastPanAbsoluteTarget =
-                    0.0;
+                HomeZeroStatusText =
+                    "LA AGENT ONLY";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] HOME POSITION SKIPPED / WEB AGENT MODE");
+                ConsoleLogHelper.PrintLine();
+
+                return;
             }
 
-            Console.WriteLine();
-            Console.WriteLine(
-                "[HOME / ZERO] HOME POSITION ABSOLUTE " +
-                $"/ STOP={stopResult} " +
-                $"/ PAN_MODE={modeResult} " +
-                $"/ PAN=0.00:{panResult} " +
-                $"/ TILT=0.00:{tiltResult} " +
-                $"/ RESULT={result}");
+            if (IsHomePositionMoving)
+            {
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] HOME POSITION IGNORED / ALREADY MOVING");
+                ConsoleLogHelper.PrintLine();
 
-            ConsoleLogHelper.PrintLine();
+                return;
+            }
 
-            HomeZeroStatusText =
-                result
-                    ? "HOME POSITION COMMAND SENT"
-                    : "HOME POSITION SEND FAILED";
+            try
+            {
+                // 기존에 진행 중이던 모든 키보드 제어 상태를 먼저 초기화한다.
+                //
+                // 현재 키보드 연속 제어 상태는 Pan/Tilt 방향키와 WASD가
+                // 동일한 KeyboardPanTiltDirection 상태를 공유한다.
+                // 향후 Zoom/Focus 단축키 상태가 추가되더라도 이 공통 함수에서
+                // 함께 초기화하도록 진입점을 하나로 유지한다.
+                //
+                // 이 시점의 Stop은 HOME 명령보다 먼저 1회만 송신한다.
+                ResetAllKeyboardControlState();
+
+                if (_currentMoveType !=
+                    ContinuousMoveType.None)
+                {
+                    StopContinuousMove();
+
+                    await Task.Delay(
+                        150);
+                }
+
+                SetHomePositionMovingState(
+                    true);
+
+                HomeZeroStatusText =
+                    "HOME POSITION MOVING...";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] HOME POSITION START / UI+KEYBOARD LOCKED");
+                ConsoleLogHelper.PrintLine();
+
+                bool stopResult =
+                    _controlCommandService
+                        .StopMove();
+
+                await Task.Delay(
+                    150);
+
+                bool modeResult =
+                    ApplySelectedPanTurnMode();
+
+                bool panResult =
+                    modeResult &&
+                    _controlCommandService
+                        .PanGoPosition(
+                            0.0);
+
+                await Task.Delay(
+                    100);
+
+                bool tiltResult =
+                    _controlCommandService
+                        .TiltGoPosition(
+                            0.0);
+
+                bool sendResult =
+                    panResult &&
+                    tiltResult;
+
+                if (panResult)
+                {
+                    _lastPanAbsoluteTarget =
+                        0.0;
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] HOME POSITION ABSOLUTE " +
+                    $"/ STOP={stopResult} " +
+                    $"/ PAN_MODE={modeResult} " +
+                    $"/ PAN=0.00:{panResult} " +
+                    $"/ TILT=0.00:{tiltResult} " +
+                    $"/ RESULT={sendResult}");
+                ConsoleLogHelper.PrintLine();
+
+                if (!sendResult)
+                {
+                    HomeZeroStatusText =
+                        "HOME POSITION SEND FAILED";
+
+                    return;
+                }
+
+                bool isCompleted =
+                    await WaitHomePositionCompletedAsync();
+
+                HomeZeroStatusText =
+                    isCompleted
+                        ? "HOME POSITION COMPLETE"
+                        : "HOME POSITION WAIT TIMEOUT";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    isCompleted
+                        ? $"[HOME / ZERO] HOME POSITION COMPLETE / PAN={_currentPan:F2} / TILT={_currentTilt:F2}"
+                        : $"[HOME / ZERO] HOME POSITION TIMEOUT / PAN={_currentPan:F2} / TILT={_currentTilt:F2}");
+                ConsoleLogHelper.PrintLine();
+            }
+            catch (Exception ex)
+            {
+                HomeZeroStatusText =
+                    "HOME POSITION FAILED";
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] HOME POSITION ERROR : " +
+                    ex.Message);
+                ConsoleLogHelper.PrintLine();
+            }
+            finally
+            {
+                // 정상 완료, 송신 실패, 예외, 30초 Timeout 등
+                // 어떤 종료 경로에서도 눌림 상태를 모두 제거한 뒤 Lock을 해제한다.
+                //
+                // HOME 이동 중에는 Reset 함수가 별도 Stop 패킷을 송신하지 않으므로
+                // HOME 완료 직전에 불필요한 STOP이 끼어들지 않는다.
+                ResetAllKeyboardControlState();
+
+                SetHomePositionMovingState(
+                    false);
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] UI+KEYBOARD UNLOCKED " +
+                    "/ ARROW+WASD+ZOOM+FOCUS INPUT ENABLED");
+                ConsoleLogHelper.PrintLine();
+            }
+        }
+
+        /// <summary>
+        /// HOME POSITION 완료 여부를 Pan/Tilt 상태값으로 판단한다.
+        ///
+        /// 단순 고정 Delay로 완료 처리하지 않고,
+        /// Pan/Tilt가 0도 허용 오차 안에 들어온 상태에서
+        /// 연속 5회 안정적으로 유지될 때 완료로 판정한다.
+        /// 최대 대기시간을 초과하면 Timeout으로 종료한다.
+        /// </summary>
+        private async Task<bool> WaitHomePositionCompletedAsync()
+        {
+            Stopwatch stopwatch =
+                Stopwatch.StartNew();
+
+            int stableCount =
+                0;
+
+            double previousPan =
+                _currentPan;
+
+            double previousTilt =
+                _currentTilt;
+
+            // 명령 직후 이전 상태 Packet을 완료로 오판하지 않도록
+            // 최소 이동 시작 시간을 확보한다.
+            await Task.Delay(
+                300);
+
+            while (stopwatch.ElapsedMilliseconds <
+                   HomePositionTimeoutMs)
+            {
+                double currentPan =
+                    _currentPan;
+
+                double currentTilt =
+                    _currentTilt;
+
+                bool isNearHome =
+                    Math.Abs(currentPan) <=
+                        HomePositionTargetTolerance &&
+                    Math.Abs(currentTilt) <=
+                        HomePositionTargetTolerance;
+
+                bool isStable =
+                    Math.Abs(currentPan - previousPan) <=
+                        HomePositionStableTolerance &&
+                    Math.Abs(currentTilt - previousTilt) <=
+                        HomePositionStableTolerance;
+
+                if (isNearHome &&
+                    isStable)
+                {
+                    stableCount++;
+                }
+                else
+                {
+                    stableCount =
+                        0;
+                }
+
+                Console.WriteLine(
+                    "[HOME / ZERO] WAIT " +
+                    $"/ PAN={currentPan:F2} " +
+                    $"/ TILT={currentTilt:F2} " +
+                    $"/ NEAR={isNearHome} " +
+                    $"/ STABLE={stableCount}/{HomePositionStableSampleCount} " +
+                    $"/ ELAPSED={stopwatch.ElapsedMilliseconds}ms");
+
+                if (stableCount >=
+                    HomePositionStableSampleCount)
+                {
+                    return true;
+                }
+
+                previousPan =
+                    currentPan;
+
+                previousTilt =
+                    currentTilt;
+
+                await Task.Delay(
+                    HomePositionPollingIntervalMs);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// HOME POSITION 이동 상태를 반영하고 관련 UI Binding을 갱신한다.
+        /// </summary>
+        private void SetHomePositionMovingState(
+            bool isMoving)
+        {
+            IsHomePositionMoving =
+                isMoving;
+
+            // HOME Lock 진입/해제 양쪽에서 남아 있는 방향키/WASD 상태를 제거한다.
+            //
+            // Zoom/Focus를 포함한 모든 키 입력은 MainWindow의
+            // PreviewKeyDown/PreviewKeyUp 최상단에서 IsHomePositionMoving을
+            // 확인하여 HOME 진행 중 전체 차단한다.
+            ClearKeyboardPanTiltPressedState();
+
+            _currentKeyboardPanTiltDirection =
+                KeyboardPanTiltDirection.None;
         }
 
         /// <summary>
@@ -7893,6 +8179,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public void HandlePanTiltKeyDown(
             Key key)
         {
+            if (IsHomePositionMoving)
+            {
+                return;
+            }
+
             if (!IsPanTiltKeyboardKey(
                     key))
             {
@@ -7929,6 +8220,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public void HandlePanTiltKeyUp(
             Key key)
         {
+            if (IsHomePositionMoving)
+            {
+                ClearKeyboardPanTiltPressedState();
+                _currentKeyboardPanTiltDirection =
+                    KeyboardPanTiltDirection.None;
+
+                return;
+            }
+
             if (!IsPanTiltKeyboardKey(
                     key))
             {
@@ -7940,6 +8240,27 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 false);
 
             UpdateKeyboardPanTiltMove();
+        }
+
+        /// <summary>
+        /// 장비 제어용 키보드 상태 전체 초기화
+        ///
+        /// HOME POSITION 시작/완료/실패/Timeout 시 공통으로 호출한다.
+        ///
+        /// 현재 구현:
+        /// - 방향키 Pan/Tilt 상태 초기화
+        /// - WASD Pan/Tilt 상태 초기화
+        ///
+        /// 방향키와 WASD는 동일한 Pan/Tilt 상태 필드를 사용하므로
+        /// ResetKeyboardPanTiltState 호출 한 번으로 함께 초기화된다.
+        ///
+        /// Zoom/Focus 단축키는 현재 별도 눌림 상태를 보관하지 않고
+        /// Window PreviewKeyDown/PreviewKeyUp 입구에서 HOME Lock 중 전체 차단한다.
+        /// 추후 Zoom/Focus 키 상태 필드가 추가되면 반드시 이 함수에서 같이 초기화한다.
+        /// </summary>
+        public void ResetAllKeyboardControlState()
+        {
+            ResetKeyboardPanTiltState();
         }
 
         /// <summary>
@@ -7961,6 +8282,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 KeyboardPanTiltDirection.None;
 
             if (!wasKeyboardMoveActive)
+            {
+                return;
+            }
+
+            // HOME POSITION 이동 중 Focus 이탈/KeyUp이 발생해도
+            // Stop 명령을 송신하지 않는다. Home 이동을 끊는 것을 방지한다.
+            if (IsHomePositionMoving)
             {
                 return;
             }
@@ -9500,6 +9828,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public async void StopContinuousMove()
         {
+            // HOME POSITION 명령 송신 이후 MouseUp/MouseLeave/Focus 이탈로
+            // 공통 Stop이 뒤늦게 들어오면 Home 이동이 중단될 수 있다.
+            // Home Lock 중에는 외부 Stop 요청을 무시한다.
+            if (IsHomePositionMoving)
+            {
+                return;
+            }
+
             /*
              * 이동 제어 VIA 0 Pan 작업이 실행 중이면
              * Stop 버튼에서도 동일하게 취소되도록 먼저 종료한다.
@@ -9800,7 +10136,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 최초 연결에 실패하더라도 내부 Auto Reconnect Loop가
                 /// 일정 간격으로 연결을 다시 시도한다.
                 /// </summary>
-                await ConnectLaAsync();
+                bool isControlAgentConnected =
+                    await ConnectLaAsync();
 
                 /// <summary>
                 /// 선택된 EO 카메라가 [옥상 GOP CTEC] 직접 제어 장비이면
@@ -10009,6 +10346,60 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 // EO / IR 개별 상태 Console 출력
                 WriteVideoConnectLog(result);
+
+                /*
+                 * [LA AGENT] 최초 장비 연결 완료 후 HOME POSITION 자동 실행
+                 *
+                 * Vertiport 운용 흐름과 동일하게 다음 순서를 보장한다.
+                 *
+                 * 1. Control Agent TCP 연결
+                 * 2. EO RTSP 연결 완료
+                 * 3. IR RTSP 연결 완료
+                 * 4. LA AGENT 모드에서만 HOME POSITION 실행
+                 *
+                 * 카메라가 아직 Connecting 상태인 동안에는 HOME을 실행하지 않는다.
+                 * EO와 IR이 모두 정상 연결된 경우에만 원점 이동을 시작한다.
+                 *
+                 * ENVIRONMENT / WEB AGENT에서는 HOME / ZERO가 지원 대상이 아니므로
+                 * 자동 HOME을 실행하지 않는다.
+                 *
+                 * HOME 진행 중에는 수동 HOME과 동일하게
+                 * 전체 우측 UI, 탭, 버튼, 방향키, WASD, Zoom/Focus 단축키가 잠기며,
+                 * 정상 완료/송신 실패/예외/30초 Timeout 후 반드시 자동 해제된다.
+                 */
+                bool areAllCamerasConnected =
+                    result.EoResult &&
+                    result.IrResult;
+
+                if (isControlAgentConnected &&
+                    IsRooftopStatusSelected &&
+                    areAllCamerasConnected)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine(
+                        "[CONNECT] LA AGENT + EO + IR CONNECTED " +
+                        "/ AUTO HOME POSITION START");
+                    ConsoleLogHelper.PrintLine();
+
+                    await MoveHomePositionAsync();
+
+                    Console.WriteLine();
+                    Console.WriteLine(
+                        "[CONNECT] LA AGENT AUTO HOME POSITION END " +
+                        $"/ STATUS={HomeZeroStatusText}");
+                    ConsoleLogHelper.PrintLine();
+                }
+                else
+                {
+                    Console.WriteLine();
+                    Console.WriteLine(
+                        "[CONNECT] AUTO HOME POSITION SKIPPED " +
+                        $"/ CONTROL_AGENT_CONNECTED={isControlAgentConnected} " +
+                        $"/ EO_CONNECTED={result.EoResult} " +
+                        $"/ IR_CONNECTED={result.IrResult} " +
+                        $"/ MODE={(IsRooftopStatusSelected ? "LA AGENT" : "WEB AGENT")}");
+                    ConsoleLogHelper.PrintLine();
+                }
 
                 /// <summary>
                 /// [EO / IR] 영상 연결 성공 시 중앙 십자선 자동 활성화
