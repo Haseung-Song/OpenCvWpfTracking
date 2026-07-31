@@ -519,6 +519,61 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
+        /// 사용자 정의 Pan 위치 이동 속도를 설정한다.
+        ///
+        /// Command2 = 0x49
+        /// Speed    = deg/s * 100 (unsigned short, Big Endian)
+        /// </summary>
+        public bool SetPanPositionSpeed(
+            double speedDegreesPerSecond)
+        {
+            ushort speedValue =
+                ConvertPositionSpeed(
+                    speedDegreesPerSecond);
+
+            return SendCommand(
+                0x00,
+                0x49,
+                (byte)((speedValue >> 8) & 0xFF),
+                (byte)(speedValue & 0xFF));
+        }
+
+        /// <summary>
+        /// 사용자 정의 Tilt 위치 이동 속도를 설정한다.
+        ///
+        /// Command2 = 0x4B
+        /// Speed    = deg/s * 100 (unsigned short, Big Endian)
+        /// </summary>
+        public bool SetTiltPositionSpeed(
+            double speedDegreesPerSecond)
+        {
+            ushort speedValue =
+                ConvertPositionSpeed(
+                    speedDegreesPerSecond);
+
+            return SendCommand(
+                0x00,
+                0x4B,
+                (byte)((speedValue >> 8) & 0xFF),
+                (byte)(speedValue & 0xFF));
+        }
+
+        private static ushort ConvertPositionSpeed(
+            double speedDegreesPerSecond)
+        {
+            double safeSpeed =
+                Math.Max(
+                    0.0,
+                    Math.Min(
+                        655.35,
+                        speedDegreesPerSecond));
+
+            return (ushort)Math.Round(
+                safeSpeed * 100.0,
+                MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
         /// [Pan] 위치 제어 명령
         /// 
         /// 입력 기준은 -180 ~ 180도이다.
@@ -551,6 +606,20 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
+        /// Pelco-D Pan / Tilt 속도를 문서 허용 범위 [0 ~ 63]으로 제한한다.
+        ///
+        /// UI의 0=STOP 정책과 1~50 환산은 ViewModel에서 처리하며,
+        /// Service는 최종 Packet 값이 허용 범위를 벗어나지 않도록 방어한다.
+        /// </summary>
+        private static byte NormalizePanTiltProtocolSpeed(
+            byte speed)
+        {
+            return speed > 0x3F
+                ? (byte)0x3F
+                : speed;
+        }
+
+        /// <summary>
         /// [PAN] 우측 연속 이동 시작
         /// 
         /// [Command2 Bit0 = Pan Right]
@@ -558,10 +627,14 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public bool StartPanRight(byte speed = 20)
         {
+            byte protocolSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    speed);
+
             return SendCommand(
                 0x00,
                 0x02,
-                speed,
+                protocolSpeed,
                 0x00);
         }
 
@@ -573,10 +646,14 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public bool StartPanLeft(byte speed = 20)
         {
+            byte protocolSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    speed);
+
             return SendCommand(
                 0x00,
                 0x04,
-                speed,
+                protocolSpeed,
                 0x00);
         }
 
@@ -614,11 +691,15 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public bool StartTiltUp(byte speed = 20)
         {
+            byte protocolSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    speed);
+
             return SendCommand(
                 0x00,
                 0x08,
                 0x00,
-                speed);
+                protocolSpeed);
         }
 
         /// <summary>
@@ -629,11 +710,15 @@ namespace OpenCvWpfTracking.Services.Communication
         /// </summary>
         public bool StartTiltDown(byte speed = 20)
         {
+            byte protocolSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    speed);
+
             return SendCommand(
                 0x00,
                 0x10,
                 0x00,
-                speed);
+                protocolSpeed);
         }
 
         /// <summary>
@@ -651,11 +736,19 @@ namespace OpenCvWpfTracking.Services.Communication
             byte panSpeed = 20,
             byte tiltSpeed = 20)
         {
+            byte protocolPanSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    panSpeed);
+
+            byte protocolTiltSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    tiltSpeed);
+
             return SendCommand(
                 0x00,
                 0x0C,
-                panSpeed,
-                tiltSpeed);
+                protocolPanSpeed,
+                protocolTiltSpeed);
         }
 
         /// <summary>
@@ -673,11 +766,19 @@ namespace OpenCvWpfTracking.Services.Communication
             byte panSpeed = 20,
             byte tiltSpeed = 20)
         {
+            byte protocolPanSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    panSpeed);
+
+            byte protocolTiltSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    tiltSpeed);
+
             return SendCommand(
                 0x00,
                 0x0A,
-                panSpeed,
-                tiltSpeed);
+                protocolPanSpeed,
+                protocolTiltSpeed);
         }
 
         /// <summary>
@@ -695,11 +796,19 @@ namespace OpenCvWpfTracking.Services.Communication
             byte panSpeed = 20,
             byte tiltSpeed = 20)
         {
+            byte protocolPanSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    panSpeed);
+
+            byte protocolTiltSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    tiltSpeed);
+
             return SendCommand(
                 0x00,
                 0x14,
-                panSpeed,
-                tiltSpeed);
+                protocolPanSpeed,
+                protocolTiltSpeed);
         }
 
         /// <summary>
@@ -717,11 +826,19 @@ namespace OpenCvWpfTracking.Services.Communication
             byte panSpeed = 20,
             byte tiltSpeed = 20)
         {
+            byte protocolPanSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    panSpeed);
+
+            byte protocolTiltSpeed =
+                NormalizePanTiltProtocolSpeed(
+                    tiltSpeed);
+
             return SendCommand(
                 0x00,
                 0x12,
-                panSpeed,
-                tiltSpeed);
+                protocolPanSpeed,
+                protocolTiltSpeed);
         }
 
         /// <summary>

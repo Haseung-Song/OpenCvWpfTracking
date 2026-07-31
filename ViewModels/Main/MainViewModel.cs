@@ -332,6 +332,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         private double _currentTilt;
 
         /// <summary>
+        /// 최신 Pan / Tilt 상태 Packet 수신 순번.
+        ///
+        /// 프리셋 이동 완료 판정에서 명령 이전의 오래된 상태값을
+        /// 완료 상태로 오판하지 않도록 사용한다.
+        /// </summary>
+        private long _panTiltStatusVersion;
+
+        /// <summary>
         /// 프로그램 시작 이후 고정밀 경과시간 측정용
         /// </summary>
         private readonly Stopwatch _focusLogStopwatch =
@@ -712,13 +720,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// <summary>
         /// [PAN / TILT] 속도제어 현재 속도 [Level]
         ///
-        /// 문서 기준 [0 ~ 63] 범위를 사용한다.
-        /// 현재 기본값은 [25]으로 설정한다.
+        /// UI 속도 Level [0 ~ 50]을 사용한다.
+        /// 실제 Pelco-D 송신 시 [1 ~ 63]으로 환산하며 UI 0은 STOP으로 처리한다.
+        /// 현재 기본값은 [30]으로 설정한다.
         ///
         /// 이후 [Slider] 또는 [ComboBox] 등 [UI] 조작으로 값이 변경될 수 있으며,
         /// 실제 연속 이동 제어 시 해당 값을 사용한다.
         /// </summary>
-        private byte _panTiltSpeedLevel = 25;
+        private byte _panTiltSpeedLevel = 30;
 
 
         /// <summary>
@@ -894,6 +903,19 @@ namespace OpenCvWpfTracking.ViewModels.Main
             "READY";
 
         /// <summary>
+        /// HOME / PAN ZERO / TILT ZERO 공통 잠금 화면 제목.
+        /// 현재 실행 중인 작업에 따라 XAML Overlay 문구를 구분한다.
+        /// </summary>
+        private string _homeZeroLockTitle =
+            "HOME / ZERO OPERATION";
+
+        /// <summary>
+        /// HOME / ZERO 공통 잠금 화면 상세 문구.
+        /// </summary>
+        private string _homeZeroLockMessage =
+            "PROCESSING...";
+
+        /// <summary>
         /// HOME POSITION 이동 진행 여부.
         ///
         /// true인 동안에는 우측의 모든 버튼/탭과
@@ -902,6 +924,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// WEB AGENT(ENVIRONMENT) 선택 상태에서는 실행하지 않는다.
         /// </summary>
         private bool _isHomePositionMoving;
+
+        /// <summary>
+        /// HOME / PAN ZERO / TILT ZERO 작업을 직렬화한다.
+        ///
+        /// Zero 명령의 마지막 Motor On 안정화 대기까지 동일 Lock 범위에 포함하여
+        /// HOME 또는 다른 Zero 명령이 중간에 겹치지 않도록 한다.
+        /// </summary>
+        private readonly SemaphoreSlim _homeZeroOperationLock =
+            new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// HOME POSITION 완료 판정 최대 대기시간.
@@ -932,6 +963,53 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private const double HomePositionStableTolerance =
             0.05;
+
+        /// <summary>
+        /// 프리셋 반복 이동 시 목표각과 현재각이 같은 0.01° 값인지 판단하는 허용 오차.
+        ///
+        /// 상태 및 명령 Protocol의 분해능이 0.01°이므로 반올림 경계와
+        /// 부동 소수점 오차를 포함한 0.015° 이내를 동일 위치로 판단한다.
+        /// </summary>
+        private const double PresetPanTiltTargetTolerance =
+            0.015;
+
+        /// <summary>
+        /// 목표 범위에 들어온 최신 상태 Packet 한 건으로 도착을 확정한다.
+        /// 별도의 정착 대기를 추가하지 않기 위한 값이다.
+        /// </summary>
+        private const int PresetPanTiltStableSampleCount =
+            1;
+
+        /// <summary>
+        /// 목표 밖에서 장비 위치가 멈췄다고 판단할 연속 상태 Packet 수.
+        /// </summary>
+        private const int PresetPanTiltStationarySampleCount =
+            3;
+
+        /// <summary>
+        /// 통신 이상으로 상태 Packet이 오지 않는 경우를 위한 안전 여유시간.
+        /// 정상 도착 시에는 이 시간까지 기다리지 않고 즉시 반환한다.
+        /// </summary>
+        private const int PresetPanTiltSafetyTimeoutMarginMs =
+            1500;
+
+        private const int PresetPanTiltSettleTimeoutMinimumMs =
+            2000;
+
+        private const int PresetPanTiltSettleTimeoutMaximumMs =
+            60000;
+
+        /// <summary>
+        /// 이동 속도를 직접 지정할 수 없는 PRESET W의 기본 확인 시간.
+        /// </summary>
+        private const int PresetPanTiltDefaultSettleTimeoutMs =
+            5000;
+
+        /// <summary>
+        /// 목표 밖에서 이동이 멈춘 경우 허용하는 즉시 재보정 횟수.
+        /// </summary>
+        private const int PresetPanTiltCorrectionRetryCount =
+            1;
 
 
         /// <summary>

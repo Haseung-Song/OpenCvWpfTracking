@@ -419,6 +419,82 @@ namespace OpenCvWpfTracking.ViewModels.Main
         #region [EO/IR] [Pan / Tilt Continuous Move]
 
         /// <summary>
+        /// UI 속도 Level [1 ~ 50]을 Pelco-D 속도 Level [1 ~ 63]으로 환산한다.
+        ///
+        /// UI 0은 이동 속도로 사용하지 않으며 정지 요청으로 처리한다.
+        /// </summary>
+        private byte ConvertPanTiltSpeedLevel(
+            int uiSpeed)
+        {
+            if (uiSpeed <= 0)
+            {
+                return 0;
+            }
+
+            const int uiMaximum = 50;
+            const int protocolMinimum = 1;
+            const int protocolMaximum = 63;
+
+            int normalizedUiSpeed =
+                Math.Min(
+                    uiMaximum,
+                    uiSpeed);
+
+            double normalized =
+                (normalizedUiSpeed - 1.0) /
+                (uiMaximum - 1.0);
+
+            int converted =
+                protocolMinimum +
+                (int)Math.Round(
+                    normalized *
+                    (protocolMaximum -
+                     protocolMinimum));
+
+            return (byte)Math.Max(
+                protocolMinimum,
+                Math.Min(
+                    protocolMaximum,
+                    converted));
+        }
+
+        /// <summary>
+        /// Pan / Tilt 이동에 사용할 Pelco-D 속도를 조회한다.
+        ///
+        /// UI 속도가 0이면 이동 패킷을 보내지 않고 STOP을 송신한 뒤
+        /// 남아 있는 연속 이동 상태를 초기화한다.
+        /// </summary>
+        private bool TryGetPanTiltProtocolSpeed(
+            out byte protocolSpeed)
+        {
+            protocolSpeed =
+                ConvertPanTiltSpeedLevel(
+                    PanTiltSpeedLevel);
+
+            if (protocolSpeed > 0)
+            {
+                return true;
+            }
+
+            bool stopResult =
+                _controlCommandService
+                    .StopMove();
+
+            _currentMoveType =
+                ContinuousMoveType.None;
+
+            _activePanTiltMoveDirection =
+                KeyboardPanTiltDirection.None;
+
+            ConsoleLogHelper.Warning(
+                "PAN / TILT",
+                "Move blocked / UI_SPEED=0 / " +
+                $"STOP_RESULT={stopResult}");
+
+            return false;
+        }
+
+        /// <summary>
         /// [EO/IR] 주간/열상 카메라 [PAN] 좌측 연속 이동 시작
         ///
         /// [PanTiltSpeedLevel] 값을 사용하여
@@ -426,15 +502,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanLeftMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType = ContinuousMoveType.PanTilt;
             _activePanTiltMoveDirection =
                 KeyboardPanTiltDirection.PanLeft;
 
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] [EO/IR] PAN LEFT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN LEFT START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartPanLeft(PanTiltSpeedLevel);
+            _controlCommandService
+                .StartPanLeft(
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -445,15 +532,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanRightMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType = ContinuousMoveType.PanTilt;
             _activePanTiltMoveDirection =
                 KeyboardPanTiltDirection.PanRight;
 
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] [EO/IR] PAN RIGHT START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] PAN RIGHT START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartPanRight(PanTiltSpeedLevel);
+            _controlCommandService
+                .StartPanRight(
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -464,15 +562,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartTiltUpMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType = ContinuousMoveType.PanTilt;
             _activePanTiltMoveDirection =
                 KeyboardPanTiltDirection.TiltUp;
 
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] [EO/IR] TILT UP START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] TILT UP START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartTiltUp(PanTiltSpeedLevel);
+            _controlCommandService
+                .StartTiltUp(
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -483,15 +592,26 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartTiltDownMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType = ContinuousMoveType.PanTilt;
             _activePanTiltMoveDirection =
                 KeyboardPanTiltDirection.TiltDown;
 
             Console.WriteLine();
-            Console.WriteLine($"[CONTROL] [EO/IR] TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+            Console.WriteLine(
+                $"[CONTROL] [EO/IR] TILT DOWN START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
             ConsoleLogHelper.PrintLine();
 
-            _controlCommandService.StartTiltDown(PanTiltSpeedLevel);
+            _controlCommandService
+                .StartTiltDown(
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -499,6 +619,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanLeftTiltUpMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType =
                 ContinuousMoveType.PanTilt;
 
@@ -508,14 +634,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine(
-                $"[CONTROL] [EO/IR] PAN LEFT + TILT UP START / SPEED : {PanTiltSpeedLevel}");
+                $"[CONTROL] [EO/IR] PAN LEFT + TILT UP START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
 
             ConsoleLogHelper.PrintLine();
 
             _controlCommandService
                 .StartPanLeftTiltUp(
-                    PanTiltSpeedLevel,
-                    PanTiltSpeedLevel);
+                    protocolSpeed,
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -523,6 +651,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanRightTiltUpMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType =
                 ContinuousMoveType.PanTilt;
 
@@ -532,14 +666,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine(
-                $"[CONTROL] [EO/IR] PAN RIGHT + TILT UP START / SPEED : {PanTiltSpeedLevel}");
+                $"[CONTROL] [EO/IR] PAN RIGHT + TILT UP START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
 
             ConsoleLogHelper.PrintLine();
 
             _controlCommandService
                 .StartPanRightTiltUp(
-                    PanTiltSpeedLevel,
-                    PanTiltSpeedLevel);
+                    protocolSpeed,
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -547,6 +683,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanLeftTiltDownMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType =
                 ContinuousMoveType.PanTilt;
 
@@ -556,14 +698,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine(
-                $"[CONTROL] [EO/IR] PAN LEFT + TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+                $"[CONTROL] [EO/IR] PAN LEFT + TILT DOWN START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
 
             ConsoleLogHelper.PrintLine();
 
             _controlCommandService
                 .StartPanLeftTiltDown(
-                    PanTiltSpeedLevel,
-                    PanTiltSpeedLevel);
+                    protocolSpeed,
+                    protocolSpeed);
         }
 
         /// <summary>
@@ -571,6 +715,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public void StartPanRightTiltDownMove()
         {
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             _currentMoveType =
                 ContinuousMoveType.PanTilt;
 
@@ -580,14 +730,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine();
             Console.WriteLine(
-                $"[CONTROL] [EO/IR] PAN RIGHT + TILT DOWN START / SPEED : {PanTiltSpeedLevel}");
+                $"[CONTROL] [EO/IR] PAN RIGHT + TILT DOWN START / " +
+                $"UI SPEED : {PanTiltSpeedLevel} / " +
+                $"PROTOCOL SPEED : {protocolSpeed}");
 
             ConsoleLogHelper.PrintLine();
 
             _controlCommandService
                 .StartPanRightTiltDown(
-                    PanTiltSpeedLevel,
-                    PanTiltSpeedLevel);
+                    protocolSpeed,
+                    protocolSpeed);
         }
 
         #endregion
@@ -607,6 +759,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
+            if (!TryGetPanTiltProtocolSpeed(
+                    out byte protocolSpeed))
+            {
+                return;
+            }
+
             bool result;
 
             switch (_activePanTiltMoveDirection)
@@ -615,60 +773,60 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     result =
                         _controlCommandService
                             .StartPanLeft(
-                                PanTiltSpeedLevel);
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.PanRight:
                     result =
                         _controlCommandService
                             .StartPanRight(
-                                PanTiltSpeedLevel);
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.TiltUp:
                     result =
                         _controlCommandService
                             .StartTiltUp(
-                                PanTiltSpeedLevel);
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.TiltDown:
                     result =
                         _controlCommandService
                             .StartTiltDown(
-                                PanTiltSpeedLevel);
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.PanLeftTiltUp:
                     result =
                         _controlCommandService
                             .StartPanLeftTiltUp(
-                                PanTiltSpeedLevel,
-                                PanTiltSpeedLevel);
+                                protocolSpeed,
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.PanRightTiltUp:
                     result =
                         _controlCommandService
                             .StartPanRightTiltUp(
-                                PanTiltSpeedLevel,
-                                PanTiltSpeedLevel);
+                                protocolSpeed,
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.PanLeftTiltDown:
                     result =
                         _controlCommandService
                             .StartPanLeftTiltDown(
-                                PanTiltSpeedLevel,
-                                PanTiltSpeedLevel);
+                                protocolSpeed,
+                                protocolSpeed);
                     break;
 
                 case KeyboardPanTiltDirection.PanRightTiltDown:
                     result =
                         _controlCommandService
                             .StartPanRightTiltDown(
-                                PanTiltSpeedLevel,
-                                PanTiltSpeedLevel);
+                                protocolSpeed,
+                                protocolSpeed);
                     break;
 
                 default:
@@ -677,7 +835,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             ConsoleLogHelper.Command(
                 "PAN / TILT SPEED",
-                $"Updated while moving / SPEED={PanTiltSpeedLevel} / " +
+                $"Updated while moving / UI_SPEED={PanTiltSpeedLevel} / " +
+                $"PROTOCOL_SPEED={protocolSpeed} / " +
                 $"DIRECTION={_activePanTiltMoveDirection} / RESULT={result}");
         }
 
@@ -1699,6 +1858,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// [CTEC Stop] Stop 송신 이후 실제 Position 값이 안정될 때까지 확인한다.
         ///
         /// 단일 조회값을 최종 위치로 확정하지 않는다.
+        /// 
         /// 카메라 상태 갱신이 늦으면 이전 이동 방향의 값이 뒤늦게 반환될 수 있으므로,
         /// 연속 두 값이 허용 오차 안에 들어올 때 최종 위치로 판단한다.
         /// </summary>

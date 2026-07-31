@@ -21,6 +21,22 @@ namespace OpenCvWpfTracking.Services.Communication
         private const int SendTimeoutMs = 1500;
         private const int InterPacketDelayMs = 100;
 
+        /// <summary>
+        /// Set Origin 시 Stop / Motor Off / Position Zero / Motor On 명령 사이 대기시간.
+        ///
+        /// 기존 20ms는 모터 드라이버가 이전 명령을 반영하기 전에
+        /// 다음 명령이 도착할 가능성이 있어 200ms로 확보한다.
+        /// </summary>
+        private const int SetOriginInterPacketDelayMs = 200;
+
+        /// <summary>
+        /// Set Origin 마지막 Motor On 명령 후 모터 드라이버 안정화 대기시간.
+        ///
+        /// 이 시간이 끝나기 전에는 상위 ViewModel의 HOME / ZERO Lock을
+        /// 해제하지 않으므로 HOME 또는 Tilt 제어 명령이 먼저 들어가지 않는다.
+        /// </summary>
+        private const int MotorEnableStabilizationMs = 1000;
+
         private readonly SemaphoreSlim _sendLock =
             new SemaphoreSlim(1, 1);
 
@@ -93,7 +109,8 @@ namespace OpenCvWpfTracking.Services.Communication
                 port,
                 packets,
                 commandName,
-                20);
+                SetOriginInterPacketDelayMs,
+                MotorEnableStabilizationMs);
         }
 
         private async Task<bool> SendPacketsAsync(
@@ -101,7 +118,8 @@ namespace OpenCvWpfTracking.Services.Communication
             int port,
             byte[][] packets,
             string commandName,
-            int interPacketDelayMs = InterPacketDelayMs)
+            int interPacketDelayMs = InterPacketDelayMs,
+            int postSendDelayMs = 0)
         {
             if (string.IsNullOrWhiteSpace(
                     ipAddress) ||
@@ -180,6 +198,16 @@ namespace OpenCvWpfTracking.Services.Communication
                                     interPacketDelayMs);
                             }
 
+                        }
+
+                        if (postSendDelayMs > 0)
+                        {
+                            Console.WriteLine(
+                                $"[MCB DIRECT] {commandName} MOTOR ENABLE STABILIZING : " +
+                                $"{postSendDelayMs}ms");
+
+                            await Task.Delay(
+                                postSendDelayMs);
                         }
 
                     }

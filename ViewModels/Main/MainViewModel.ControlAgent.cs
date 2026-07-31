@@ -868,6 +868,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentTilt =
                 tiltDegree;
 
+            Interlocked.Increment(
+                ref _panTiltStatusVersion);
+
             _currentEoZoom =
                 zoomRaw;
 

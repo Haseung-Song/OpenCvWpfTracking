@@ -360,7 +360,46 @@ namespace OpenCvWpfTracking.ViewModels.Main
             IsRooftopStatusSelected;
 
         /// <summary>
-        /// HOME POSITION 이동 진행 여부.
+        /// HOME / ZERO 잠금 화면의 작업 제목.
+        /// HOME POSITION, PAN ZERO, TILT ZERO를 각각 구분하여 표시한다.
+        /// </summary>
+        public string HomeZeroLockTitle
+        {
+            get => _homeZeroLockTitle;
+            private set
+            {
+                if (_homeZeroLockTitle == value)
+                {
+                    return;
+                }
+
+                _homeZeroLockTitle = value;
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// HOME / ZERO 잠금 화면의 현재 처리 단계.
+        /// </summary>
+        public string HomeZeroLockMessage
+        {
+            get => _homeZeroLockMessage;
+            private set
+            {
+                if (_homeZeroLockMessage == value)
+                {
+                    return;
+                }
+
+                _homeZeroLockMessage = value;
+                OnPropertyChanged();
+            }
+
+        }
+
+        /// <summary>
+        /// HOME / ZERO 작업 진행 여부.
         /// </summary>
         public bool IsHomePositionMoving
         {
@@ -375,7 +414,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _isHomePositionMoving = value;
 
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(IsMainControlEnabled));
+                OnPropertyChanged(
+                    nameof(IsMainControlEnabled));
             }
 
         }
@@ -403,7 +443,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 _selectedZoomSyncLevel = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(SelectedZoomSyncPositionText));
+                OnPropertyChanged(
+                    nameof(SelectedZoomSyncPositionText));
             }
 
         }
@@ -1603,7 +1644,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiMappingConfidence = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(AiMappingConfidenceText));
+                    OnPropertyChanged(
+                        nameof(AiMappingConfidenceText));
                 }
 
             }
@@ -1628,7 +1670,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiMappingIou = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(AiMappingIouText));
+                    OnPropertyChanged(
+                        nameof(AiMappingIouText));
                 }
 
             }
@@ -1653,7 +1696,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 {
                     _aiDisplayConfidenceThreshold = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(AiDisplayConfidenceThresholdText));
+                    OnPropertyChanged(
+                        nameof(AiDisplayConfidenceThresholdText));
                 }
 
             }
@@ -1733,8 +1777,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
                 OnPropertyChanged();
                 OnPropertyChanged(
-                    nameof(
-                        CrosshairButtonText));
+                    nameof(CrosshairButtonText));
             }
 
         }

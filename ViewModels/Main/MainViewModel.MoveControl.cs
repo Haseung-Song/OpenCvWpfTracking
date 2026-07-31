@@ -106,15 +106,15 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            if (IsHomePositionMoving)
+            if (!await _homeZeroOperationLock.WaitAsync(0))
             {
                 ConsoleLogHelper.Warning(
                     "HOME / ZERO",
-                    "HOME POSITION ignored / already moving");
+                    "HOME POSITION ignored / HOME or ZERO operation already running");
 
                 Console.WriteLine();
                 Console.WriteLine(
-                    "[HOME / ZERO] HOME POSITION IGNORED / ALREADY MOVING");
+                    "[HOME / ZERO] HOME POSITION IGNORED / OPERATION LOCKED");
                 ConsoleLogHelper.PrintLine();
 
                 return;
@@ -140,6 +140,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     await Task.Delay(
                         150);
                 }
+
+                HomeZeroLockTitle =
+                    "HOME POSITION";
+
+                HomeZeroLockMessage =
+                    "MOVING TO HOME POSITION...";
 
                 SetHomePositionMovingState(
                     true);
@@ -262,6 +268,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     "[HOME / ZERO] UI+KEYBOARD UNLOCKED " +
                     "/ ARROW+WASD+ZOOM+FOCUS INPUT ENABLED");
                 ConsoleLogHelper.PrintLine();
+
+                _homeZeroOperationLock.Release();
             }
 
         }
@@ -360,31 +368,78 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "HOME / ZERO",
                 "PAN ZERO requested");
 
-            HomeZeroStatusText =
-                "PAN ZERO SENDING...";
+            if (!await _homeZeroOperationLock.WaitAsync(0))
+            {
+                HomeZeroStatusText =
+                    "HOME / ZERO OPERATION BUSY";
 
-            string mcbIpAddress =
-                GetMcbMaintenanceIpAddress();
+                ConsoleLogHelper.Warning(
+                    "HOME / ZERO",
+                    "PAN ZERO ignored / HOME or ZERO operation already running");
 
-            bool result =
-                await _mcbMaintenanceCommandService
-                    .SetPanZeroAsync(
-                        mcbIpAddress,
-                        McbMaintenancePort);
+                return;
+            }
 
-            Console.WriteLine();
-            Console.WriteLine(
-                "[HOME / ZERO] PAN SET ORIGIN " +
-                $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
-                $"/ SEQUENCE=],),|2,( " +
-                $"/ RESULT={result}");
+            HomeZeroLockTitle =
+                "PAN ZERO";
 
-            ConsoleLogHelper.PrintLine();
+            HomeZeroLockMessage =
+                "SETTING PAN ORIGIN...";
 
-            HomeZeroStatusText =
-                result
-                    ? "PAN ZERO COMMAND SENT"
-                    : "PAN ZERO SEND FAILED";
+            SetHomePositionMovingState(
+                true);
+
+            try
+            {
+                HomeZeroStatusText =
+                    "PAN ZERO SENDING...";
+
+                string mcbIpAddress =
+                    GetMcbMaintenanceIpAddress();
+
+                HomeZeroLockMessage =
+                    "PAN MOTOR STABILIZING...";
+
+                bool result =
+                    await _mcbMaintenanceCommandService
+                        .SetPanZeroAsync(
+                            mcbIpAddress,
+                            McbMaintenancePort);
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] PAN SET ORIGIN " +
+                    $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
+                    $"/ SEQUENCE=],),|2,( " +
+                    $"/ MOTOR_STABILIZATION=1000ms " +
+                    $"/ RESULT={result}");
+
+                ConsoleLogHelper.PrintLine();
+
+                HomeZeroStatusText =
+                    result
+                        ? "PAN ZERO COMPLETE"
+                        : "PAN ZERO SEND FAILED";
+            }
+            catch (Exception ex)
+            {
+                HomeZeroStatusText =
+                    "PAN ZERO FAILED";
+
+                ConsoleLogHelper.Error(
+                    "HOME / ZERO",
+                    "PAN ZERO failed",
+                    ex);
+            }
+            finally
+            {
+                ResetAllKeyboardControlState();
+
+                SetHomePositionMovingState(
+                    false);
+
+                _homeZeroOperationLock.Release();
+            }
         }
 
         /// <summary>
@@ -397,31 +452,78 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "HOME / ZERO",
                 "TILT ZERO requested");
 
-            HomeZeroStatusText =
-                "TILT ZERO SENDING...";
+            if (!await _homeZeroOperationLock.WaitAsync(0))
+            {
+                HomeZeroStatusText =
+                    "HOME / ZERO OPERATION BUSY";
 
-            string mcbIpAddress =
-                GetMcbMaintenanceIpAddress();
+                ConsoleLogHelper.Warning(
+                    "HOME / ZERO",
+                    "TILT ZERO ignored / HOME or ZERO operation already running");
 
-            bool result =
-                await _mcbMaintenanceCommandService
-                    .SetTiltZeroAsync(
-                        mcbIpAddress,
-                        McbMaintenancePort);
+                return;
+            }
 
-            Console.WriteLine();
-            Console.WriteLine(
-                "[HOME / ZERO] TILT SET ORIGIN " +
-                $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
-                $"/ SEQUENCE=],),|2,( " +
-                $"/ RESULT={result}");
+            // TILT ZERO의 Stop / Motor Off / Position Zero / Motor On과
+            // 마지막 모터 안정화 대기가 모두 끝날 때까지 기존 HOME Lock을 유지한다.
+            // 이 구간에는 HOME, 방향키, WASD, Zoom/Focus 입력이 차단된다.
+            HomeZeroLockTitle =
+                "TILT ZERO";
 
-            ConsoleLogHelper.PrintLine();
+            HomeZeroLockMessage =
+                "TILT MOTOR STABILIZING...";
 
-            HomeZeroStatusText =
-                result
-                    ? "TILT ZERO COMMAND SENT"
-                    : "TILT ZERO SEND FAILED";
+            SetHomePositionMovingState(
+                true);
+
+            try
+            {
+                HomeZeroStatusText =
+                    "TILT ZERO / MOTOR STABILIZING...";
+
+                string mcbIpAddress =
+                    GetMcbMaintenanceIpAddress();
+
+                bool result =
+                    await _mcbMaintenanceCommandService
+                        .SetTiltZeroAsync(
+                            mcbIpAddress,
+                            McbMaintenancePort);
+
+                Console.WriteLine();
+                Console.WriteLine(
+                    "[HOME / ZERO] TILT SET ORIGIN " +
+                    $"/ MCB={mcbIpAddress}:{McbMaintenancePort} " +
+                    $"/ SEQUENCE=],),|2,( " +
+                    $"/ MOTOR_STABILIZATION=1000ms " +
+                    $"/ RESULT={result}");
+
+                ConsoleLogHelper.PrintLine();
+
+                HomeZeroStatusText =
+                    result
+                        ? "TILT ZERO COMPLETE / MOTOR READY"
+                        : "TILT ZERO SEND FAILED";
+            }
+            catch (Exception ex)
+            {
+                HomeZeroStatusText =
+                    "TILT ZERO FAILED";
+
+                ConsoleLogHelper.Error(
+                    "HOME / ZERO",
+                    "TILT ZERO failed",
+                    ex);
+            }
+            finally
+            {
+                ResetAllKeyboardControlState();
+
+                SetHomePositionMovingState(
+                    false);
+
+                _homeZeroOperationLock.Release();
+            }
         }
 
         /// <summary>
@@ -738,16 +840,44 @@ namespace OpenCvWpfTracking.ViewModels.Main
             cancellationToken
                 .ThrowIfCancellationRequested();
 
+            int moveSpeed =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        LaPresetScanSpeed));
+
+            int settleTimeoutMs =
+                CalculatePresetPanTiltSettleTimeoutMs(
+                    preset,
+                    moveSpeed);
+
+            bool panSpeedResult =
+                _controlCommandService
+                    .SetPanPositionSpeed(
+                        moveSpeed);
+
+            bool tiltSpeedResult =
+                _controlCommandService
+                    .SetTiltPositionSpeed(
+                        moveSpeed);
+
+            bool speedResult =
+                panSpeedResult &&
+                tiltSpeedResult;
+
             bool modeResult =
                 ApplySelectedPanTurnMode();
 
             bool panResult =
                 modeResult &&
+                speedResult &&
                 _controlCommandService
                     .PanGoPosition(
                         preset.Pan);
 
             bool tiltResult =
+                speedResult &&
                 _controlCommandService
                     .TiltGoPosition(
                         preset.Tilt);
@@ -757,6 +887,51 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _lastPanAbsoluteTarget =
                     preset.Pan;
             }
+
+            bool panTiltSettled =
+                panResult &&
+                tiltResult &&
+                await EnsurePresetPanTiltTargetAsync(
+                    "PRESET L",
+                    preset,
+                    () =>
+                    {
+                        bool retryPanSpeedResult =
+                            _controlCommandService
+                                .SetPanPositionSpeed(
+                                    moveSpeed);
+
+                        bool retryTiltSpeedResult =
+                            _controlCommandService
+                                .SetTiltPositionSpeed(
+                                    moveSpeed);
+
+                        bool retryModeResult =
+                            ApplySelectedPanTurnMode();
+
+                        bool retryPanResult =
+                            retryPanSpeedResult &&
+                            retryTiltSpeedResult &&
+                            retryModeResult &&
+                            _controlCommandService
+                                .PanGoPosition(
+                                    preset.Pan);
+
+                        bool retryTiltResult =
+                            retryPanSpeedResult &&
+                            retryTiltSpeedResult &&
+                            _controlCommandService
+                                .TiltGoPosition(
+                                    preset.Tilt);
+
+                        return retryModeResult &&
+                               retryPanSpeedResult &&
+                               retryTiltSpeedResult &&
+                               retryPanResult &&
+                               retryTiltResult;
+                    },
+                    settleTimeoutMs,
+                    cancellationToken);
 
             int eoZoom =
                 ParsePresetPosition(
@@ -791,9 +966,11 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     cancellationToken);
 
             bool result =
+                speedResult &&
                 modeResult &&
                 panResult &&
                 tiltResult &&
+                panTiltSettled &&
                 zoomResult &&
                 focusResult;
 
@@ -803,13 +980,313 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             Console.WriteLine(
                 $"[PRESET 1 / WPF DIRECT] " +
+                $"SPEED={moveSpeed}deg/s:{speedResult} / " +
                 $"P={panResult} / T={tiltResult} / " +
+                $"PT_SETTLED={panTiltSettled} / " +
                 $"Z={zoomResult} / F={focusResult} / " +
                 $"RESULT={result}");
 
             ConsoleLogHelper.PrintLine();
 
             return result;
+        }
+
+        /// <summary>
+        /// 프리셋 Pan / Tilt 목표각 도달을 최신 상태 Packet으로 확인하고,
+        /// 0.01° Protocol 위치가 일치하지 않으면 제한 횟수만 재보정한다.
+        /// </summary>
+        private async Task<bool> EnsurePresetPanTiltTargetAsync(
+            string category,
+            PresetPointOption preset,
+            Func<bool> resendCommand,
+            int settleTimeoutMs,
+            CancellationToken cancellationToken)
+        {
+            for (int correctionCount = 0;
+                 correctionCount <=
+                 PresetPanTiltCorrectionRetryCount;
+                 correctionCount++)
+            {
+                cancellationToken
+                    .ThrowIfCancellationRequested();
+
+                if (correctionCount > 0)
+                {
+                    double correctionPanDelta =
+                        GetShortestPanDifference(
+                            _currentPan,
+                            preset.Pan);
+
+                    double correctionTiltDelta =
+                        _currentTilt -
+                        preset.Tilt;
+
+                    bool resendResult =
+                        resendCommand != null &&
+                        resendCommand();
+
+                    ConsoleLogHelper.Command(
+                        category,
+                        $"Pan/Tilt correction / " +
+                        $"COUNT={correctionCount}/" +
+                        $"{PresetPanTiltCorrectionRetryCount} / " +
+                        $"TARGET={preset.Pan:F2},{preset.Tilt:F2} / " +
+                        $"ACTUAL={_currentPan:F2},{_currentTilt:F2} / " +
+                        $"DELTA={correctionPanDelta:+0.00;-0.00;0.00}," +
+                        $"{correctionTiltDelta:+0.00;-0.00;0.00} / " +
+                        $"RESULT={resendResult}");
+
+                    if (!resendResult)
+                    {
+                        return false;
+                    }
+                }
+
+                bool settled =
+                    await WaitForPresetPanTiltTargetAsync(
+                        category,
+                        preset,
+                        correctionCount,
+                        settleTimeoutMs,
+                        cancellationToken);
+
+                if (settled)
+                {
+                    return true;
+                }
+            }
+
+            double finalPanDelta =
+                GetShortestPanDifference(
+                    _currentPan,
+                    preset.Pan);
+
+            double finalTiltDelta =
+                _currentTilt -
+                preset.Tilt;
+
+            ConsoleLogHelper.Warning(
+                category,
+                $"Pan/Tilt settle incomplete / " +
+                $"TARGET_PAN={preset.Pan:F2} / " +
+                $"ACTUAL_PAN={_currentPan:F2} / " +
+                $"DELTA_PAN={finalPanDelta:+0.00;-0.00;0.00} / " +
+                $"TARGET_TILT={preset.Tilt:F2} / " +
+                $"ACTUAL_TILT={_currentTilt:F2} / " +
+                $"DELTA_TILT={finalTiltDelta:+0.00;-0.00;0.00}");
+
+            return false;
+        }
+
+        /// <summary>
+        /// 명령 이후 새로 수신된 상태 Packet만 사용하여 목표각 안정화를 판정한다.
+        /// </summary>
+        private async Task<bool> WaitForPresetPanTiltTargetAsync(
+            string category,
+            PresetPointOption preset,
+            int correctionCount,
+            int settleTimeoutMs,
+            CancellationToken cancellationToken)
+        {
+            long observedVersion =
+                Interlocked.Read(
+                    ref _panTiltStatusVersion);
+
+            int stableCount = 0;
+            int stationaryCount = 0;
+
+            bool hasPreviousPosition =
+                false;
+
+            bool movementObserved =
+                false;
+
+            double previousPan = 0.0;
+            double previousTilt = 0.0;
+
+            Stopwatch stopwatch =
+                Stopwatch.StartNew();
+
+            while (stopwatch.ElapsedMilliseconds <
+                   settleTimeoutMs)
+            {
+                await Task.Delay(
+                    100,
+                    cancellationToken);
+
+                long currentVersion =
+                    Interlocked.Read(
+                        ref _panTiltStatusVersion);
+
+                if (currentVersion ==
+                    observedVersion)
+                {
+                    continue;
+                }
+
+                observedVersion =
+                    currentVersion;
+
+                double currentPan =
+                    _currentPan;
+
+                double currentTilt =
+                    _currentTilt;
+
+                double panDelta =
+                    GetShortestPanDifference(
+                        currentPan,
+                        preset.Pan);
+
+                double tiltDelta =
+                    currentTilt -
+                    preset.Tilt;
+
+                bool isTargetSample =
+                    Math.Abs(
+                        panDelta) <=
+                    PresetPanTiltTargetTolerance &&
+                    Math.Abs(
+                        tiltDelta) <=
+                    PresetPanTiltTargetTolerance;
+
+                stableCount =
+                    isTargetSample
+                        ? stableCount + 1
+                        : 0;
+
+                if (hasPreviousPosition)
+                {
+                    double panMovement =
+                        Math.Abs(
+                            GetShortestPanDifference(
+                                currentPan,
+                                previousPan));
+
+                    double tiltMovement =
+                        Math.Abs(
+                            currentTilt -
+                            previousTilt);
+
+                    bool isMoving =
+                        panMovement >
+                            PresetPanTiltTargetTolerance ||
+                        tiltMovement >
+                            PresetPanTiltTargetTolerance;
+
+                    if (isMoving)
+                    {
+                        movementObserved =
+                            true;
+
+                        stationaryCount =
+                            0;
+                    }
+                    else if (movementObserved)
+                    {
+                        stationaryCount++;
+                    }
+                }
+
+                previousPan =
+                    currentPan;
+
+                previousTilt =
+                    currentTilt;
+
+                hasPreviousPosition =
+                    true;
+
+                if (stableCount >=
+                    PresetPanTiltStableSampleCount)
+                {
+                    ConsoleLogHelper.State(
+                        category,
+                        $"Pan/Tilt settled / " +
+                        $"TARGET={preset.Pan:F2},{preset.Tilt:F2} / " +
+                        $"ACTUAL={currentPan:F2},{currentTilt:F2} / " +
+                        $"CORRECTION={correctionCount}");
+
+                    return true;
+                }
+
+                if (movementObserved &&
+                    stationaryCount >=
+                    PresetPanTiltStationarySampleCount)
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 현재 위치와 목표 위치의 각도 차이 및 설정 속도로 통신 장애
+        /// 방지용 안전 제한시간을 계산한다. 정상 도착 시 즉시 반환되므로
+        /// 이 값은 사용자 Delay에 추가되지 않는다.
+        /// </summary>
+        private int CalculatePresetPanTiltSettleTimeoutMs(
+            PresetPointOption preset,
+            double speedDegreesPerSecond)
+        {
+            double panDistance =
+                Math.Abs(
+                    GetShortestPanDifference(
+                        _currentPan,
+                        preset.Pan));
+
+            double tiltDistance =
+                Math.Abs(
+                    _currentTilt -
+                    preset.Tilt);
+
+            double maximumDistance =
+                Math.Max(
+                    panDistance,
+                    tiltDistance);
+
+            double safeSpeed =
+                Math.Max(
+                    1.0,
+                    speedDegreesPerSecond);
+
+            int expectedTravelMs =
+                (int)Math.Ceiling(
+                    maximumDistance /
+                    safeSpeed *
+                    1000.0);
+
+            return Math.Max(
+                PresetPanTiltSettleTimeoutMinimumMs,
+                Math.Min(
+                    PresetPanTiltSettleTimeoutMaximumMs,
+                    expectedTravelMs +
+                    PresetPanTiltSafetyTimeoutMarginMs));
+        }
+
+        /// <summary>
+        /// ±180° 경계를 고려한 Pan 최단 각도 차이를 반환한다.
+        /// </summary>
+        private static double GetShortestPanDifference(
+            double currentPan,
+            double targetPan)
+        {
+            double difference =
+                currentPan -
+                targetPan;
+
+            while (difference > 180.0)
+            {
+                difference -= 360.0;
+            }
+
+            while (difference < -180.0)
+            {
+                difference += 360.0;
+            }
+
+            return difference;
         }
 
         private static int ParsePresetPosition(
@@ -1190,6 +1667,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                         60,
                         LaPresetScanDelay));
 
+            int speedDegreesPerSecond =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        LaPresetScanSpeed));
+
             IsLaPresetScanRunning =
                 true;
 
@@ -1203,6 +1687,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             Console.WriteLine(
                 $"[PRESET 1 / WPF DIRECT SCAN] " +
                 $"POINTS={LaPresetPoints.Count} / " +
+                $"SPEED={speedDegreesPerSecond}deg/s / " +
                 $"DELAY={delaySeconds}s");
 
             ConsoleLogHelper.PrintLine();
@@ -1277,6 +1762,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         private void UpdateLaPresetScan()
         {
+            int speed =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        60,
+                        LaPresetScanSpeed));
+
             int delay =
                 Math.Max(
                     1,
@@ -1289,12 +1781,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 "[PRESET 1 / WPF DIRECT SCAN] OPTION");
 
             Console.WriteLine(
-                $"[PRESET 1 / WPF DIRECT SCAN] DELAY={delay}s");
+                $"[PRESET 1 / WPF DIRECT SCAN] " +
+                $"SPEED={speed}deg/s / DELAY={delay}s");
 
             ConsoleLogHelper.PrintLine();
 
             LaPresetCommandStatusText =
-                $"DIRECT SCAN DELAY={delay}s / NEXT START APPLIED";
+                $"SPEED={speed}deg/s NEXT POINT / " +
+                $"DELAY={delay}s NEXT START";
         }
 
         private void StopLaPresetScan()
@@ -1460,7 +1954,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// Data1    = 0x00
         /// Data2    = Preset Number (1 ~ 63)
         /// </summary>
-        private void MoveToSelectedPresetPoint()
+        private async void MoveToSelectedPresetPoint()
         {
             if (SelectedPresetPoint == null)
             {
@@ -1496,20 +1990,34 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     SelectedPresetPoint.Pan;
             }
 
+            bool panTiltSettled =
+                moveResult &&
+                await EnsurePresetPanTiltTargetAsync(
+                    "PRESET W",
+                    SelectedPresetPoint,
+                    () =>
+                        _controlCommandService
+                            .MoveToPresetPoint(
+                                (byte)presetNumber),
+                    PresetPanTiltDefaultSettleTimeoutMs,
+                    CancellationToken.None);
+
             Console.WriteLine();
             Console.WriteLine(
                 "[PRESET 2 / WEB AGENT] GOTO PRESET");
 
             Console.WriteLine(
                 $"[PRESET 2 / WEB AGENT] NUMBER={presetNumber} / " +
-                $"PELCO_D=0x07 / RESULT={moveResult}");
+                $"PELCO_D=0x07 / RESULT={moveResult} / " +
+                $"PT_SETTLED={panTiltSettled}");
 
             ConsoleLogHelper.PrintLine();
 
             PresetCommandStatusText =
-                moveResult
-                    ? $"P{presetNumber:00} GOTO PRESET SENT"
-                    : $"P{presetNumber:00} GOTO PRESET FAILED";
+                moveResult &&
+                panTiltSettled
+                    ? $"P{presetNumber:00} GOTO PRESET COMPLETED"
+                    : $"P{presetNumber:00} GOTO PRESET INCOMPLETE";
         }
 
         /// <summary>
@@ -1641,8 +2149,32 @@ namespace OpenCvWpfTracking.ViewModels.Main
                             return;
                         }
 
+                        bool panTiltSettled =
+                            await EnsurePresetPanTiltTargetAsync(
+                                "PRESET W",
+                                preset,
+                                () =>
+                                    _controlCommandService
+                                        .MoveToPresetPoint(
+                                            (byte)preset.Number),
+                                PresetPanTiltDefaultSettleTimeoutMs,
+                                cancellationToken);
+
+                        if (!panTiltSettled)
+                        {
+                            PresetCommandStatusText =
+                                $"P{preset.Number:00} PAN/TILT SETTLE INCOMPLETE";
+
+                            ConsoleLogHelper.Warning(
+                                "PRESET W",
+                                $"Loop continuing after settle limit / " +
+                                $"P{preset.Number:00}");
+                        }
+
                         PresetCommandStatusText =
-                            $"P{preset.Number:00} GOTO SENT";
+                            panTiltSettled
+                                ? $"P{preset.Number:00} GOTO COMPLETED"
+                                : $"P{preset.Number:00} GOTO INCOMPLETE";
 
                         int delaySeconds =
                             Math.Max(
@@ -1705,6 +2237,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /*
              * PRESET 2는 0x99/0x9D LA Auto Scan을 사용하지 않는다.
              * 따라서 APPLY는 WPF 반복 주기의 Delay만 즉시 반영한다.
+             *
              * Pelco-D GOTO PRESET(0x07)에는 이동 속도 필드가 없으므로
              * Speed 값은 화면 표시용으로만 유지한다.
              */

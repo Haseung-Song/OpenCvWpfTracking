@@ -55,13 +55,6 @@
                       Stroke="#CC000000"
                       StrokeThickness="4"/>
 
-                <Ellipse Width="14"
-                         Height="14"
-                         Canvas.Left="29"
-                         Canvas.Top="29"
-                         Stroke="#CC000000"
-                         StrokeThickness="4"/>
-
             </Canvas>
 
             <!-- 적색 십자선 본선 -->
@@ -81,13 +74,6 @@
                       Y2="36"
                       Stroke="#FFFF3B30"
                       StrokeThickness="2"/>
-
-                <Ellipse Width="14"
-                         Height="14"
-                         Canvas.Left="29"
-                         Canvas.Top="29"
-                         Stroke="#FFFF3B30"
-                         StrokeThickness="2"/>
 
             </Canvas>
 
@@ -152,4 +138,3 @@
     </Grid>
 
 </Window>
-    
