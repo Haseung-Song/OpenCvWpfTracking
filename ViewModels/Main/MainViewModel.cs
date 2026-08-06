@@ -12,6 +12,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace OpenCvWpfTracking.ViewModels.Main
@@ -322,6 +323,17 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 마지막 목표 부호를 보관한다.
         /// </summary>
         private double? _lastPanAbsoluteTarget;
+
+        /// <summary>
+        /// 현재 진행 중인 Pan / Tilt Absolute 이동 목표값
+        ///
+        /// 이동 중 속도 Slider가 변경되면 위치 속도 명령을 적용한 뒤
+        /// 같은 목표 좌표를 다시 송신하기 위해 보관한다.
+        /// 목표 도착, STOP, 연속 이동 시작 또는 연결 해제 시 초기화한다.
+        /// </summary>
+        private double? _activePanAbsoluteTarget;
+
+        private double? _activeTiltAbsoluteTarget;
 
         /// <summary>
         /// 현재 [TILT] 각도 값(현재 위치 저장용)
@@ -1000,17 +1012,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
             60000;
 
         /// <summary>
-        /// 이동 속도를 직접 지정할 수 없는 PRESET W의 기본 확인 시간.
-        /// </summary>
-        private const int PresetPanTiltDefaultSettleTimeoutMs =
-            5000;
-
-        /// <summary>
         /// 목표 밖에서 이동이 멈춘 경우 허용하는 즉시 재보정 횟수.
         /// </summary>
         private const int PresetPanTiltCorrectionRetryCount =
             1;
-
 
         /// <summary>
         /// PRESET 1 (LA TEST) 선택 ID
@@ -1094,6 +1099,28 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// PRESET 2 WEB AGENT Pelco-D 슬롯 순회 취소 토큰
         /// </summary>
         private CancellationTokenSource _presetDirectScanCts;
+
+        /// <summary>
+        /// PRESET L 단일 MOVE TO PRESET 작업 취소 토큰
+        /// </summary>
+        private CancellationTokenSource _laPresetSingleMoveCts;
+
+        /// <summary>
+        /// PRESET W 단일 MOVE TO PRESET 작업 취소 토큰
+        /// </summary>
+        private CancellationTokenSource _presetSingleMoveCts;
+
+        /// <summary>
+        /// 우측 상위 탭 선택 인덱스.
+        /// 0: 통신 설정, 1: 운용 제어
+        /// </summary>
+        private int _selectedRightPanelTabIndex;
+
+        /// <summary>
+        /// 운용 제어 하위 탭 선택 인덱스.
+        /// 0: PTZF
+        /// </summary>
+        private int _selectedOperationControlTabIndex;
 
         #endregion
 
@@ -1231,6 +1258,23 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private bool _isCrosshairVisible =
             false;
+
+        /// <summary>
+        /// 중앙 십자선의 현재 표시 색상.
+        /// 최초 색상은 기존 적색이며, 사용자가 십자선을 다시 켤 때마다
+        /// 적색 -> 주황 -> 황색 -> 녹색 -> 청록 -> 청색 -> 보라 순으로 변경한다.
+        /// </summary>
+        private Brush _crosshairBrush =
+            new SolidColorBrush(
+                Color.FromArgb(
+                    0xFF,
+                    0xFF,
+                    0x3B,
+                    0x30));
+
+        private int _crosshairColorIndex;
+
+        private bool _hasCrosshairBeenDisplayed;
 
         #endregion
 
@@ -1378,12 +1422,18 @@ namespace OpenCvWpfTracking.ViewModels.Main
             /// <summary>
             /// [EO / IR] 중앙 십자선 표시 상태 전환
             ///
-            /// 버튼을 누를 때마다 [IsCrosshairVisible] 값을 반전하여
-            /// EO / IR 영상의 십자선을 동시에 표시하거나 숨긴다.
+            /// 버튼을 눌러 숨긴 뒤 다시 표시할 때마다
+            /// EO / IR 영상의 십자선 색상을 7가지 색상으로 순환한다.
             /// </summary>
             ToggleCrosshairCommand =
                 new RelayCommand(() =>
                 {
+                    if (!IsCrosshairVisible &&
+                        _hasCrosshairBeenDisplayed)
+                    {
+                        AdvanceCrosshairColor();
+                    }
+
                     IsCrosshairVisible =
                         !IsCrosshairVisible;
                 });
@@ -1912,6 +1962,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 new RelayCommand(
                     StopLaPresetScan);
 
+            StopLaPresetMoveCommand =
+                new RelayCommand(
+                    StopLaPresetMove);
+
             AddOrUpdatePresetCommand =
                 new RelayCommand(
                     AddOrUpdatePresetPoint);
@@ -1935,6 +1989,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
             StopPresetScanCommand =
                 new RelayCommand(
                     StopPresetScan);
+
+            StopPresetMoveCommand =
+                new RelayCommand(
+                    StopPresetMove);
+
+            StopActivePresetScanCommand =
+                new RelayCommand(
+                    StopActivePresetScan);
 
             #endregion
 

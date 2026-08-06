@@ -459,19 +459,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
             try
             {
                 /// <summary>
-                /// IR Focus Raw 방향은 Web Agent 표준 방향과 반대다.
-                ///
-                /// 표준:
-                /// 0    = Far
-                /// 1000 = Near
-                ///
-                /// IR Raw:
-                /// 1000 = Far
-                /// 0    = Near
+                /// IR Focus 목표값을 현재 장비의 상태 좌표로 변환한다.
+                /// LA 상태만 표준 방향과 반대이며 Web Agent 상태는 동일하다.
                 /// </summary>
                 int irRawTargetPosition =
-                    1000 -
-                    standardPosition;
+                    ConvertIrFocusStandardToStatusPosition(
+                        standardPosition);
 
                 Task<bool> irMoveTask =
                     MoveIrFocusToPositionAsync(
@@ -615,8 +608,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
                 bool moveNear =
-                    safeTargetPosition <
-                    startPosition;
+                    SelectedEquipmentStatusMode ==
+                        EquipmentStatusMode.Rooftop
+                            ? safeTargetPosition <
+                              startPosition
+                            : safeTargetPosition >
+                              startPosition;
 
                 bool commandResult =
                     moveNear
@@ -855,7 +852,6 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 }
 
             }
-
             return _currentIrFocus;
         }
 

@@ -868,6 +868,31 @@ namespace OpenCvWpfTracking.ViewModels.Main
             _currentTilt =
                 tiltDegree;
 
+            // 이동이 완료된 축은 더 이상 Slider 변경 시 목표를 재송신하지 않는다.
+            double? activePanTarget =
+                _activePanAbsoluteTarget;
+
+            double? activeTiltTarget =
+                _activeTiltAbsoluteTarget;
+
+            if (activePanTarget.HasValue &&
+                Math.Abs(
+                    _currentPan -
+                    activePanTarget.Value) <= 0.03)
+            {
+                _activePanAbsoluteTarget =
+                    null;
+            }
+
+            if (activeTiltTarget.HasValue &&
+                Math.Abs(
+                    _currentTilt -
+                    activeTiltTarget.Value) <= 0.03)
+            {
+                _activeTiltAbsoluteTarget =
+                    null;
+            }
+
             Interlocked.Increment(
                 ref _panTiltStatusVersion);
 

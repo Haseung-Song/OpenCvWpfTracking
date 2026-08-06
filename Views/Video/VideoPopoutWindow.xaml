@@ -57,7 +57,7 @@
 
             </Canvas>
 
-            <!-- 적색 십자선 본선 -->
+            <!-- 메인 화면과 동일한 사용자 선택 색상의 십자선 본선 -->
             <Canvas Width="72"
                     Height="72">
 
@@ -65,14 +65,14 @@
                       Y1="2"
                       X2="36"
                       Y2="70"
-                      Stroke="#FFFF3B30"
+                      Stroke="{Binding CrosshairBrush}"
                       StrokeThickness="2"/>
 
                 <Line X1="2"
                       Y1="36"
                       X2="70"
                       Y2="36"
-                      Stroke="#FFFF3B30"
+                      Stroke="{Binding CrosshairBrush}"
                       StrokeThickness="2"/>
 
             </Canvas>
@@ -120,6 +120,30 @@
                            Text="키를 떼면 동작이 정지합니다."
                            Foreground="#D0D0D0"
                            FontSize="12"/>
+
+                <!-- AUTO SCAN 중 분리 창 단축키 잠금 안내 -->
+                <TextBlock Margin="0,7,0,0"
+                           Text="AUTO SCAN 동작 중이므로 키 입력이 비활성화됩니다."
+                           Foreground="#FFFF6B6B"
+                           FontSize="13"
+                           FontWeight="Bold">
+
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPresetScanControlLocked}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+
+                </TextBlock>
 
             </StackPanel>
 

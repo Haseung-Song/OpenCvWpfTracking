@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenCvWpfTracking"
         mc:Ignorable="d"
-        Title="[MOE] EO/IR TEST VIEWER"
+        Title="[REI] EO/IR TEST VIEWER"
         Width="1920"
         Height="1080"
         MinWidth="960"
@@ -26,7 +26,7 @@
             중앙에 짧게 표시하는 십자가 형태로 구성한다.
 
             수평선과 수직선이 화면 중심에서 교차하며,
-            검정 외곽선 위에 적색 본선을 겹쳐 표시하여
+            검정 외곽선 위에 선택된 색상의 본선을 겹쳐 표시하여
             밝은 EO 영상과 흑백 IR 영상에서 모두 식별 가능하도록 한다. -->
         <ControlTemplate x:Key="CenterCrosshairTemplate"
                 TargetType="Control">
@@ -51,20 +51,20 @@
                             StrokeThickness="4"/>
                 </Canvas>
 
-                <!-- 적색 십자선 본선 -->
+                <!-- 사용자 선택 순환 색상의 십자선 본선 -->
                 <Canvas Width="72"
                         Height="72">
                     <Line X1="36"
                             Y1="2"
                             X2="36"
                             Y2="70"
-                            Stroke="#FFFF3B30"
+                            Stroke="{Binding CrosshairBrush}"
                             StrokeThickness="2"/>
                     <Line X1="2"
                             Y1="36"
                             X2="70"
                             Y2="36"
-                            Stroke="#FFFF3B30"
+                            Stroke="{Binding CrosshairBrush}"
                             StrokeThickness="2"/>
                 </Canvas>
 
@@ -383,8 +383,7 @@
             기본 WPF TabControl은 Header 영역에 TabPanel을 사용하므로
             ItemsPanel을 UniformGrid로 지정해도 Header가 내용 크기만큼만 표시될 수 있다.
 
-            상단 TabControl만 전용 Template을 사용하여
-            Header Host 자체를 UniformGrid 2열로 구성한다.
+            상단 TabControl만 전용 Template을 사용하여 Header Host 자체를 UniformGrid 2열로 구성한다.
         -->
         <Style x:Key="TopRightPanelTabControlStyle"
                 TargetType="TabControl">
@@ -509,7 +508,8 @@
 
         1920 x 1080 기준 레이아웃을 유지하면서 창이 작아지면
         전체 UI를 균일 축소하고, 4K처럼 창이 커지면 비율에 맞게
-        균일 확대한다. 우측/하단 내부 ScrollViewer는 그대로 동작하므로
+        균일 확대한다.
+        우측/하단 내부 ScrollViewer는 그대로 동작하므로
         탭과 메뉴가 화면 밖으로 잘리지 않는다.
     -->
     <Viewbox Stretch="Uniform"
@@ -846,7 +846,7 @@
                                         Value="{Binding PanTiltSpeedLevel,
                                         Mode=TwoWay,
                                         UpdateSourceTrigger=PropertyChanged}"
-                                        IsEnabled="{Binding IsMainControlEnabled}"
+                                        IsEnabled="{Binding IsPanTiltSpeedControlEnabled}"
                                         Height="30"/>
                             </Grid>
                         </Border>
@@ -859,12 +859,14 @@
                                 Margin="0"
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch"
+                                SelectedIndex="{Binding SelectedRightPanelTabIndex, Mode=TwoWay}"
                                 IsEnabled="{Binding IsMainControlEnabled}"
                                 Style="{StaticResource TopRightPanelTabControlStyle}"
                                 ItemContainerStyle="{StaticResource TopRightPanelTabItemStyle}">
 
                             <!-- Control Agent 통신 연결 설정 -->
-                            <TabItem Header="통신 설정">
+                            <TabItem Header="통신 설정"
+                                    IsEnabled="{Binding IsOperationCommandEnabled}">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                         HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Margin="5">
@@ -1247,6 +1249,7 @@
                                                             Content="ROOFTOP"
                                                             Height="28"
                                                             Margin="2"
+                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                             Command="{Binding ShowRooftopStatusCommand}"/>
 
                                                     <Button x:Name="EnvironmentStatusButton"
@@ -1254,6 +1257,7 @@
                                                             Content="ENVIRONMENT"
                                                             Height="28"
                                                             Margin="2"
+                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                             Command="{Binding ShowEnvironmentStatusCommand}"/>
                                                 </Grid>
 
@@ -1530,10 +1534,12 @@
                                             BorderThickness="1"
                                             Padding="3"
                                             HorizontalContentAlignment="Stretch"
+                                            SelectedIndex="{Binding SelectedOperationControlTabIndex, Mode=TwoWay}"
                                             ItemContainerStyle="{StaticResource RightPanelTabItemStyle}">
 
                                         <!-- [PTZF] Overlay / Pan / Tilt / Zoom / Focus 이동 제어 -->
-                                        <TabItem Header="PTZF">
+                                        <TabItem Header="PTZF"
+                                                IsEnabled="{Binding IsOperationCommandEnabled}">
                                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                                     HorizontalScrollBarVisibility="Disabled">
                                                 <StackPanel Margin="4,2,2,5">
@@ -2092,7 +2098,7 @@
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="7">
 
                                                         <StackPanel>
 
@@ -2107,6 +2113,7 @@
                                                                     FontSize="11"/>
 
                                                             <ComboBox ItemsSource="{Binding LaPresetSlotOptions}"
+                                                                    IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                     SelectedItem="{Binding LaPresetSlotNumber, Mode=TwoWay}"
                                                                     Height="27"
                                                                     Margin="0,3,0,8"
@@ -2128,7 +2135,7 @@
                                                                             FontSize="10"
                                                                             FontWeight="Bold"
                                                                             HorizontalAlignment="Center"
-                                                                            Margin="0,0,0,5"/>
+                                                                            Margin="0,0,0,7"/>
 
                                                                     <TextBlock Text="{Binding CurrentLaPresetSnapshotText}"
                                                                             Foreground="#F1F4F6"
@@ -2147,6 +2154,7 @@
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="REGISTER / UPDATE"
                                                                         Height="30"
                                                                         Margin="0,0,4,0"
@@ -2154,6 +2162,7 @@
                                                                         Command="{Binding AddOrUpdateLaPresetCommand}"/>
 
                                                                 <Button Grid.Column="1"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="DELETE"
                                                                         Height="30"
                                                                         Margin="4,0,0,0"
@@ -2178,12 +2187,12 @@
                                                     </Border>
 
                                                     <!-- 현재 프로그램에서 등록한 프리셋 목록 -->
-                                                    <Border Margin="0,7,5,0"
+                                                    <Border Margin="0,10,5,0"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="7">
 
                                                         <StackPanel>
 
@@ -2194,6 +2203,7 @@
                                                                     Margin="0,0,0,10"/>
 
                                                             <ComboBox ItemsSource="{Binding LaPresetPoints}"
+                                                                    IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                     SelectedItem="{Binding SelectedLaPresetPoint, Mode=TwoWay}"
                                                                     DisplayMemberPath="DisplayText"
                                                                     Height="29"
@@ -2205,7 +2215,7 @@
                                                                     BorderThickness="1"
                                                                     CornerRadius="4"
                                                                     Padding="7"
-                                                                    Margin="0,0,0,8">
+                                                                    Margin="0,0,0,7">
 
                                                                 <TextBlock Text="{Binding SelectedLaPresetDetailText}"
                                                                         Foreground="#F1F4F6"
@@ -2215,10 +2225,32 @@
 
                                                             </Border>
 
-                                                            <Button Content="MOVE TO PRESET"
-                                                                    Height="32"
-                                                                    Style="{StaticResource EoControlButtonStyle}"
-                                                                    Command="{Binding MoveToLaPresetCommand}"/>
+                                                            <!-- 단일 프리셋 이동과 위치 정지를 동일 행에 배치한다. -->
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition/>
+                                                                    <ColumnDefinition Width="8"/>
+                                                                    <ColumnDefinition/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
+                                                                        Content="MOVE TO PRESET"
+                                                                        Height="30"
+                                                                        Style="{StaticResource EoControlButtonStyle}"
+                                                                        Command="{Binding MoveToLaPresetCommand}"/>
+
+                                                                <Button Grid.Column="2"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
+                                                                        Content="STOP MOVE"
+                                                                        Height="30"
+                                                                        Background="#8B2E2E"
+                                                                        Foreground="White"
+                                                                        FontWeight="Bold"
+                                                                        BorderBrush="#FF6B6B"
+                                                                        BorderThickness="1"
+                                                                        Command="{Binding StopLaPresetMoveCommand}"/>
+                                                            </Grid>
 
                                                             <TextBlock Text="※ 선택한 프리셋으로 카메라가 이동합니다."
                                                                     Foreground="#F6E05E"
@@ -2227,17 +2259,32 @@
                                                                     TextAlignment="Center"
                                                                     Margin="0,10,0,0"/>
 
+                                                            <TextBlock Text="{Binding LaPresetScanSpeed,
+                                                                    StringFormat={}PRESET MOVE SPEED : {0} / 60}"
+                                                                    Foreground="#8FD3FF"
+                                                                    FontSize="9.8"
+                                                                    FontWeight="Bold"
+                                                                    TextAlignment="Center"
+                                                                    Margin="0,4,0,0"/>
+
+                                                            <TextBlock Text="※ STOP MOVE는 프리셋 위치 이동을 정지합니다. AUTO SCAN 종료는 화면 상단 STOP AUTO SCAN을 사용합니다."
+                                                                    Foreground="#D0D7DE"
+                                                                    FontSize="8.8"
+                                                                    TextWrapping="Wrap"
+                                                                    TextAlignment="Center"
+                                                                    Margin="0,3,0,0"/>
+
                                                         </StackPanel>
 
                                                     </Border>
 
                                                     <!-- 프리셋 오토 스캔 -->
-                                                    <Border Margin="0,7,5,5"
+                                                    <Border Margin="0,10,5,5"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="10">
 
                                                         <StackPanel>
 
@@ -2261,6 +2308,7 @@
                                                                             FontSize="10"/>
 
                                                                     <ComboBox ItemsSource="{Binding PresetScanValueOptions}"
+                                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                             SelectedItem="{Binding LaPresetScanSpeed, Mode=TwoWay}"
                                                                             Height="27"
                                                                             Margin="0,3,0,0"
@@ -2270,11 +2318,12 @@
 
                                                                 <StackPanel Grid.Column="2">
 
-                                                                    <TextBlock Text="Delay  (1 ~ 60 sec)"
+                                                                    <TextBlock Text="Delay After Move  (1 ~ 60 sec)"
                                                                             Foreground="White"
                                                                             FontSize="10"/>
 
                                                                     <ComboBox ItemsSource="{Binding PresetScanValueOptions}"
+                                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                             SelectedItem="{Binding LaPresetScanDelay, Mode=TwoWay}"
                                                                             Height="27"
                                                                             Margin="0,3,0,0"
@@ -2287,38 +2336,27 @@
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition/>
-                                                                    <ColumnDefinition/>
+                                                                    <ColumnDefinition Width="8"/>
                                                                     <ColumnDefinition/>
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="START"
                                                                         Height="30"
-                                                                        Margin="0,0,3,0"
                                                                         Style="{StaticResource EoControlButtonStyle}"
                                                                         Command="{Binding StartLaPresetScanCommand}"/>
 
-                                                                <Button Grid.Column="1"
+                                                                <Button Grid.Column="2"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="APPLY"
                                                                         Height="30"
-                                                                        Margin="3,0,3,0"
                                                                         Background="#4A6475"
                                                                         Foreground="White"
                                                                         FontWeight="Bold"
                                                                         BorderBrush="#8FB6CE"
                                                                         BorderThickness="1"
                                                                         Command="{Binding UpdateLaPresetScanCommand}"/>
-
-                                                                <Button Grid.Column="2"
-                                                                        Content="STOP"
-                                                                        Height="30"
-                                                                        Margin="3,0,0,0"
-                                                                        Background="#8A3D3D"
-                                                                        Foreground="White"
-                                                                        FontWeight="Bold"
-                                                                        BorderBrush="#C87070"
-                                                                        BorderThickness="1"
-                                                                        Command="{Binding StopLaPresetScanCommand}"/>
 
                                                             </Grid>
 
@@ -2349,7 +2387,7 @@
 
                                                             </Border>
 
-                                                            <TextBlock Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 LA AGENT 내부 순서대로 반복합니다."
+                                                            <TextBlock Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 [LA AGENT] 내부 순서대로 반복합니다."
                                                                     Foreground="#D0D7DE"
                                                                     FontSize="9.2"
                                                                     TextWrapping="Wrap"
@@ -2375,7 +2413,7 @@
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="7">
 
                                                         <StackPanel>
 
@@ -2390,6 +2428,7 @@
                                                                     FontSize="11"/>
 
                                                             <ComboBox ItemsSource="{Binding PresetSlotOptions}"
+                                                                    IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                     SelectedItem="{Binding PresetSlotNumber, Mode=TwoWay}"
                                                                     Height="27"
                                                                     Margin="0,3,0,8"
@@ -2430,6 +2469,7 @@
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="REGISTER / UPDATE"
                                                                         Height="30"
                                                                         Margin="0,0,4,0"
@@ -2437,6 +2477,7 @@
                                                                         Command="{Binding AddOrUpdatePresetCommand}"/>
 
                                                                 <Button Grid.Column="1"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="DELETE"
                                                                         Height="30"
                                                                         Margin="4,0,0,0"
@@ -2461,12 +2502,12 @@
                                                     </Border>
 
                                                     <!-- 현재 프로그램에서 등록한 프리셋 목록 -->
-                                                    <Border Margin="0,7,5,0"
+                                                    <Border Margin="0,10,5,0"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="7">
 
                                                         <StackPanel>
 
@@ -2477,6 +2518,7 @@
                                                                     Margin="0,0,0,10"/>
 
                                                             <ComboBox ItemsSource="{Binding PresetPoints}"
+                                                                    IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                     SelectedItem="{Binding SelectedPresetPoint, Mode=TwoWay}"
                                                                     DisplayMemberPath="DisplayText"
                                                                     Height="29"
@@ -2498,10 +2540,32 @@
 
                                                             </Border>
 
-                                                            <Button Content="MOVE TO PRESET"
-                                                                    Height="32"
-                                                                    Style="{StaticResource EoControlButtonStyle}"
-                                                                    Command="{Binding MoveToPresetCommand}"/>
+                                                            <!-- 단일 프리셋 이동과 위치 정지를 동일 행에 배치한다. -->
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition/>
+                                                                    <ColumnDefinition Width="8"/>
+                                                                    <ColumnDefinition/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
+                                                                        Content="MOVE TO PRESET"
+                                                                        Height="30"
+                                                                        Style="{StaticResource EoControlButtonStyle}"
+                                                                        Command="{Binding MoveToPresetCommand}"/>
+
+                                                                <Button Grid.Column="2"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
+                                                                        Content="STOP MOVE"
+                                                                        Height="30"
+                                                                        Background="#8B2E2E"
+                                                                        Foreground="White"
+                                                                        FontWeight="Bold"
+                                                                        BorderBrush="#FF6B6B"
+                                                                        BorderThickness="1"
+                                                                        Command="{Binding StopPresetMoveCommand}"/>
+                                                            </Grid>
 
                                                             <TextBlock Text="※ 선택한 프리셋으로 카메라가 이동합니다."
                                                                     Foreground="#F6E05E"
@@ -2510,17 +2574,32 @@
                                                                     TextAlignment="Center"
                                                                     Margin="0,10,0,0"/>
 
+                                                            <TextBlock Text="{Binding PresetScanSpeed,
+                                                                    StringFormat={}PRESET MOVE SPEED : {0} / 60}"
+                                                                    Foreground="#8FD3FF"
+                                                                    FontSize="9.8"
+                                                                    FontWeight="Bold"
+                                                                    TextAlignment="Center"
+                                                                    Margin="0,4,0,0"/>
+
+                                                            <TextBlock Text="※ STOP MOVE는 프리셋 위치 이동을 정지합니다. AUTO SCAN 종료는 화면 상단 STOP AUTO SCAN을 사용합니다."
+                                                                    Foreground="#D0D7DE"
+                                                                    FontSize="8.8"
+                                                                    TextWrapping="Wrap"
+                                                                    TextAlignment="Center"
+                                                                    Margin="0,3,0,0"/>
+
                                                         </StackPanel>
 
                                                     </Border>
 
                                                     <!-- 프리셋 오토 스캔 -->
-                                                    <Border Margin="0,7,5,5"
+                                                    <Border Margin="0,10,5,5"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
                                                             CornerRadius="5"
-                                                            Padding="8">
+                                                            Padding="10">
 
                                                         <StackPanel>
 
@@ -2544,6 +2623,7 @@
                                                                             FontSize="10"/>
 
                                                                     <ComboBox ItemsSource="{Binding PresetScanValueOptions}"
+                                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                             SelectedItem="{Binding PresetScanSpeed, Mode=TwoWay}"
                                                                             Height="27"
                                                                             Margin="0,3,0,0"
@@ -2553,11 +2633,12 @@
 
                                                                 <StackPanel Grid.Column="2">
 
-                                                                    <TextBlock Text="Delay  (1 ~ 60 sec)"
+                                                                    <TextBlock Text="Delay After Move  (1 ~ 60 sec)"
                                                                             Foreground="White"
                                                                             FontSize="10"/>
 
                                                                     <ComboBox ItemsSource="{Binding PresetScanValueOptions}"
+                                                                            IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                             SelectedItem="{Binding PresetScanDelay, Mode=TwoWay}"
                                                                             Height="27"
                                                                             Margin="0,3,0,0"
@@ -2570,38 +2651,27 @@
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition/>
-                                                                    <ColumnDefinition/>
+                                                                    <ColumnDefinition Width="8"/>
                                                                     <ColumnDefinition/>
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <Button Grid.Column="0"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="START"
                                                                         Height="30"
-                                                                        Margin="0,0,3,0"
                                                                         Style="{StaticResource EoControlButtonStyle}"
                                                                         Command="{Binding StartPresetScanCommand}"/>
 
-                                                                <Button Grid.Column="1"
+                                                                <Button Grid.Column="2"
+                                                                        IsEnabled="{Binding IsOperationCommandEnabled}"
                                                                         Content="APPLY"
                                                                         Height="30"
-                                                                        Margin="3,0,3,0"
                                                                         Background="#4A6475"
                                                                         Foreground="White"
                                                                         FontWeight="Bold"
                                                                         BorderBrush="#8FB6CE"
                                                                         BorderThickness="1"
                                                                         Command="{Binding UpdatePresetScanCommand}"/>
-
-                                                                <Button Grid.Column="2"
-                                                                        Content="STOP"
-                                                                        Height="30"
-                                                                        Margin="3,0,0,0"
-                                                                        Background="#8A3D3D"
-                                                                        Foreground="White"
-                                                                        FontWeight="Bold"
-                                                                        BorderBrush="#C87070"
-                                                                        BorderThickness="1"
-                                                                        Command="{Binding StopPresetScanCommand}"/>
 
                                                             </Grid>
 
@@ -2632,7 +2702,7 @@
 
                                                             </Border>
 
-                                                            <TextBlock Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 WEB AGENT 내부 순서대로 반복합니다."
+                                                            <TextBlock Text="※ START 버튼은 위에 REGISTER 등록이 된 P01, P02, P03... 지점을 [WEB AGENT] 내부 순서대로 반복합니다."
                                                                     Foreground="#D0D7DE"
                                                                     FontSize="9.2"
                                                                     TextWrapping="Wrap"
@@ -2648,17 +2718,18 @@
                                         </TabItem>
 
                                         <!-- [LENS] EO / IR Zoom / Focus 제어 -->
-                                        <TabItem Header="LENS">
+                                        <TabItem Header="LENS"
+                                                IsEnabled="{Binding IsOperationCommandEnabled}">
                                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                                     HorizontalScrollBarVisibility="Disabled">
                                                 <StackPanel Margin="5,0,0,5">
                                                     <!-- [EO] [ZOOM] / [FOCUS] 제어 -->
                                                     <Border Grid.Row="2"
-                                                            Margin="0,5,5,0"
+                                                            Margin="0,10,5,0"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
-                                                            Padding="12">
+                                                            Padding="6">
 
                                                         <Grid>
                                                             <Grid.RowDefinitions>
@@ -2740,11 +2811,11 @@
 
                                                     <!-- [IR] [ZOOM] / [FOCUS] 제어 -->
                                                     <Border Grid.Row="2"
-                                                            Margin="0,5,5,0"
+                                                            Margin="0,15,5,0"
                                                             Background="#5F666D"
                                                             BorderBrush="#95A5B0"
                                                             BorderThickness="1.5"
-                                                            Padding="12">
+                                                            Padding="6">
 
                                                         <Grid>
                                                             <Grid.RowDefinitions>
@@ -2857,7 +2928,7 @@
                                                             <Button Grid.Row="4"
                                                                     Content="AUTO FOCUS"
                                                                     Width="180"
-                                                                    Margin="3"
+                                                                    Margin="5"
                                                                     HorizontalAlignment="Center"
                                                                     Style="{StaticResource IrControlButtonStyle}"
                                                                     PreviewMouseDown="IrAutoFocus_MouseDown"/>
@@ -2869,7 +2940,8 @@
                                         </TabItem>
 
                                         <!-- [SYNC] 환경장비 Web Agent 표준 Zoom 동기화 -->
-                                        <TabItem Header="SYNC">
+                                        <TabItem Header="SYNC"
+                                                IsEnabled="{Binding IsOperationCommandEnabled}">
                                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                                     HorizontalScrollBarVisibility="Disabled">
                                                 <StackPanel Margin="4,4,2,6">
@@ -2877,7 +2949,7 @@
                                                     <Border Background="#2F363D"
                                                             BorderBrush="#8A9BA8"
                                                             BorderThickness="1"
-                                                            Padding="10">
+                                                            Padding="11">
                                                         <StackPanel>
                                                             <TextBlock Text="EO / IR ZOOM SYNC"
                                                                     Foreground="White"
@@ -2947,7 +3019,7 @@
                                                     <Border Background="#2F363D"
                                                             BorderBrush="#8A9BA8"
                                                             BorderThickness="1"
-                                                            Padding="10"
+                                                            Padding="11"
                                                             Margin="0,5,0,0">
                                                         <StackPanel>
                                                             <TextBlock Text="EO / IR FOCUS SYNC"
@@ -3023,15 +3095,22 @@
                         </TabControl>
 
                         <!--
-                            HOME / PAN ZERO / TILT ZERO 실행 중 전체 우측 제어 잠금 Overlay
+                            HOME / PAN ZERO / TILT ZERO / AUTO SCAN 실행 상태 안내 Overlay
 
                             IsEnabled Binding만 적용하면 사용자 눈에는 기존 색상과 비슷해
                             잠금 여부가 명확하지 않을 수 있다.
 
-                            Overlay가 모든 버튼/탭 Mouse 입력을 한 번 더 차단하고,
-                            현재 실행 중인 HOME / PAN ZERO / TILT ZERO 상태를 화면에 명확히 표시한다.
+                            HOME / ZERO 중에는 기존처럼 우측 제어 전체를 잠근다.
+                            AUTO SCAN 중에는 PAN/TILT SPEED 영역에 실행 상태와
+                            전용 STOP 버튼을 표시하되, 하단 CURRENT STATUS와
+                            PRESET L / PRESET W 탭의 상태 확인은 계속 허용한다.
                         -->
-                        <Border Panel.ZIndex="100"
+                        <Border Grid.Row="1"
+                                Panel.ZIndex="100"
+                                Margin="0,8,0,8"
+                                Padding="14,12,14,16"
+                                MinHeight="142"
+                                VerticalAlignment="Center"
                                 Background="#99000000"
                                 BorderBrush="#F6E05E"
                                 BorderThickness="2"
@@ -3044,7 +3123,7 @@
                                             Value="Collapsed"/>
 
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsHomePositionMoving}"
+                                        <DataTrigger Binding="{Binding IsControlInputLocked}"
                                                 Value="True">
                                             <Setter Property="Visibility"
                                                     Value="Visible"/>
@@ -3056,13 +3135,13 @@
                             <StackPanel HorizontalAlignment="Center"
                                     VerticalAlignment="Center">
 
-                                <TextBlock Text="{Binding HomeZeroLockTitle}"
+                                <TextBlock Text="{Binding ControlLockTitle}"
                                         Foreground="#F6E05E"
                                         FontSize="18"
                                         FontWeight="Bold"
                                         HorizontalAlignment="Center"/>
 
-                                <TextBlock Text="{Binding HomeZeroLockMessage}"
+                                <TextBlock Text="{Binding ControlLockMessage}"
                                         Foreground="White"
                                         FontSize="14"
                                         FontWeight="Bold"
@@ -3074,6 +3153,33 @@
                                         FontSize="10"
                                         HorizontalAlignment="Center"
                                         Margin="0,8,0,0"/>
+
+                                <Button Content="STOP AUTO SCAN"
+                                        Command="{Binding StopActivePresetScanCommand}"
+                                        Width="180"
+                                        Height="34"
+                                        Margin="0,14,0,0"
+                                        Background="#8B2E2E"
+                                        Foreground="White"
+                                        FontWeight="Bold"
+                                        BorderBrush="#FF6B6B">
+
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility"
+                                                    Value="Collapsed"/>
+
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPresetScanControlLocked}"
+                                                        Value="True">
+                                                    <Setter Property="Visibility"
+                                                            Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+
+                                </Button>
 
                             </StackPanel>
 

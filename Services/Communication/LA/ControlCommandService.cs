@@ -842,7 +842,61 @@ namespace OpenCvWpfTracking.Services.Communication
         }
 
         /// <summary>
-        /// 전체 속도제어 정지
+        /// Pan 위치 이동을 정지한다.
+        ///
+        /// TORUSS 위치 제어 명령:
+        /// Command2 = 0x4F
+        /// Data1    = 0x01 (Pan Position Stop)
+        /// Data2    = 0x00
+        /// </summary>
+        public bool StopPanPositionMove()
+        {
+            return SendCommand(
+                0x00,
+                0x4F,
+                0x01,
+                0x00);
+        }
+
+        /// <summary>
+        /// Tilt 위치 이동을 정지한다.
+        ///
+        /// TORUSS 위치 제어 명령:
+        /// Command2 = 0x4F
+        /// Data1    = 0x02 (Tilt Position Stop)
+        /// Data2    = 0x00
+        /// </summary>
+        public bool StopTiltPositionMove()
+        {
+            return SendCommand(
+                0x00,
+                0x4F,
+                0x02,
+                0x00);
+        }
+
+        /// <summary>
+        /// Pan과 Tilt 위치 이동 정지 명령을 순서대로 송신한다.
+        /// PRESET GOTO 또는 ABSOLUTE 위치 이동 중지에 사용한다.
+        /// </summary>
+        public bool StopPanTiltPositionMove()
+        {
+            bool panResult =
+                StopPanPositionMove();
+
+            bool tiltResult =
+                StopTiltPositionMove();
+
+            ConsoleLogHelper.Command(
+                "POSITION STOP",
+                $"PAN={panResult} / TILT={tiltResult} / CMD2=0x4F");
+
+            return panResult &&
+                   tiltResult;
+        }
+
+        /// <summary>
+        /// 전체 연속 속도제어 정지
         /// </summary>
         public bool StopMove()
         {

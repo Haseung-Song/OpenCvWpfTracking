@@ -304,7 +304,7 @@ namespace OpenCvWpfTracking
             object sender,
             KeyEventArgs e)
         {
-            // HOME POSITION 이동 중에는 장비 제어 키 입력 전체를 차단한다.
+            // HOME / ZERO 또는 AUTO SCAN 중에는 장비 제어 키 입력 전체를 차단한다.
             //
             // 차단 범위:
             // - 방향키
@@ -315,10 +315,10 @@ namespace OpenCvWpfTracking
             // - 이후 추가되는 기타 Window 장비 제어 단축키
             //
             // 특정 키만 선별하지 않고 PreviewKeyDown 입구에서 먼저 반환하므로
-            // HOME 진행 중 어떠한 키보드 제어도 장비 명령 함수까지 도달하지 않는다.
-            // 정상 완료/실패/30초 Timeout 후 IsHomePositionMoving=false가 되면
+            // 잠금 진행 중 어떠한 키보드 제어도 장비 명령 함수까지 도달하지 않는다.
+            // 작업 완료/중지 후 IsControlInputLocked=false가 되면
             // 별도 사용자 조작 없이 자동으로 정상 입력 상태로 복귀한다.
-            if (IsHomePositionKeyboardLocked())
+            if (IsControlInputKeyboardLocked())
             {
                 e.Handled =
                     true;
@@ -384,12 +384,12 @@ namespace OpenCvWpfTracking
             object sender,
             KeyEventArgs e)
         {
-            // HOME 진행 중 KeyUp도 함께 소비한다.
+            // HOME / ZERO 또는 AUTO SCAN 진행 중 KeyUp도 함께 소비한다.
             //
             // HOME 시작 전에 눌려 있던 방향키/WASD/Zoom/Focus 키가
             // HOME 완료 뒤 늦게 해제되면서 Stop 또는 방향 전환 명령을
             // 발생시키는 것을 방지한다.
-            if (IsHomePositionKeyboardLocked())
+            if (IsControlInputKeyboardLocked())
             {
                 e.Handled =
                     true;
@@ -425,14 +425,14 @@ namespace OpenCvWpfTracking
         }
 
         /// <summary>
-        /// HOME POSITION 실행 중 키보드 전체 Lock 여부 확인
+        /// HOME / ZERO 또는 AUTO SCAN 실행 중 키보드 전체 Lock 여부 확인
         ///
         /// PreviewKeyDown / PreviewKeyUp이 동일한 조건을 사용하도록
         /// 공통 함수로 관리한다.
         /// </summary>
-        private bool IsHomePositionKeyboardLocked()
+        private bool IsControlInputKeyboardLocked()
         {
-            return vm?.IsHomePositionMoving == true;
+            return vm?.IsControlInputLocked == true;
         }
 
         /// <summary>

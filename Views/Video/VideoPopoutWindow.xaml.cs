@@ -106,6 +106,14 @@ namespace OpenCvWpfTracking
             object sender,
             KeyEventArgs e)
         {
+            if (_viewModel.IsControlInputLocked)
+            {
+                e.Handled =
+                    true;
+
+                return;
+            }
+
             if (IsTextInputFocused())
             {
                 return;
@@ -178,6 +186,7 @@ namespace OpenCvWpfTracking
 
             /*
              * 동시에 여러 렌즈 명령을 보내지 않는다.
+             * 
              * 현재 키를 뗀 뒤 다음 키를 눌러야 새 동작을 시작한다.
              */
             if (_activeLensKey.HasValue)
@@ -202,6 +211,17 @@ namespace OpenCvWpfTracking
             object sender,
             KeyEventArgs e)
         {
+            if (_viewModel.IsControlInputLocked)
+            {
+                _activeLensKey =
+                    null;
+
+                e.Handled =
+                    true;
+
+                return;
+            }
+
             /// <summary>
             /// 분리 창 방향키 해제 처리
             ///
@@ -500,6 +520,11 @@ namespace OpenCvWpfTracking
 
             _activeLensKey =
                 null;
+
+            if (_viewModel.IsControlInputLocked)
+            {
+                return;
+            }
 
             if (_cameraType ==
                 VideoPopoutCameraType.Eo)

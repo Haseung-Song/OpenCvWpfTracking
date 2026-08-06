@@ -301,6 +301,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 /// 더미 탐지 결과를 이용하여 [Overlay] 표시 상태를 확인한다.
                 /// 테스트 완료 후 주석 처리한다.
                 /// </summary>
+                /// 
                 //TestDummyAiDetectionResult();
             }
             finally
@@ -442,6 +443,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             _lastPanAbsoluteTarget =
                 null;
+
+            ClearActivePanTiltAbsoluteMove();
 
             IsPresetScanRunning =
                 false;

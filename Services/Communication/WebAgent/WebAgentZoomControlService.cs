@@ -24,8 +24,7 @@
         /// <summary>
         /// 환경장비 EO / IR을 동일 HFOV 기준으로 이동한다.
         ///
-        /// EO는 표준 Position 0 ~ 1000,
-        /// IR은 계산된 Raw Position 1000(Wide) ~ 0(Tele)을 사용한다.
+        /// EO / IR 모두 Web Agent의 동일 방향 Position 0 ~ 1000을 사용한다.
         /// </summary>
         public bool ApplyFovSynchronizedZoom(
             short eoPosition,
@@ -40,7 +39,7 @@
             bool irResult =
                 _controlCommandService
                     .IrZoomGoPosition(
-                        ConvertIrRawTargetToCommandPosition(
+                        ClampPosition(
                             irRawPosition));
 
             return eoResult &&
@@ -88,52 +87,16 @@
         }
 
         /// <summary>
-        /// FOV 계산 결과인 IR Zoom Raw Position을 적용한다.
-        ///
-        /// 목표 상태 Raw 1000:
-        /// Wide / 약 30mm / HFOV 약 20.5°
-        /// 실제 0x29 명령 Position은 0
-        ///
-        /// 목표 상태 Raw 0:
-        /// Tele / 약 150mm / HFOV 약 4.1°
-        /// 실제 0x29 명령 Position은 1000
+        /// FOV 계산 결과인 IR Zoom Position을 Web Agent에 그대로 적용한다.
+        /// 환경장비는 상태값과 명령값의 방향이 동일하다.
         /// </summary>
         public bool SetIrZoomRawPosition(
             short rawPosition)
         {
             return _controlCommandService
                 .IrZoomGoPosition(
-                    ConvertIrRawTargetToCommandPosition(
+                    ClampPosition(
                         rawPosition));
-        }
-
-        /// <summary>
-        /// IR 상태 Raw 목표값을 0x29 명령 Position으로 변환한다.
-        ///
-        /// 실장비 시험 결과 두 좌표계의 방향이 서로 반대다.
-        ///
-        /// 상태 Raw:
-        /// 1000 = Wide
-        /// 0    = Tele
-        ///
-        /// 명령 Position:
-        /// 0    = Wide
-        /// 1000 = Tele
-        ///
-        /// 예:
-        /// 목표 상태 Raw 999 -> 명령 Position 1
-        /// 목표 상태 Raw 0   -> 명령 Position 1000
-        /// </summary>
-        private static short ConvertIrRawTargetToCommandPosition(
-            short rawTargetPosition)
-        {
-            short safeRawTarget =
-                ClampPosition(
-                    rawTargetPosition);
-
-            return (short)(
-                1000 -
-                safeRawTarget);
         }
 
         private static short ClampPosition(
@@ -148,7 +111,6 @@
             {
                 return 1000;
             }
-
             return position;
         }
 

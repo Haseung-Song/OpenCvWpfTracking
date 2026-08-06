@@ -4,6 +4,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace OpenCvWpfTracking.ViewModels.Main
@@ -202,6 +203,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
         public ICommand StopLaPresetScanCommand { get; }
 
+        public ICommand StopLaPresetMoveCommand { get; }
+
         /// <summary>
         /// 현재 PTZF 위치를 선택 슬롯에 프리셋으로 추가 / 갱신
         /// </summary>
@@ -231,6 +234,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// 프리셋 오토 스캔 정지
         /// </summary>
         public ICommand StopPresetScanCommand { get; }
+
+        public ICommand StopPresetMoveCommand { get; }
+
+        public ICommand StopActivePresetScanCommand { get; }
 
         #endregion
 
@@ -311,6 +318,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// LEVEL 0  = 0
         /// LEVEL 1  = 100
         /// ...
+        /// LEVEL 9  = 900
         /// LEVEL 10 = 1000
         /// </summary>
         public ObservableCollection<ZoomSyncLevelOption> FocusSyncLevelOptions { get; }
@@ -335,6 +343,14 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged(nameof(IsEnvironmentStatusSelected));
                 OnPropertyChanged(nameof(CurrentStatusEquipmentText));
                 OnPropertyChanged(nameof(IsHomeZeroVisible));
+                OnPropertyChanged(nameof(CurrentIrZoomText));
+                OnPropertyChanged(nameof(CurrentIrFocusText));
+                OnPropertyChanged(nameof(RooftopIrZoomStatusText));
+                OnPropertyChanged(nameof(RooftopIrFocusStatusText));
+                OnPropertyChanged(nameof(EnvironmentIrZoomStatusText));
+                OnPropertyChanged(nameof(EnvironmentIrFocusStatusText));
+                OnPropertyChanged(nameof(CurrentLaPresetSnapshotText));
+                OnPropertyChanged(nameof(CurrentPresetSnapshotText));
             }
 
         }
@@ -416,17 +432,115 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 OnPropertyChanged();
                 OnPropertyChanged(
                     nameof(IsMainControlEnabled));
+                OnPropertyChanged(
+                    nameof(IsOperationCommandEnabled));
+                OnPropertyChanged(
+                    nameof(IsPanTiltSpeedControlEnabled));
+                OnPropertyChanged(
+                    nameof(IsControlInputLocked));
+                OnPropertyChanged(
+                    nameof(ControlLockTitle));
+                OnPropertyChanged(
+                    nameof(ControlLockMessage));
             }
 
         }
 
         /// <summary>
-        /// 우측 운용 UI 전체 활성 여부.
-        /// HOME POSITION 이동 중에는 다른 명령이 끼어들지 않도록
-        /// 통신 설정/운용 제어 탭과 내부 버튼을 모두 비활성화한다.
+        /// 우측 상태 확인 UI 활성 여부.
+        /// HOME / ZERO 중에는 기존 전체 잠금을 유지하지만,
+        /// AUTO SCAN 중에는 CURRENT STATUS와 PRESET 화면을 계속 확인할 수 있다.
         /// </summary>
         public bool IsMainControlEnabled =>
             !IsHomePositionMoving;
+
+        /// <summary>
+        /// 실제 장비 명령을 발생시키는 UI 활성 여부.
+        /// HOME / ZERO 및 AUTO SCAN 중에는 키보드와 함께 잠근다.
+        /// </summary>
+        public bool IsOperationCommandEnabled =>
+            !IsControlInputLocked;
+
+        /// <summary>
+        /// 우측 상위 탭 선택 상태.
+        /// PAN / TILT SPEED는 운용 제어 탭에서만 사용할 수 있다.
+        /// </summary>
+        public int SelectedRightPanelTabIndex
+        {
+            get =>
+                _selectedRightPanelTabIndex;
+
+            set
+            {
+                if (_selectedRightPanelTabIndex == value)
+                {
+                    return;
+                }
+
+                _selectedRightPanelTabIndex =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(IsPanTiltSpeedControlEnabled));
+            }
+
+        }
+
+        /// <summary>
+        /// 운용 제어 하위 탭 선택 상태.
+        /// 0번 PTZF 탭에서만 수동 PAN / TILT SPEED를 사용할 수 있다.
+        /// </summary>
+        public int SelectedOperationControlTabIndex
+        {
+            get =>
+                _selectedOperationControlTabIndex;
+
+            set
+            {
+                if (_selectedOperationControlTabIndex == value)
+                {
+                    return;
+                }
+
+                _selectedOperationControlTabIndex =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(IsPanTiltSpeedControlEnabled));
+            }
+
+        }
+
+        /// <summary>
+        /// 상단 PAN / TILT SPEED 슬라이더 활성 여부.
+        /// 수동 PTZF용 속도와 PRESET용 Speed(1 ~ 60)를 명확히 분리한다.
+        /// </summary>
+        public bool IsPanTiltSpeedControlEnabled =>
+            IsOperationCommandEnabled &&
+            SelectedRightPanelTabIndex == 1 &&
+            SelectedOperationControlTabIndex == 0;
+
+        public bool IsPresetScanControlLocked =>
+            IsLaPresetScanRunning ||
+            IsPresetScanRunning;
+
+        public bool IsControlInputLocked =>
+            IsHomePositionMoving ||
+            IsPresetScanControlLocked;
+
+        public string ControlLockTitle =>
+            IsPresetScanControlLocked
+                ? "AUTO SCAN OPERATION"
+                : HomeZeroLockTitle;
+
+        public string ControlLockMessage =>
+            IsLaPresetScanRunning
+                ? "PRESET L AUTO SCAN RUNNING"
+                : IsPresetScanRunning
+                    ? "PRESET W AUTO SCAN RUNNING"
+                    : HomeZeroLockMessage;
 
         /// <summary>
         /// 현재 선택된 Zoom Sync Level
@@ -967,6 +1081,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     value;
 
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsPresetScanControlLocked));
+                OnPropertyChanged(nameof(IsControlInputLocked));
+                OnPropertyChanged(nameof(IsMainControlEnabled));
+                OnPropertyChanged(nameof(IsOperationCommandEnabled));
+                OnPropertyChanged(nameof(IsPanTiltSpeedControlEnabled));
+                OnPropertyChanged(nameof(ControlLockTitle));
+                OnPropertyChanged(nameof(ControlLockMessage));
             }
 
         }
@@ -1226,6 +1347,13 @@ namespace OpenCvWpfTracking.ViewModels.Main
                     value;
 
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsPresetScanControlLocked));
+                OnPropertyChanged(nameof(IsControlInputLocked));
+                OnPropertyChanged(nameof(IsMainControlEnabled));
+                OnPropertyChanged(nameof(IsOperationCommandEnabled));
+                OnPropertyChanged(nameof(IsPanTiltSpeedControlEnabled));
+                OnPropertyChanged(nameof(ControlLockTitle));
+                OnPropertyChanged(nameof(ControlLockMessage));
             }
 
         }
@@ -1775,6 +1903,12 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 _isCrosshairVisible =
                     value;
 
+                if (value)
+                {
+                    _hasCrosshairBeenDisplayed =
+                        true;
+                }
+
                 OnPropertyChanged();
                 OnPropertyChanged(
                     nameof(CrosshairButtonText));
@@ -1790,8 +1924,71 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public string CrosshairButtonText =>
             IsCrosshairVisible
-                ? "CROSSHAIR : ENABLED"
+                ? $"CROSSHAIR : ENABLED ({CrosshairColorName})"
                 : "CROSSHAIR : DISABLED";
+
+        /// <summary>
+        /// EO / IR 메인 화면과 영상 분리 창에 공통 적용되는 십자선 색상.
+        /// </summary>
+        public Brush CrosshairBrush
+        {
+            get =>
+                _crosshairBrush;
+
+            private set
+            {
+                _crosshairBrush =
+                    value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(CrosshairButtonText));
+            }
+
+        }
+
+        public string CrosshairColorName
+        {
+            get
+            {
+                string[] colorNames =
+                {
+                    "RED",
+                    "ORANGE",
+                    "YELLOW",
+                    "GREEN",
+                    "CYAN",
+                    "BLUE",
+                    "PURPLE"
+                };
+                return colorNames[_crosshairColorIndex];
+            }
+
+        }
+
+        /// <summary>
+        /// 십자선을 다시 활성화할 때 사용할 다음 색상으로 전환한다.
+        /// </summary>
+        private void AdvanceCrosshairColor()
+        {
+            _crosshairColorIndex =
+                (_crosshairColorIndex + 1) % 7;
+
+            Color[] colors =
+            {
+                Color.FromRgb(0xFF, 0x3B, 0x30),
+                Color.FromRgb(0xFF, 0x95, 0x00),
+                Color.FromRgb(0xFF, 0xD6, 0x0A),
+                Color.FromRgb(0x34, 0xC7, 0x59),
+                Color.FromRgb(0x32, 0xAD, 0xE6),
+                Color.FromRgb(0x00, 0x7A, 0xFF),
+                Color.FromRgb(0xAF, 0x52, 0xDE)
+            };
+
+            CrosshairBrush =
+                new SolidColorBrush(
+                    colors[_crosshairColorIndex]);
+        }
 
         #endregion
 
@@ -2211,16 +2408,16 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 .ToString();
 
         /// <summary>
-        /// 현재 IR Zoom 표준 위치 표시.
-        /// LA 상태 Raw 방향이 반대이므로 1000 - Raw를 사용한다.
+        /// 현재 장비 구성에 맞춘 IR Zoom 위치 표시.
+        /// LA 상태만 역변환하고 Web Agent 상태는 그대로 표시한다.
         /// </summary>
         public string CurrentIrZoomText =>
             GetCurrentIrZoomStandardPosition()
                 .ToString();
 
         /// <summary>
-        /// 현재 IR Focus 표준 위치 표시.
-        /// LA 상태 Raw 방향이 반대이므로 1000 - Raw를 사용한다.
+        /// 현재 장비 구성에 맞춘 IR Focus 위치 표시.
+        /// LA 상태만 역변환하고 Web Agent 상태는 그대로 표시한다.
         /// </summary>
         public string CurrentIrFocusText =>
             GetCurrentIrFocusStandardPosition()

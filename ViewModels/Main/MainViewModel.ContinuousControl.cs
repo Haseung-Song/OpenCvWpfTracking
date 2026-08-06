@@ -29,7 +29,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public void HandlePanTiltKeyDown(
             Key key)
         {
-            if (IsHomePositionMoving)
+            if (IsControlInputLocked)
             {
                 return;
             }
@@ -70,7 +70,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
         public void HandlePanTiltKeyUp(
             Key key)
         {
-            if (IsHomePositionMoving)
+            if (IsControlInputLocked)
             {
                 ClearKeyboardPanTiltPressedState();
                 _currentKeyboardPanTiltDirection =
@@ -136,9 +136,9 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 return;
             }
 
-            // HOME POSITION 이동 중 Focus 이탈/KeyUp이 발생해도
-            // Stop 명령을 송신하지 않는다. Home 이동을 끊는 것을 방지한다.
-            if (IsHomePositionMoving)
+            // HOME / ZERO 또는 AUTO SCAN 중 Focus 이탈/KeyUp이 발생해도
+            // Stop 명령을 송신하지 않아 진행 중인 동작을 보호한다.
+            if (IsControlInputLocked)
             {
                 return;
             }
@@ -473,6 +473,8 @@ namespace OpenCvWpfTracking.ViewModels.Main
 
             if (protocolSpeed > 0)
             {
+                ClearActivePanTiltAbsoluteMove();
+
                 return true;
             }
 
@@ -750,11 +752,28 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         private void ApplyPanTiltSpeedWhileMoving()
         {
+            if (IsControlInputLocked)
+            {
+                return;
+            }
+
+            // 위치 이동 속도(0x49/0x4B)는 이동 전 설정뿐 아니라
+            // ABSOLUTE 이동 중 Slider 변경에도 즉시 반영한다.
+            if (!ApplyPanTiltPositionSpeedFromUi(
+                    out double positionSpeed))
+            {
+                return;
+            }
+
+            // 장비가 새 위치 속도를 현재 이동에 적용하도록
+            // 진행 중인 ABSOLUTE 목표(0x45/0x47)를 그대로 재송신한다.
+            ReapplyActivePanTiltAbsoluteTarget(
+                positionSpeed);
+
             if (_currentMoveType !=
                     ContinuousMoveType.PanTilt ||
                 _activePanTiltMoveDirection ==
-                    KeyboardPanTiltDirection.None ||
-                IsHomePositionMoving)
+                    KeyboardPanTiltDirection.None)
             {
                 return;
             }
@@ -1958,10 +1977,10 @@ namespace OpenCvWpfTracking.ViewModels.Main
         /// </summary>
         public async void StopContinuousMove()
         {
-            // HOME POSITION 명령 송신 이후 MouseUp/MouseLeave/Focus 이탈로
-            // 공통 Stop이 뒤늦게 들어오면 Home 이동이 중단될 수 있다.
-            // Home Lock 중에는 외부 Stop 요청을 무시한다.
-            if (IsHomePositionMoving)
+            // HOME / ZERO 또는 AUTO SCAN 명령 이후 MouseUp/MouseLeave/Focus 이탈로
+            // 공통 Stop이 뒤늦게 들어오면 진행 중인 동작이 중단될 수 있다.
+            // 제어 Lock 중에는 외부 Stop 요청을 무시한다.
+            if (IsControlInputLocked)
             {
                 return;
             }
@@ -2008,6 +2027,7 @@ namespace OpenCvWpfTracking.ViewModels.Main
                 null;
 
             Console.WriteLine();
+
             Console.WriteLine(
                 $"[CONTROL] MOVE STOP: {moveType}");
 
