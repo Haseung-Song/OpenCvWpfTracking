@@ -154,7 +154,6 @@
                    Margin="0,0,14,10"
                    HorizontalAlignment="Right"
                    VerticalAlignment="Bottom"
-                   Foreground="#7FB3E6"
                    FontSize="16"
                    FontWeight="Bold"
                    IsHitTestVisible="False"/>
