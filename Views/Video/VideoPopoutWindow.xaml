@@ -145,6 +145,47 @@
 
                 </TextBlock>
 
+                <!--
+                    HOME POSITION 중 분리 창 단축키 잠금 안내
+
+                    IsHomePositionMoving은 HOME POSITION뿐만 아니라
+                    PAN ZERO / TILT ZERO 작업에도 공통으로 사용된다.
+
+                    HOME POSITION 실행 중에만 안내 문구가 표시되도록
+                    HomeZeroLockTitle을 함께 확인한다.
+                -->
+                <TextBlock Margin="0,7,0,0"
+                           Text="HOME POSITION 동작 중이므로 키 입력이 비활성화됩니다."
+                           Foreground="#FFFF6B6B"
+                           FontSize="13"
+                           FontWeight="Bold">
+
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsHomePositionMoving}"
+                                                   Value="True"/>
+
+                                        <Condition Binding="{Binding HomeZeroLockTitle}"
+                                                   Value="HOME POSITION"/>
+                                    </MultiDataTrigger.Conditions>
+
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
+
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+
+                </TextBlock>
+
             </StackPanel>
 
         </Border>
