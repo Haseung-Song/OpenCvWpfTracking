@@ -205,6 +205,12 @@
     <Content Include="FFmpeg\swscale-9.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="Images\Demo\BackPanel.png" />
+    <Resource Include="Images\Demo\DefaultRooftopPanorama.jpg" />
+    <Resource Include="Images\Demo\GlobalSystemsLogo.png" />
+    <Resource Include="Images\Demo\GlobalSystemsTacticalMap.png" />
+    <Resource Include="Images\Demo\LogoBlackBackground.png" />
+    <Resource Include="Images\Demo\TorussLogo.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
